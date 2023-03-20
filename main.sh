@@ -37,7 +37,8 @@ step1(sparseGRMFile, sparseGRMSampleIDFile, phenoFile, phenoCol, sampleIDColinph
                         --invNormalize=TRUE \
                         --skipVarianceRatioEstimation=FALSE \
                         --SampleIDIncludeFile $SampleIDIncludeFile \
-                        --includeNonautoMarkersforVarRatio=TRUE
+                        --includeNonautoMarkersforVarRatio=TRUE \
+                        --isCateVarianceRatio=TRUE \
     """
 
     run_container_cmd(CMD, is_singularity)
