@@ -94,9 +94,18 @@ check_container_env(is_singularity){
     }
 }
 
+check_sparse_grm_data(genotypeFileBim, genotypeFileBed, genotypeFileFam, exomeFileBim, exomeFileBed, exomeFileFam){
+    if (genotypeFileBim == "" && genotypeFileBed == "" && genotypeFileFam == "" && exomeFileBim == "" && exomeFileBed == "" && exomeFileFam == ""){
+        print("Error: either genotype plink files or exome plink files are required for sparse GRM")
+        exit(1)
+    }
+}
+
 main(phenoCol, GMMATmodelFile, SAIGEOutputFile, subSampleFile, chrom, bimFile, sparseGRMFile, outputPrefix, qCovarColList, traitType, sparseGRMSampleIDFile, sampleIDColinphenoFile, covarColList, varianceRatioFile, SampleIDIncludeFile, phenoFile, bedFile, famFile, is_singularity){
-    # check if either bimFile or VCF file is provided but not both:
-    check_exome_data(bimFile, bedFile, famFile, vcfFile)
+    # check if either exome plink files or VCF file are provided but not both:
+    check_exome_data(exomeFileBim, exomeFileBed, exomeFileFam vcfFile)
+    # check if either genotype plink files or exome plink files are provided for sparse GRM:
+    check_sparse_grm_data(genotypeFileBim, genotypeFileBed, genotypeFileFam, exomeFileBim, exomeFileBed, exomeFileFam)
     # check if singularity or docker is installed:
     check_container_env(is_singularity)
 
