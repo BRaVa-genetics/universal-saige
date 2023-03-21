@@ -1,3 +1,7 @@
+# Import functions from other scripts:
+. check.sh
+. setup.sh
+
 run_container_cmd(CMD, is_singularity){
     if (is_singularity){
         singularity pull saige.sif docker://wzhou88/saige:1.1.6.3
@@ -68,40 +72,13 @@ step2(bedFile, bimFile, famFile, GMMATmodelFile, varianceRatioFile, sparseGRMFil
     run_container_cmd(CMD, is_singularity)
 }
 
-check_exome_data(bimFile, bedFile, famFile, vcfFile){
-    if (bimFile == "" && bedFile == "" && famFile == "" && vcfFile == ""){
-        print("Error: either plink files or VCF file is required")
-        exit(1)
-    }
-    if (bimFile != "" && bedFile != "" && famFile != "" && vcfFile != ""){
-        print("Error: either plink files or VCF file is required")
-        exit(1)
-    }
-}
+phenoCol, GMMATmodelFile, SAIGEOutputFile, subSampleFile, chrom, bimFile, sparseGRMFile, outputPrefix, qCovarColList, sparseGRMSampleIDFile, sampleIDColinphenoFile, covarColList, varianceRatioFile, SampleIDIncludeFile, phenoFile, bedFile, famFile, is_singularity){
 
-check_container_env(is_singularity){
-    # check if singularity or docker is installed:
-    if (is_singularity){
-        if (system("which singularity") != 0){
-            print("Error: singularity is not installed")
-            exit(1)
-        }
-    } else if (!is_singularity){
-        if (system("which docker") != 0){
-            print("Error: docker is not installed")
-            exit(1)
-        }
-    }
-}
-
-check_sparse_grm_data(genotypeFileBim, genotypeFileBed, genotypeFileFam, exomeFileBim, exomeFileBed, exomeFileFam){
-    if (genotypeFileBim == "" && genotypeFileBed == "" && genotypeFileFam == "" && exomeFileBim == "" && exomeFileBed == "" && exomeFileFam == ""){
-        print("Error: either genotype plink files or exome plink files are required for sparse GRM")
-        exit(1)
-    }
-}
-
-main(phenoCol, GMMATmodelFile, SAIGEOutputFile, subSampleFile, chrom, bimFile, sparseGRMFile, outputPrefix, qCovarColList, traitType, sparseGRMSampleIDFile, sampleIDColinphenoFile, covarColList, varianceRatioFile, SampleIDIncludeFile, phenoFile, bedFile, famFile, is_singularity){
+main(phenoCol, subSampleFile, covarColList, qCovarColList, chrom, # Phenotype+covariate variables
+     GMMATmodelFile, SAIGEOutputFile, sparseGRMFile, outputPrefix, # Where to write files
+     exomeFileBim, exomeFileBed, exomeFileFam, vcfFile, # Exome data
+     genotypeFileBim, genotypeFileBed, genotypeFileFam)  # Genotype data
+{    
     # check if either exome plink files or VCF file are provided but not both:
     check_exome_data(exomeFileBim, exomeFileBed, exomeFileFam vcfFile)
     # check if either genotype plink files or exome plink files are provided for sparse GRM:
