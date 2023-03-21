@@ -38,7 +38,7 @@ step1(sparseGRMFile, sparseGRMSampleIDFile, phenoFile, phenoCol, sampleIDColinph
                         --skipVarianceRatioEstimation=FALSE \
                         --SampleIDIncludeFile $SampleIDIncludeFile \
                         --includeNonautoMarkersforVarRatio=TRUE \
-                        --isCateVarianceRatio=TRUE \
+                        --isCateVarianceRatio=TRUE
     """
 
     run_container_cmd(CMD, is_singularity)
@@ -61,7 +61,7 @@ step2(bedFile, bimFile, famFile, GMMATmodelFile, varianceRatioFile, sparseGRMFil
                     --chrom "$chrom" \
                     --subSampleFile $subSampleFile \
                     --minMAF=0 \
-                    --minMAC=20 \
+                    --minMAC=0.5 \
                     --is_fastTest TRUE \
     """
 
@@ -70,9 +70,9 @@ step2(bedFile, bimFile, famFile, GMMATmodelFile, varianceRatioFile, sparseGRMFil
 
 main(){
     preprocess_step1()
-    step1()
+    step1(sparseGRMFile, sparseGRMSampleIDFile, phenoFile, phenoCol, sampleIDColinphenoFile, covarColList, qCovarColList, bedFile, bimFile, famFile, outputPrefix, traitType, SampleIDIncludeFile, is_singularity)
     preprocess_step2()
-    step2()
+    step2(bedFile, bimFile, famFile, GMMATmodelFile, varianceRatioFile, sparseGRMFile, sparseGRMSampleIDFile, SAIGEOutputFile, chrom, subSampleFile, is_singularity)
 }
 
-main()
+main(phenoCol, GMMATmodelFile, SAIGEOutputFile, subSampleFile, chrom, bimFile, sparseGRMFile, outputPrefix, qCovarColList, traitType, sparseGRMSampleIDFile, sampleIDColinphenoFile, covarColList, varianceRatioFile, SampleIDIncludeFile, phenoFile, bedFile, famFile, is_singularity)
