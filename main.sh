@@ -4,8 +4,11 @@
 
 run_container_cmd(CMD, is_singularity){
     if (is_singularity){
-        singularity pull saige.sif docker://wzhou88/saige:1.1.6.3
-        singularity run saige.sif $CMD
+        # check if saige.sif exists:
+        if (!file.exists("saige.sif"))
+            singularity pull saige-1.1.6.3.sif docker://wzhou88/saige:1.1.6.3
+
+        singularity run saige-1.1.6.3 $CMD
 
     } else if (!is_singularity){
         docker pull wzhou88/saige:1.1.6.3
