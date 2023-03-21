@@ -68,7 +68,38 @@ step2(bedFile, bimFile, famFile, GMMATmodelFile, varianceRatioFile, sparseGRMFil
     run_container_cmd(CMD, is_singularity)
 }
 
-main(){
+check_exome_data(bimFile, bedFile, famFile, vcfFile){
+    if (bimFile == "" && bedFile == "" && famFile == "" && vcfFile == ""){
+        print("Error: either plink files or VCF file is required")
+        exit(1)
+    }
+    if (bimFile != "" && bedFile != "" && famFile != "" && vcfFile != ""){
+        print("Error: either plink files or VCF file is required")
+        exit(1)
+    }
+}
+
+check_container_env(is_singularity){
+    # check if singularity or docker is installed:
+    if (is_singularity){
+        if (system("which singularity") != 0){
+            print("Error: singularity is not installed")
+            exit(1)
+        }
+    } else if (!is_singularity){
+        if (system("which docker") != 0){
+            print("Error: docker is not installed")
+            exit(1)
+        }
+    }
+}
+
+main(phenoCol, GMMATmodelFile, SAIGEOutputFile, subSampleFile, chrom, bimFile, sparseGRMFile, outputPrefix, qCovarColList, traitType, sparseGRMSampleIDFile, sampleIDColinphenoFile, covarColList, varianceRatioFile, SampleIDIncludeFile, phenoFile, bedFile, famFile, is_singularity){
+    # check if either bimFile or VCF file is provided but not both:
+    check_exome_data(bimFile, bedFile, famFile, vcfFile)
+    # check if singularity or docker is installed:
+    check_container_env(is_singularity)
+
     preprocess_step1()
     step1(sparseGRMFile, sparseGRMSampleIDFile, phenoFile, phenoCol, sampleIDColinphenoFile, covarColList, qCovarColList, bedFile, bimFile, famFile, outputPrefix, traitType, SampleIDIncludeFile, is_singularity)
     preprocess_step2()
