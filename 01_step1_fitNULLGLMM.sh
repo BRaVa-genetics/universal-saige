@@ -1,7 +1,7 @@
 #!/bin/bash
-# 01_saige_fit_null
+
 source ./setup.sh
-. check.sh
+source ./check.sh
 
 POSITIONAL_ARGS=()
 
