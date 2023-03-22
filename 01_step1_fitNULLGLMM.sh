@@ -72,12 +72,12 @@ while [[ $# -gt 0 ]]; do
       CATEGCOVARCOLLIST="$2"
       shift # past argument
       shift # past value
-    ;;
+      ;;
     -i|--sampleIDCol)
       SAMPLEIDCOL="$2"
       shift # past argument
       shift # past value
-    ;;
+      ;;
     -h|--help)
       echo "usage: 01_step1_fitNULLGLMM.sh
   required:
@@ -147,12 +147,10 @@ fi
 
 if [[ $COVARCOLLIST = "" ]]; then
   echo "Warning: no continuous fixed effeect covariates included."
-  OUT="${PHENOCOL}"
 fi
 
 if [[ $CATEGCOVARCOLLIST = "" ]]; then
   echo "Warning: no categorical fixed effeect covariates included."
-  OUT="${PHENOCOL}"
 fi
 
 echo "OUT               = ${OUT}"
@@ -184,7 +182,6 @@ set -exo pipefail
 
 ## Set up directories
 WD=$( pwd )
-mkdir -p out/{model_file,variance_ratios}
 
 # Get number of threads
 n_threads=$(( $(nproc --all) - 1 ))
@@ -201,44 +198,42 @@ if [[ ${SINGULARITY} = true ]]; then
     --env HOME=${WD} \
     --bind ${WD}/:$HOME/ \
     "saige-${saige_version}.sif" step1_fitNULLGLMM.R \
-      --bedFile ${HOME}/in/plink_for_vr_bed/${PLINK}.bed \
-      --bimFile ${HOME}/in/plink_for_vr_bim/${PLINK}.bim \
-      --famFile ${HOME}/in/plink_for_vr_fam/${PLINK}.fam \
+      --bedFile ${HOME}/in/plink_vr/${PLINK}.bed \
+      --bimFile ${HOME}/in/plink_vr/${PLINK}.bim \
+      --famFile ${HOME}/in/plink_vr/${PLINK}.fam \
       --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
-      --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID}  \
-      --useSparseGRMtoFitNULL=TRUE  \
+      --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
+      --useSparseGRMtoFitNULL=TRUE \
       --phenoFile ${HOME}/in/pheno_files/${PHENOFILE} \
       --skipVarianceRatioEstimation FALSE \
       --phenoCol "${PHENOCOL}" \
       --covarColList "${COVARCOLLIST}" \
-      --qCovarColList="${CATEGCOVARCOLLIST}"  \
+      --qCovarColList="${CATEGCOVARCOLLIST}" \
       --sampleIDColinphenoFile=${IDCOL} \
       ${trait_flags} \
       --outputPrefix="${HOME}/${OUT}" \
       --IsOverwriteVarianceRatioFile=TRUE \
       --nThreads=${n_threads} \
       --isCateVarianceRatio=TRUE
-
 else
-  # Run script
   docker run \
-    -e HOME=${WD}  \
+    -e HOME=${WD} \
     -v ${WD}/:$HOME/ \
-    "wzhou88/saige:${saige_version}" step1_fitNULLGLMM.R  \
-      --bedFile ${HOME}/in/plink_for_vr_bed/${PLINK}.bed \
-      --bimFile ${HOME}/in/plink_for_vr_bim/${PLINK}.bim \
-      --famFile ${HOME}/in/plink_for_vr_fam/${PLINK}.fam \
+    "wzhou88/saige:${saige_version}" step1_fitNULLGLMM.R \
+      --bedFile ${HOME}/in/plink_vr/${PLINK}.bed \
+      --bimFile ${HOME}/in/plink_vr/${PLINK}.bim \
+      --famFile ${HOME}/in/plink_vr/${PLINK}.fam \
       --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
       --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
-      --useSparseGRMtoFitNULL=TRUE  \
+      --useSparseGRMtoFitNULL=TRUE \
       --phenoFile ${HOME}/in/pheno_files/${PHENOFILE} \
       --skipVarianceRatioEstimation FALSE \
-      --phenoCol "${pheno_col}" \
-      --covarColList "${covar_col_list}" \
-      --qCovarColList="${qcovar_col_list}"  \
-      --sampleIDColinphenoFile="IID" \
+      --phenoCol "${PHENOCOL}" \
+      --covarColList "${COVARCOLLIST}" \
+      --qCovarColList="${CATEGCOVARCOLLIST}" \
+      --sampleIDColinphenoFile=${IDCOL} \
       ${trait_flags} \
-      --outputPrefix="${HOME}/${output_prefix}" \
+      --outputPrefix="${HOME}/${OUT}" \
       --IsOverwriteVarianceRatioFile=TRUE \
       --nThreads=${n_threads} \
       --isCateVarianceRatio=TRUE
