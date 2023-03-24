@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-    -p|--plink)
+    --plink)
       PLINK="$2"
       shift # past argument
       shift # past value
@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-    -p|-phenoFile)
+    --phenoFile)
       PHENOFILE="$2"
       shift # past argument
       shift # past value
@@ -188,12 +188,16 @@ n_threads=$(( $(nproc --all) - 1 ))
 
 # Get inverse-normalize flag if trait_type=="quantitative"
 if [[ ${TRAITTYPE} == "quantitative" ]]; then
-  trait_flags="--traitType=${trait_type} --invNormalize=TRUE"
+  trait_flags="--traitType=${TRAITTYPE} --invNormalize=TRUE"
 else
-  trait_flags="--traitType=${trait_type}"
+  trait_flags="--traitType=${TRAITTYPE}"
 fi
 
 if [[ ${SINGULARITY} = true ]]; then
+  singularity exec \
+     --env HOME=${WD} \
+     --bind ${WD}/:$HOME/ \
+     "saige-${saige_version}.sif" file ${HOME}/in/pheno_files/${PHENOFILE} 
   singularity exec \
     --env HOME=${WD} \
     --bind ${WD}/:$HOME/ \
@@ -206,9 +210,9 @@ if [[ ${SINGULARITY} = true ]]; then
       --useSparseGRMtoFitNULL=TRUE \
       --phenoFile ${HOME}/in/pheno_files/${PHENOFILE} \
       --skipVarianceRatioEstimation FALSE \
-      --phenoCol "${PHENOCOL}" \
-      --covarColList "${COVARCOLLIST}" \
-      --qCovarColList="${CATEGCOVARCOLLIST}" \
+      --phenoCol ""${PHENOCOL}"" \
+      --covarColList ""${COVARCOLLIST}"" \
+      --qCovarColList=""${CATEGCOVARCOLLIST}"" \
       --sampleIDColinphenoFile=${IDCOL} \
       ${trait_flags} \
       --outputPrefix="${HOME}/${OUT}" \
@@ -237,3 +241,4 @@ else
       --IsOverwriteVarianceRatioFile=TRUE \
       --nThreads=${n_threads} \
       --isCateVarianceRatio=TRUE
+fi
