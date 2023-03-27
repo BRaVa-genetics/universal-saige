@@ -2,7 +2,6 @@
 
 source ./setup.sh
 source ./check.sh
-source ./saige_construct.sh
 
 POSITIONAL_ARGS=()
 
@@ -17,14 +16,6 @@ SPARSEGRM=""
 SPARSEGRMID=""
 GROUPFILE=""
 
-variant_or_group
-  echo "Running variant based tests for all variants in with MAC > 20"
-        "saige-${saige_version}.sif" step2_SPAtests.R \
-        --GMMATmodelFile ${HOME}/in/model_file/${MODELFILE} \
-        --varianceRatioFile ${HOME}/in/variance_ratios/${VARIANCERATIO} \
-        --groupFile ${HOME}/in/${GROUPFILE} \
-
-
 while [[ $# -gt 0 ]]; do
   case $1 in
     -o|--outputPrefix)
@@ -34,7 +25,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --testType)
       TESTTYPE="$2"
-      if ! ( [[ ${TRAITTYPE} = "variant" ]] || [[ ${TRAITTYPE} = "group" ]] ); then
+      if ! ( [[ ${TESTTYPE} = "variant" ]] || [[ ${TESTTYPE} = "group" ]] ); then
         echo "Test type is not in {variant,group}"
         exit 1
       fi
@@ -197,13 +188,22 @@ else
   groupFile="${HOME}/in/${GROUPFILE}"
 fi
 
-if [[ ${PLINK} != "" ]] then
-  PLINK=
+if [[ ${PLINK} != "" ]]; then
+  PLINK="${HOME}/${PLINK}"
   VCF=""
+elif [[ ${VCF} != "" ]]; then 
+  PLINK=""
+  VCF="${HOME}/${VCF}"
+else
+  echo "No plink or vcf found!"
+  exit 1
 fi
 
 cmd="""step2_SPAtests.R \
-        --plink ${PLINK} \
+        --bedFile "${PLINK}.bed" \
+        --bimFile "${PLINK}.bim" \
+        --famFile "${PLINK}.fam" \
+		--vcfFile ${VCF} \
         --minMAF=0 \
         --minMAC=${min_mac} \
         --GMMATmodelFile ${HOME}/${MODELFILE} \
