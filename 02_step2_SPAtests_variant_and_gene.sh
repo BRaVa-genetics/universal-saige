@@ -2,6 +2,7 @@
 
 source ./setup.sh
 source ./check.sh
+source ./saige_construct.sh
 
 POSITIONAL_ARGS=()
 
@@ -121,10 +122,6 @@ if [[ ${PLINK} == "" ]] && [[ ${VCF} == "" ]]; then
   exit 1
 fi
 
-if [[ ${PLINK} != "" ]] && [[ ${VCF} != "" ]]; then
-  echo "Both plink and VCF files given. Defaulting to using the plink files."
-  VCF=""
-fi
 if [[ ${SPARSEGRM} == "" ]]; then
   echo "sparse GRM .mtx file not set"
   exit 1
@@ -191,101 +188,53 @@ set -exo pipefail
 ## Set up directories
 WD=$( pwd )
 
+
 if [[ "$test_type" = "variant" ]]; then
-  echo "Running variant based tests for all variants in with MAC > 20"
-  if [[ ${SINGULARITY} = true ]]; then
-    singularity exec \
-      --env HOME=${WD} \
-      --bind ${WD}/:$HOME/ \
-      "saige-${saige_version}.sif" step2_SPAtests.R \
-        --bedFile ${HOME}/in/plink_exome/${PLINK}.bed \
-        --bimFile ${HOME}/in/plink_exome/${PLINK}.bim \
-        --famFile ${HOME}/in/plink_exome/${PLINK}.fam \
-        --minMAF=0 \
-        --minMAC=20 \
-        --GMMATmodelFile ${HOME}/${MODELFILE} \
-        --varianceRatioFile ${HOME}/${VARIANCERATIO} \
-        --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
-        --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
-        --LOCO=FALSE \
-        --is_Firth_beta=TRUE \
-        --pCutoffforFirth=0.1 \
-        --is_output_moreDetails=TRUE \
-        --is_fastTest=TRUE \
-        --SAIGEOutputFile=${HOME}/${OUT}_variant.tsv
-  else
-    # Check --AlleleOrder=ref-first
-    docker run \
-      -e HOME=${WD} \
-      -v ${WD}/:$HOME/ \
-      "wzhou88/saige:${saige_version}" step2_SPAtests.R \
-        --bedFile ${HOME}/in/plink_exome/${PLINK}.bed \
-        --bimFile ${HOME}/in/plink_exome/${PLINK}.bim \
-        --famFile ${HOME}/in/plink_exome/${PLINK}.fam \
-        --minMAF=0 \
-        --minMAC=20 \
-        --GMMATmodelFile ${HOME}/${MODELFILE} \
-        --varianceRatioFile ${HOME}/${VARIANCERATIO} \
-        --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
-        --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
-        --LOCO=FALSE \
-        --is_Firth_beta=TRUE \
-        --pCutoffforFirth=0.1 \
-        --is_output_moreDetails=TRUE \
-        --is_fastTest=TRUE \
-        --SAIGEOutputFile=${HOME}/${OUT}_variant.tsv
-  fi
+  min_mac=0.5
+  groupFile=""
 else
-    echo '''Running gene based tests and variant based tests for all variants present in the annotations.
-    This includes the collapsed variants in the set-based tests'''
-    if [[ ${SINGULARITY} = true ]]; then
-      singularity exec \
-        --env HOME=${WD} \
-        --bind ${WD}/:$HOME/ \
-        "saige-${saige_version}.sif" step2_SPAtests.R \
-        --bedFile ${HOME}/in/plink_exome/${PLINK}.bed \
-        --bimFile ${HOME}/in/plink_exome/${PLINK}.bim \
-        --famFile ${HOME}/in/plink_exome/${PLINK}.fam \
-        --minMAF=0 \
-        --minMAC=0.5 \
-        --GMMATmodelFile ${HOME}/${MODELFILE} \
-        --varianceRatioFile ${HOME}/${VARIANCERATIO} \
-        --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
-        --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
-        --LOCO=FALSE \
-        --groupFile ${HOME}/in/${GROUPFILE} \
-        --annotation_in_groupTest="pLoF,damaging_missense,other_missense,synonymous,pLoF:damaging_missense,pLoF:damaging_missense:other_missense:synonymous" \
-        --maxMAF_in_groupTest=0.0001,0.001,0.01 \
-        --is_output_markerList_in_groupTest=TRUE \
-        --is_single_in_groupTest=TRUE \
-        --is_Firth_beta=TRUE \
-        --pCutoffforFirth=0.1 \
-        --is_fastTest=TRUE \
-        --SAIGEOutputFile=${HOME}/${OUT}_variant_and_group.tsv
-fi
-    # Check --AlleleOrder=ref-first
-    docker run \
-      -e HOME=${WD} \
-      -v ${WD}/:$HOME/ \
-      "wzhou88/saige:${saige_version}" step2_SPAtests.R \
-        --bedFile ${HOME}/in/plink_exome/${PLINK}.bed \
-        --bimFile ${HOME}/in/plink_exome/${PLINK}.bim \
-        --famFile ${HOME}/in/plink_exome/${PLINK}.fam \
-        --minMAF=0 \
-        --minMAC=0.5 \
-        --GMMATmodelFile ${HOME}/${MODELFILE} \
-        --varianceRatioFile ${HOME}/${VARIANCERATIO} \
-        --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
-        --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
-        --LOCO=FALSE \
-        --groupFile ${HOME}/in/${GROUPFILE} \
-        --annotation_in_groupTest="pLoF,damaging_missense,other_missense,synonymous,pLoF:damaging_missense,pLoF:damaging_missense:other_missense:synonymous" \
-        --maxMAF_in_groupTest=0.0001,0.001,0.01 \
-        --is_output_markerList_in_groupTest=TRUE \
-        --is_single_in_groupTest=TRUE \
-        --is_Firth_beta=TRUE \
-        --pCutoffforFirth=0.1 \
-        --is_fastTest=TRUE \
-        --SAIGEOutputFile=${HOME}/${OUT}_variant_and_group.tsv
+  min_mac=20
+  groupFile="${HOME}/in/${GROUPFILE}"
 fi
 
+if [[ ${PLINK} != "" ]] then
+  PLINK=
+  VCF=""
+fi
+
+cmd="""step2_SPAtests.R \
+        --plink ${PLINK} \
+        --minMAF=0 \
+        --minMAC=${min_mac} \
+        --GMMATmodelFile ${HOME}/${MODELFILE} \
+        --varianceRatioFile ${HOME}/${VARIANCERATIO} \
+        --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
+        --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
+        --LOCO=FALSE \
+        --is_Firth_beta=TRUE \
+        --pCutoffforFirth=0.1 \
+        --is_output_moreDetails=TRUE \
+        --is_fastTest=TRUE \
+        --groupFile ${groupFile} \
+        --is_output_markerList_in_groupTest=TRUE \
+        --is_single_in_groupTest=TRUE \
+        --SAIGEOutputFile=${HOME}/${OUT}_variant.tsv
+    """
+
+echo "Running variant based tests for all variants in with MAC > 20"
+
+if [[ ${SINGULARITY} = true ]]; then
+  singularity exec \
+    --env HOME=${WD} \
+    --bind ${WD}/:$HOME/ \
+    "saige-${saige_version}.sif" $cmd
+else
+  echo '''Running gene based tests and variant based tests for all variants present in the annotations.
+  This includes the collapsed variants in the set-based tests'''
+
+  # Check --AlleleOrder=ref-first
+  docker run \
+    -e HOME=${WD} \
+    -v ${WD}/:$HOME/ \
+    "wzhou88/saige:${saige_version}" $cmd
+fi
