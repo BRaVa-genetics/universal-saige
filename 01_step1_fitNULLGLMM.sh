@@ -213,7 +213,7 @@ if [[ ${SINGULARITY} = true ]]; then
       --phenoCol ""${PHENOCOL}"" \
       --covarColList ""${COVARCOLLIST}"" \
       --qCovarColList=""${CATEGCOVARCOLLIST}"" \
-      --sampleIDColinphenoFile=${IDCOL} \
+      --sampleIDColinphenoFile=${SAMPLEIDCOL} \
       ${trait_flags} \
       --outputPrefix="${HOME}/${OUT}" \
       --IsOverwriteVarianceRatioFile=TRUE \
@@ -235,7 +235,7 @@ else
       --phenoCol "${PHENOCOL}" \
       --covarColList "${COVARCOLLIST}" \
       --qCovarColList="${CATEGCOVARCOLLIST}" \
-      --sampleIDColinphenoFile=${IDCOL} \
+      --sampleIDColinphenoFile=${SAMPLEIDCOL} \
       ${trait_flags} \
       --outputPrefix="${HOME}/${OUT}" \
       --IsOverwriteVarianceRatioFile=TRUE \
