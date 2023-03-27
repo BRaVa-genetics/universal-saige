@@ -9,6 +9,7 @@ SINGULARITY=false
 OUT="out"
 TESTTYPE=""
 PLINK=""
+VCF=""
 MODELFILE=""
 VARIANCERATIO=""
 SPARSEGRM=""
@@ -49,6 +50,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+	--vcf)
+	  VCF="$2"
+      shift # past argument
+      shift # past value
+      ;;
     -m|--modelFile)
       MODELFILE="$2"
       shift # past argument
@@ -79,6 +85,7 @@ while [[ $# -gt 0 ]]; do
   required:
     --testType: type of test {variant,group}.
     -p,--plink: plink filename prefix of bim/bed/fam files. These must be present in the working directory at ./in/plink_for_vr_bed/
+    --vcf vcf exome file. If a plink exome file is not available then this vcf file will be used. These must be present in the working directory at ./in/vcf/
     --modelFile: filename of the model file output from step 1. This must be in relation to the working directory.
     --varianceRatio: filename of the varianceRatio file output from step 1. This must be in relation to the working directory.
     --sparseGRM: filename of the sparseGRM .mtx file. This must be present in the working directory at ./in/sparse_grm/
@@ -109,11 +116,15 @@ if [[ ${TESTTYPE} == "" ]]; then
   exit 1
 fi
 
-if [[ ${PLINK} == "" ]]; then
-  echo "plink files plink.{bim,bed,fam} not set"
+if [[ ${PLINK} == "" ]] && [[ ${VCF} == "" ]]; then
+  echo "plink files plink.{bim,bed,fam} and vcf not set"
   exit 1
 fi
 
+if [[ ${PLINK} != "" ]] && [[ ${VCF} != "" ]]; then
+  echo "Both plink and VCF files given. Defaulting to using the plink files."
+  VCF=""
+fi
 if [[ ${SPARSEGRM} == "" ]]; then
   echo "sparse GRM .mtx file not set"
   exit 1

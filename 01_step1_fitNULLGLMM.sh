@@ -195,10 +195,6 @@ fi
 
 if [[ ${SINGULARITY} = true ]]; then
   singularity exec \
-     --env HOME=${WD} \
-     --bind ${WD}/:$HOME/ \
-     "saige-${saige_version}.sif" file ${HOME}/in/pheno_files/${PHENOFILE} 
-  singularity exec \
     --env HOME=${WD} \
     --bind ${WD}/:$HOME/ \
     "saige-${saige_version}.sif" step1_fitNULLGLMM.R \
