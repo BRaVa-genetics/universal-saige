@@ -193,11 +193,7 @@ else
   trait_flags="--traitType=${TRAITTYPE}"
 fi
 
-if [[ ${SINGULARITY} = true ]]; then
-  singularity exec \
-    --env HOME=${WD} \
-    --bind ${WD}/:$HOME/ \
-    "saige-${saige_version}.sif" step1_fitNULLGLMM.R \
+cmd="""step1_fitNULLGLMM.R \
       --bedFile ${HOME}/in/plink_vr/${PLINK}.bed \
       --bimFile ${HOME}/in/plink_vr/${PLINK}.bim \
       --famFile ${HOME}/in/plink_vr/${PLINK}.fam \
@@ -214,27 +210,16 @@ if [[ ${SINGULARITY} = true ]]; then
       --outputPrefix="${HOME}/${OUT}" \
       --IsOverwriteVarianceRatioFile=TRUE \
       --nThreads=${n_threads} \
-      --isCateVarianceRatio=TRUE
+      --isCateVarianceRatio=TRUE"""
+
+if [[ ${SINGULARITY} = true ]]; then
+  singularity exec \
+    --env HOME=${WD} \
+    --bind ${WD}/:$HOME/ \
+    "saige-${saige_version}.sif" $cmd
 else
   docker run \
     -e HOME=${WD} \
     -v ${WD}/:$HOME/ \
-    "wzhou88/saige:${saige_version}" step1_fitNULLGLMM.R \
-      --bedFile ${HOME}/in/plink_vr/${PLINK}.bed \
-      --bimFile ${HOME}/in/plink_vr/${PLINK}.bim \
-      --famFile ${HOME}/in/plink_vr/${PLINK}.fam \
-      --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
-      --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
-      --useSparseGRMtoFitNULL=TRUE \
-      --phenoFile ${HOME}/in/pheno_files/${PHENOFILE} \
-      --skipVarianceRatioEstimation FALSE \
-      --phenoCol "${PHENOCOL}" \
-      --covarColList "${COVARCOLLIST}" \
-      --qCovarColList="${CATEGCOVARCOLLIST}" \
-      --sampleIDColinphenoFile=${SAMPLEIDCOL} \
-      ${trait_flags} \
-      --outputPrefix="${HOME}/${OUT}" \
-      --IsOverwriteVarianceRatioFile=TRUE \
-      --nThreads=${n_threads} \
-      --isCateVarianceRatio=TRUE
+    "wzhou88/saige:${saige_version}" $cmd
 fi
