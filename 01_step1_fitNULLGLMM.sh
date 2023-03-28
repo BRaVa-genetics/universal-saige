@@ -17,7 +17,7 @@ PHENOCOL=""
 COVARCOLLIST=""
 CATEGCOVARCOLLIST=""
 
-run_container(){
+run_container () {
   if [[ ${SINGULARITY} = true ]]; then
     singularity exec \
       --env HOME=${WD} \
@@ -35,70 +35,70 @@ generate_GRM(){
 
   # download plink binary to resources:
   wget https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20230116.zip -P resources/
-  unzip resources/plink_linux_x86_64_20230116.zip -d resources/
+  unzip -o resources/plink_linux_x86_64_20230116.zip -d resources/
 
   ./resources/plink \
     --bfile "${GENOTYPE_PLINK}" \
-    --keep ${SAMPLEIDS} \
+    --keep <(awk '{ print $1,$1 }' ${SAMPLEIDS}) \
     --indep-pairwise 50 5 0.05 \
-    --out "${out}"
+    --out "${OUT}"
 
   # Extract set of pruned variants and export to bfile
   ./resources/plink \
     --bfile "${GENOTYPE_PLINK}" \
-    --keep ${SAMPLEIDS} \
-    --extract "${out}.prune.in" \
+    --keep <(awk '{ print $1,$1 }' ${SAMPLEIDS})\
+    --extract "${OUT}.prune.in" \
     --make-bed \
-    --out "${out}"
+    --out "${OUT}"
 
-  cmd = "createSparseGRM.R \
+  cmd="createSparseGRM.R \
     --plinkFile=${GENOTYPE_PLINK} \
     --nThreads=$(nproc) \
-    --outputPrefix=${out} \
+    --outputPrefix=${OUT} \
     --numRandomMarkerforSparseKin=5000 \
     --relatednessCutoff=0.05"
 
-  run_container()
+  run_container
   
-  SPARSEGRM="${out}.sparseGRM.mtx"
-  SPARSEGRMID="${out}.sparseGRM.mtx.sampleIDs.txt"
+  SPARSEGRM="${OUT}.sparseGRM.mtx"
+  SPARSEGRMID="${OUT}.sparseGRM.mtx.sampleIDs.txt"
 
 }
 
 generate_plink_for_vr(){
 
   wget https://s3.amazonaws.com/plink2-assets/plink2_linux_x86_64_20230325.zip -P resources/
-  unzip resources/plink2_linux_x86_64_20230325.zip -d resources/
+  unzip -o resources/plink2_linux_x86_64_20230325.zip -d resources/
 
   #1. Calculate allele counts for each marker in the large PLINK file with hard called genotypes
 
   ./resources/plink2 \
-    --keep ${SAMPLEIDS} ) \
+    --keep <(awk '{ print $1,$1 }' ${SAMPLEIDS})  \
     --bfile "${GENOTYPE_PLINK}" \
     --freq counts \
-    --out "${out}"
+    --out "${OUT}"
 
   #2. Randomly extract IDs for markers falling in the two MAC categories:
   # * 1,000 markers with 10 <= MAC < 20
   # * 1,000 markers with MAC >= 20
 
   cat <(
-    tail -n +2 "${out}.acount" \
+    tail -n +2 "${OUT}.acount" \
     | awk '(($6-$5) < 20 && ($6-$5) >= 10) || ($5 < 20 && $5 >= 10) {print $2}' \
     | shuf -n 1000 ) \
   <( \
-    tail -n +2 "${out}.acount" \
+    tail -n +2 "${OUT}.acount" \
     | awk ' $5 >= 20 && ($6-$5)>= 20 {print $2}' \
     | shuf -n 1000 \
-    ) > "${out}.markerid.list"
+    ) > "${OUT}.markerid.list"
 
   # Make sure to still subset to Europeans
   ./resources/plink2 \
     --bfile "${GENOTYPE_PLINK}" \
-    --keep ${SAMPLEIDS}\
-    --extract "${out}.markerid.list" \
+    --keep <(awk '{ print $1,$1 }' ${SAMPLEIDS}) \
+    --extract "${OUT}.markerid.list" \
     --make-bed \
-    --out "${out}"
+    --out "${OUT}"
 
 }
 
@@ -123,18 +123,8 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-    --wesPlink)
-      WES_PLINK="$2"
-      shift # past argument
-      shift # past value
-      ;;
     --genotypePlink)
       GENOTYPE_PLINK="$2"
-      shift # past argument
-      shift # past value
-      ;;
-    --wesVCF)
-      WES_VCF="$2"
       shift # past argument
       shift # past value
       ;;
@@ -168,7 +158,7 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-    --sampleIDs
+    --sampleIDs)
       SAMPLEIDS="$2" 
       shift
       shift
@@ -215,18 +205,16 @@ if [[ ${TRAITTYPE} == "" ]]; then
   exit 1
 fi
 
-if [[ ${WES_PLINK} == "" & ${WES_VCF} == "" ]]; then
-  echo "WES plink files plink.{bim,bed,fam} and VCF not set"
-fi
-
-if [[ ${GENOTYPE_PLINK} == "" ]]; then
-  echo "Genotype plink files plink.{bim,bed,fam} not set"
-  exit 1
-fi
-
 if [[ ${SPARSEGRM} == "" || ${SPARSEGRMID} == "" ]]; then
   echo "Sparse GRM .mtx file not set. Generating sparse GRM from genotype or exome sequence data."
-  generate_GRM()
+  
+  if [[ ${GENOTYPE_PLINK} == "" ]]; then
+    echo "Genotype plink files plink.{bim,bed,fam} not set - cannot generate GRM!"
+    exit 1
+  fi
+
+  generate_GRM
+
 fi
 
 if [[ ${PHENOFILE} == "" ]]; then
@@ -266,9 +254,9 @@ echo "SAMPLEIDCOL       = ${SAMPLEIDCOL}"
 
 check_container_env $SINGULARITY
 
-if [[ ${SINGULARITY} = true || !(test -f "saige-${saige_version}.sif") ]]; then
+if [[ ${SINGULARITY} = true || ! $( test -f "saige-${saige_version}.sif" ) ]]; then
   singularity pull "saige-${saige_version}.sif" "docker://wzhou88/saige:${saige_version}"
-elif [[ ${SINGULARITY} = false || !(test -f "saige-${saige_version}.sif") ]]; then
+elif [[ ${SINGULARITY} = false || ! $( test -f "saige-${saige_version}.sif" ) ]]; then
   docker pull wzhou88/saige:${saige_version}
 fi
 
@@ -289,10 +277,8 @@ else
 fi
 
 cmd="""step1_fitNULLGLMM.R \
-      --bedFile ${HOME}/in/plink_vr/${PLINK}.bed \
-      --bimFile ${HOME}/in/plink_vr/${PLINK}.bim \
-      --famFile ${HOME}/in/plink_vr/${PLINK}.fam \
-      --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
+      --plinkFile "${HOME}/${OUT}" \
+	  --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
       --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
       --useSparseGRMtoFitNULL=TRUE \
       --phenoFile ${HOME}/in/pheno_files/${PHENOFILE} \
@@ -303,10 +289,9 @@ cmd="""step1_fitNULLGLMM.R \
       --covarColList ""${COVARCOLLIST}"" \
       --qCovarColList=""${CATEGCOVARCOLLIST}"" \
       --sampleIDColinphenoFile=${SAMPLEIDCOL} \
-      ${trait_flags} \
       --outputPrefix="${HOME}/${OUT}" \
       --IsOverwriteVarianceRatioFile=TRUE \
       --nThreads=${n_threads} \
       --isCateVarianceRatio=TRUE"""
 
-run_container()
+run_container
