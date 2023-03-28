@@ -62,6 +62,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --subSampleFile)
+      SUBSAMPLES="$2"
+      shift # past argument
+      shift # past value
+      ;;
     --sparseGRM)
       SPARSEGRM="$2"
       shift # past argument
@@ -104,7 +109,7 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 # Checks
 if [[ ${TESTTYPE} == "" ]]; then
-  echo "traitType not set"
+  echo "Test type not set"
   exit 1
 fi
 
@@ -180,53 +185,62 @@ set -exo pipefail
 WD=$( pwd )
 
 
-if [[ "$test_type" = "variant" ]]; then
+if [[ "$TESTTYPE" = "variant" ]]; then
+  echo "variant testing"
   min_mac=0.5
-  groupFile=""
+  GROUPFILE=""
 else
+  echo "gene testing"
   min_mac=20
-  groupFile="${HOME}/in/${GROUPFILE}"
+  GROUPFILE="${HOME}/in/${GROUPFILE}"
 fi
 
 if [[ ${PLINK} != "" ]]; then
   PLINK="${HOME}/${PLINK}"
+  BED=${PLINK}".bed"
+  BIM=${PLINK}".bim"
+  FAM=${PLINK}".fam"
   VCF=""
 elif [[ ${VCF} != "" ]]; then 
-  PLINK=""
+  BED=""
+  BIM=""
+  FAM="" 
   VCF="${HOME}/${VCF}"
 else
   echo "No plink or vcf found!"
   exit 1
 fi
 
-cmd="""step2_SPAtests.R \
-        --bedFile "${PLINK}.bed" \
-        --bimFile "${PLINK}.bim" \
-        --famFile "${PLINK}.fam" \
+cmd="step2_SPAtests.R \
+        --bedFile=$BED \
+        --bimFile=$BIM \
+        --famFile=$FAM \
+	 	--groupFile=$GROUPFILE \
 		--vcfFile ${VCF} \
-        --minMAF=0 \
+        --chrom=21 \
+		--minMAF=0 \
         --minMAC=${min_mac} \
         --GMMATmodelFile ${HOME}/${MODELFILE} \
         --varianceRatioFile ${HOME}/${VARIANCERATIO} \
         --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
         --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
+		--subSampleFile ${HOME}/${SUBSAMPLES} \
         --LOCO=FALSE \
         --is_Firth_beta=TRUE \
         --pCutoffforFirth=0.1 \
         --is_output_moreDetails=TRUE \
         --is_fastTest=TRUE \
-        --groupFile ${groupFile} \
         --is_output_markerList_in_groupTest=TRUE \
         --is_single_in_groupTest=TRUE \
         --SAIGEOutputFile=${HOME}/${OUT}_variant.tsv
-    """
+    "
 
 echo "Running variant based tests for all variants in with MAC > 20"
 
 if [[ ${SINGULARITY} = true ]]; then
   singularity exec \
     --env HOME=${WD} \
-    --bind ${WD}/:$HOME/ \
+    --bind ${WD}/:$HOME/,${WD}/tmp/:/tmp/ \
     "saige-${saige_version}.sif" $cmd
 else
   echo '''Running gene based tests and variant based tests for all variants present in the annotations.
