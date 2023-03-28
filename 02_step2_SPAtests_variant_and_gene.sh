@@ -107,6 +107,18 @@ done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
+check_container_env $SINGULARITY
+
+echo $SINGULARITY
+if [[ ${SINGULARITY} = true ]]; then
+  # check if saige sif exists:
+  if !(test -f "saige-${saige_version}.sif"); then
+    singularity pull "saige-${saige_version}.sif" "docker://wzhou88/saige:${saige_version}"
+  fi
+else
+  docker pull wzhou88/saige:${saige_version}
+fi
+
 # Checks
 if [[ ${TESTTYPE} == "" ]]; then
   echo "Test type not set"
@@ -157,18 +169,6 @@ echo "GROUPFILE         = ${GROUPFILE}"
 echo "SPARSEGRM         = ${SPARSEGRM}"
 echo "SPARSEGRMID       = ${SPARSEGRMID}"
 
-check_container_env $SINGULARITY
-
-echo $SINGULARITY
-if [[ ${SINGULARITY} = true ]]; then
-  # check if saige sif exists:
-  if !(test -f "saige-${saige_version}.sif"); then
-      singularity pull "saige-${saige_version}.sif" "docker://wzhou88/saige:${saige_version}"
-  fi
-else
-  docker pull wzhou88/saige:${saige_version}
-fi
-
 # For debugging
 set -exo pipefail
 
@@ -215,16 +215,16 @@ cmd="step2_SPAtests.R \
         --bedFile=$BED \
         --bimFile=$BIM \
         --famFile=$FAM \
-	 	--groupFile=$GROUPFILE \
-		--vcfFile ${VCF} \
+	    	--groupFile=$GROUPFILE \
+	      --vcfFile ${VCF} \
         --chrom=21 \
-		--minMAF=0 \
+		    --minMAF=0 \
         --minMAC=${min_mac} \
         --GMMATmodelFile ${HOME}/${MODELFILE} \
         --varianceRatioFile ${HOME}/${VARIANCERATIO} \
         --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
         --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
-		--subSampleFile ${HOME}/${SUBSAMPLES} \
+	    	--subSampleFile ${HOME}/${SUBSAMPLES} \
         --LOCO=FALSE \
         --is_Firth_beta=TRUE \
         --pCutoffforFirth=0.1 \
