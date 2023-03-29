@@ -32,9 +32,10 @@ run_container () {
 }
 
 generate_GRM(){
+  echo "Generating GRM..."
 
   # download plink binary to resources:
-  wget https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20230116.zip -P resources/
+  wget -nc https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20230116.zip -P resources/
   unzip -o resources/plink_linux_x86_64_20230116.zip -d resources/
 
   ./resources/plink \
@@ -52,22 +53,25 @@ generate_GRM(){
     --out "${OUT}"
 
   cmd="createSparseGRM.R \
-    --plinkFile=${GENOTYPE_PLINK} \
+    --plinkFile="${HOME}/${OUT}" \
     --nThreads=$(nproc) \
-    --outputPrefix=${OUT} \
+    --outputPrefix="${HOME}/${OUT}" \
     --numRandomMarkerforSparseKin=5000 \
     --relatednessCutoff=0.05"
 
   run_container
-  
+ 
+  echo "GRM generated!"
+ 
   SPARSEGRM="${OUT}.sparseGRM.mtx"
   SPARSEGRMID="${OUT}.sparseGRM.mtx.sampleIDs.txt"
 
 }
 
 generate_plink_for_vr(){
+  echo "Generating plink file for vr..."
 
-  wget https://s3.amazonaws.com/plink2-assets/plink2_linux_x86_64_20230325.zip -P resources/
+  wget -nc https://s3.amazonaws.com/plink2-assets/plink2_linux_x86_64_20230325.zip -P resources/
   unzip -o resources/plink2_linux_x86_64_20230325.zip -d resources/
 
   #1. Calculate allele counts for each marker in the large PLINK file with hard called genotypes

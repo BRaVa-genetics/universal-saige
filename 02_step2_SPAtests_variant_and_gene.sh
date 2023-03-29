@@ -215,16 +215,16 @@ cmd="step2_SPAtests.R \
         --bedFile=$BED \
         --bimFile=$BIM \
         --famFile=$FAM \
-	    	--groupFile=$GROUPFILE \
-	      --vcfFile ${VCF} \
-        --chrom=21 \
-		    --minMAF=0 \
+	    --groupFile=$GROUPFILE \
+	    --vcfFile ${VCF} \
+        --chrom="chr21" \
+		--minMAF=0 \
         --minMAC=${min_mac} \
         --GMMATmodelFile ${HOME}/${MODELFILE} \
         --varianceRatioFile ${HOME}/${VARIANCERATIO} \
         --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
         --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
-	    	--subSampleFile ${HOME}/${SUBSAMPLES} \
+	    --subSampleFile ${HOME}/${SUBSAMPLES} \
         --LOCO=FALSE \
         --is_Firth_beta=TRUE \
         --pCutoffforFirth=0.1 \
