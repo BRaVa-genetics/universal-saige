@@ -303,8 +303,8 @@ else
 fi
 
 cmd="""step1_fitNULLGLMM.R \
-      --plinkFile "${HOME}/${OUT}" \
-	    --sparseGRMFile ${HOME}/${SPARSEGRM} \
+      --plinkFile "${HOME}/${GENOTYPE_PLINK}" \
+	  --sparseGRMFile ${HOME}/${SPARSEGRM} \
       --sparseGRMSampleIDFile ${HOME}/${SPARSEGRMID} \
       --useSparseGRMtoFitNULL=TRUE \
       --phenoFile ${HOME}/${PHENOFILE} \
