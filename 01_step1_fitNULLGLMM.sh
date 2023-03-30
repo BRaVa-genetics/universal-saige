@@ -133,7 +133,6 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     -s|--isSingularity)
-      SINGULARITY=true
       shift # past argument
       shift # past value
       ;;
@@ -305,10 +304,10 @@ fi
 
 cmd="""step1_fitNULLGLMM.R \
       --plinkFile "${HOME}/${OUT}" \
-	    --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
-      --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
+	    --sparseGRMFile ${HOME}/${SPARSEGRM} \
+      --sparseGRMSampleIDFile ${HOME}/${SPARSEGRMID} \
       --useSparseGRMtoFitNULL=TRUE \
-      --phenoFile ${HOME}/in/pheno_files/${PHENOFILE} \
+      --phenoFile ${HOME}/${PHENOFILE} \
       --skipVarianceRatioEstimation FALSE \
       --traitType=${TRAITTYPE} \
       --invNormalize=${INVNORMALISE} \
