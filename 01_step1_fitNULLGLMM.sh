@@ -16,6 +16,7 @@ PHENOFILE=""
 PHENOCOL=""
 COVARCOLLIST=""
 CATEGCOVARCOLLIST=""
+WD=$(pwd)
 
 run_container () {
   if [[ ${SINGULARITY} = true ]]; then
@@ -33,25 +34,43 @@ run_container () {
 
 generate_GRM(){
   echo "Generating GRM..."
+  ls -l
+  pwd
+  unameOut="$(uname -s)"
+  case "${unameOut}" in
+      Linux*)     machine=Linux;;
+      Darwin*)    machine=Mac;;
+      *)          machine="UNKNOWN:${unameOut}"
+  esac
+  echo ${machine}
 
   # download plink binary to resources:
-  wget -nc https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20230116.zip -P resources/
-  unzip -o resources/plink_linux_x86_64_20230116.zip -d resources/
-
+  if [[ $machine == "Mac" ]]; then
+    echo "Downloading OSX version of plink"
+    wget -nc https://s3.amazonaws.com/plink1-assets/plink_mac_20230116.zip --no-check-certificate -P resources/
+    unzip -o resources/plink_mac_20230116.zip -d resources/
+  elif [[ $machine == "Linux" ]]; then
+    echo "Downloading linux version of plink"
+    wget -nc https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20230116.zip --no-check-certificate -P resources/
+    unzip -o resources/plink_linux_x86_64_20230116.zip -d resources/
+  else
+    echo "Operating system not compatible with the code"
+  fi
+  echo $SAMPLEIDS
   ./resources/plink \
     --bfile "${GENOTYPE_PLINK}" \
-    --keep <(awk '{ print $1,$1 }' ${SAMPLEIDS}) \
+    --keep-fam ${SAMPLEIDS} \
     --indep-pairwise 50 5 0.05 \
     --out "${OUT}"
 
   # Extract set of pruned variants and export to bfile
   ./resources/plink \
     --bfile "${GENOTYPE_PLINK}" \
-    --keep <(awk '{ print $1,$1 }' ${SAMPLEIDS})\
+    --keep-fam ${SAMPLEIDS} \
     --extract "${OUT}.prune.in" \
     --make-bed \
     --out "${OUT}"
-
+  
   cmd="createSparseGRM.R \
     --plinkFile="${HOME}/${OUT}" \
     --nThreads=$(nproc) \
@@ -120,14 +139,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     -t|--traitType)
       TRAITTYPE="$2"
-      if ! ( [[ ${TRAITTYPE} = "quantitative" ]] || [[ ${TRAITTYPE} = "binary" ]] ); then
+      if ! ( [[ ${TRAITTYPE} == "quantitative" ]] || [[ ${TRAITTYPE} == "binary" ]] ); then
         echo "Trait type is not in {quantitative,binary}"
         exit 1
       fi
       shift # past argument
       shift # past value
       ;;
-    --genotypePlink)
+    -p|--genotypePlink)
       GENOTYPE_PLINK="$2"
       shift # past argument
       shift # past value
@@ -176,7 +195,7 @@ while [[ $# -gt 0 ]]; do
       echo "usage: 01_step1_fitNULLGLMM.sh
   required:
     -t,--traitType: type of the trait {quantitative,binary}.
-    -p,--plink: plink filename prefix of bim/bed/fam files. These must be present in the working directory at ./in/plink_for_vr_bed/
+    --genotypePlink: plink filename prefix of bim/bed/fam files. These must be present in the working directory at ./in/plink_for_vr_bed/
     --sparseGRM: filename of the sparseGRM .mtx file. This must be present in the working directory at ./in/sparse_grm/
     --sparseGRMID: filename of the sparseGRM ID file. This must be present in the working directory at ./in/sparse_grm/
     --phenoFile: filename of the phenotype file. This must be present in the working directory at ./in/pheno_files/
@@ -186,7 +205,7 @@ while [[ $# -gt 0 ]]; do
     -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
     -c,--covarColList: comma separated column names (e.g. age,pc1,pc2) of continuous covariates to include as fixed effects in the file specified in --phenoFile.
     --categCovarColList: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
-    --sampleIDCol (default: IID): column containing the sample IDs in teh phenotype file, which must match the sample IDs in the plink files.
+    --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
       "
       shift # past argument
       ;;
@@ -211,14 +230,7 @@ fi
 
 if [[ ${SPARSEGRM} == "" || ${SPARSEGRMID} == "" ]]; then
   echo "Sparse GRM .mtx file not set. Generating sparse GRM from genotype or exome sequence data."
-  
-  if [[ ${GENOTYPE_PLINK} == "" ]]; then
-    echo "Genotype plink files plink.{bim,bed,fam} not set - cannot generate GRM!"
-    exit 1
-  fi
-
-  generate_GRM
-
+  echo "Will attempt to generate GRM"
 fi
 
 if [[ ${PHENOFILE} == "" ]]; then
@@ -254,13 +266,22 @@ echo "PHENOFILE         = ${PHENOFILE}"
 echo "PHENOCOL          = ${PHENOCOL}"
 echo "COVARCOLLIST      = ${COVARCOLLIST}"
 echo "CATEGCOVARCOLLIST = ${CATEGCOVARCOLLIST}"
+echo "SAMPLEIDS         = ${SAMPLEIDS}"
 echo "SAMPLEIDCOL       = ${SAMPLEIDCOL}"
 
 check_container_env $SINGULARITY
 
-if [[ ${SINGULARITY} = true || ! $( test -f "saige-${saige_version}.sif" ) ]]; then
+if [[ ${SPARSEGRM} == "" || ${SPARSEGRMID} == "" ]]; then
+  if [[ ${GENOTYPE_PLINK} == "" ]]; then
+    echo "Genotype plink files plink.{bim,bed,fam} not set - cannot generate GRM!"
+    exit 1
+  fi
+  generate_GRM
+fi
+
+if [[ ${SINGULARITY} = true && ! $( test -f "saige-${saige_version}.sif" ) ]]; then
   singularity pull "saige-${saige_version}.sif" "docker://wzhou88/saige:${saige_version}"
-elif [[ ${SINGULARITY} = false || ! $( test -f "saige-${saige_version}.sif" ) ]]; then
+elif [[ ${SINGULARITY} = false ]]; then
   docker pull wzhou88/saige:${saige_version}
 fi
 
@@ -275,14 +296,16 @@ n_threads=$(( $(nproc --all) - 1 ))
 
 # Get inverse-normalize flag if trait_type=="quantitative"
 if [[ ${TRAITTYPE} == "quantitative" ]]; then
+  echo "Quantitative trait passed to SAIGE, perform IRNT"
   INVNORMALISE=TRUE
 else
+  echo "Binary trait passed to SAIGE"
   INVNORMALISE=FALSE
 fi
 
 cmd="""step1_fitNULLGLMM.R \
       --plinkFile "${HOME}/${OUT}" \
-	  --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
+	    --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
       --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
       --useSparseGRMtoFitNULL=TRUE \
       --phenoFile ${HOME}/in/pheno_files/${PHENOFILE} \

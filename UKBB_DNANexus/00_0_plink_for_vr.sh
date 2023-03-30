@@ -26,7 +26,7 @@ readonly samples_w_superpop="/mnt/project/saige_pipeline/data/00_set_up/ukb_wes_
 readonly out="ukb_array.wes_450k_qc_pass_${pop}.for_vr.chr${chrom}"
 
 
-#1. Calculate allele counts for each marker in the large PLINK file with hard called genotypes
+# 1. Calculate allele counts for each marker in the large PLINK file with hard called genotypes
 if [[ "${pop}" == "allpop" ]]; then 
   plink2 \
     --bfile "${array_bfile}" \
@@ -41,7 +41,7 @@ elif [[ "${pop}" == "eur" ]]; then
     --out "${out}"
 fi
 
-#2. Randomly extract IDs for markers falling in the two MAC categories:
+# 2. Randomly extract IDs for markers falling in the two MAC categories:
 # * 1,000 markers with 10 <= MAC < 20
 # * 1,000 markers with MAC >= 20
 cat <(
