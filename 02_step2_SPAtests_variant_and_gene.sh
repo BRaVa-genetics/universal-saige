@@ -33,7 +33,6 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     -s|--isSingularity)
-      SINGULARITY=true
       shift # past argument
       shift # past value
       ;;
@@ -215,16 +214,17 @@ cmd="step2_SPAtests.R \
         --bedFile=$BED \
         --bimFile=$BIM \
         --famFile=$FAM \
-	    --groupFile=$GROUPFILE \
-	    --vcfFile ${VCF} \
+        --groupFile=$GROUPFILE \
+	      --vcfFile ${VCF} \
+        --vcfField "GT" \
         --chrom="chr21" \
-		--minMAF=0 \
+		    --minMAF=0 \
         --minMAC=${min_mac} \
         --GMMATmodelFile ${HOME}/${MODELFILE} \
         --varianceRatioFile ${HOME}/${VARIANCERATIO} \
         --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
         --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
-	    --subSampleFile ${HOME}/${SUBSAMPLES} \
+	      --subSampleFile ${HOME}/${SUBSAMPLES} \
         --LOCO=FALSE \
         --is_Firth_beta=TRUE \
         --pCutoffforFirth=0.1 \
