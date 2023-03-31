@@ -1,3 +1,3 @@
-download_dockerfile(is_singularity){
+#!/bin/bash
 
-}
+saige_version="1.1.6.3"
