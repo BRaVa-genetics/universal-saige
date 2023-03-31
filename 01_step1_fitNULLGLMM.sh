@@ -227,6 +227,10 @@ if [[ ${TRAITTYPE} == "" ]]; then
   exit 1
 fi
 
+if [[ ${SAMPLEIDS} != "" ]]; then
+  SAMPLEIDS=${HOME}/$SAMPLEIDS
+fi
+
 if [[ ${SPARSEGRM} == "" || ${SPARSEGRMID} == "" ]]; then
   echo "Sparse GRM .mtx file not set. Generating sparse GRM from genotype or exome sequence data."
   echo "Will attempt to generate GRM"
@@ -318,6 +322,7 @@ cmd="""step1_fitNULLGLMM.R \
       --outputPrefix="${HOME}/${OUT}" \
       --IsOverwriteVarianceRatioFile=TRUE \
       --nThreads=${n_threads} \
-      --isCateVarianceRatio=TRUE"""
+      --isCateVarianceRatio=TRUE \
+	  --SampleIDIncludeFile=${SAMPLEIDS}"""
 
 run_container
