@@ -23,6 +23,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --chr)
+      CHR="$2"
+      shift # past argument
+      shift # past value
+      ;;
     --testType)
       TESTTYPE="$2"
       if ! ( [[ ${TESTTYPE} = "variant" ]] || [[ ${TESTTYPE} = "group" ]] ); then
@@ -86,6 +91,7 @@ while [[ $# -gt 0 ]]; do
     --varianceRatio: filename of the varianceRatio file output from step 1. This must be in relation to the working directory.
     --sparseGRM: filename of the sparseGRM .mtx file. This must be present in the working directory at ./in/sparse_grm/
     --sparseGRMID: filename of the sparseGRM ID file. This must be present in the working directory at ./in/sparse_grm/
+	--chr: chromosome to test.
   optional:
     -o,--outputPrefix:  output prefix of the SAIGE step 2 output.
     -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
@@ -218,7 +224,7 @@ cmd="step2_SPAtests.R \
         --groupFile=$GROUPFILE \
 	      --vcfFile=${VCF} \
         --vcfField "GT" \
-        --chrom="chr21" \
+        --chrom="chr$CHR" \
 		    --minMAF=0 \
         --minMAC=${min_mac} \
         --GMMATmodelFile=${HOME}/${MODELFILE} \
