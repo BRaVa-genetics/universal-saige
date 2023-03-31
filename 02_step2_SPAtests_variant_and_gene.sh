@@ -155,7 +155,7 @@ if [[ $GROUPFILE == "" ]] && [[ ${TESTTYPE} == "group" ]]; then
 fi
 
 if [[ $SUBSAMPLES != "" ]]; then
-  $SUBSAMPLES="${HOME}/${SUBSAMPLES}"
+  SUBSAMPLES="${HOME}/${SUBSAMPLES}"
 fi
 
 if [[ $OUT = "out" ]]; then
