@@ -223,7 +223,7 @@ cmd="step2_SPAtests.R \
         --famFile=$FAM \
         --groupFile=$GROUPFILE \
 	      --vcfFile=${VCF} \
-        --vcfField "GT" \
+        --vcfField="DS" \
         --chrom="chr$CHR" \
 		    --minMAF=0 \
         --minMAC=${min_mac} \
