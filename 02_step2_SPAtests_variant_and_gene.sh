@@ -154,6 +154,10 @@ if [[ $GROUPFILE == "" ]] && [[ ${TESTTYPE} == "group" ]]; then
   exit 1
 fi
 
+if [[ $SUBSAMPLES != "" ]]; then
+  $SUBSAMPLES="${HOME}/${SUBSAMPLES}"
+fi
+
 if [[ $OUT = "out" ]]; then
   echo "Warning: outputPrefix not set, setting outputPrefix to 'out'. Check that this will not overwrite existing files."
 fi
@@ -176,9 +180,6 @@ WD=$( pwd )
 
 # Get number of threads
 n_threads=$(( $(nproc --all) - 1 ))
-
-# For debugging
-set -exo pipefail
 
 ## Set up directories
 WD=$( pwd )
@@ -215,16 +216,16 @@ cmd="step2_SPAtests.R \
         --bimFile=$BIM \
         --famFile=$FAM \
         --groupFile=$GROUPFILE \
-	      --vcfFile ${VCF} \
+	      --vcfFile=${VCF} \
         --vcfField "GT" \
         --chrom="chr21" \
 		    --minMAF=0 \
         --minMAC=${min_mac} \
-        --GMMATmodelFile ${HOME}/${MODELFILE} \
-        --varianceRatioFile ${HOME}/${VARIANCERATIO} \
-        --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
-        --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
-	      --subSampleFile ${HOME}/${SUBSAMPLES} \
+        --GMMATmodelFile=${HOME}/${MODELFILE} \
+        --varianceRatioFile=${HOME}/${VARIANCERATIO} \
+        --sparseGRMFile=${HOME}/in/sparse_grm/${SPARSEGRM} \
+        --sparseGRMSampleIDFile=${HOME}/in/sparse_grm/${SPARSEGRMID} \
+	      --subSampleFile={SUBSAMPLES} \
         --LOCO=FALSE \
         --is_Firth_beta=TRUE \
         --pCutoffforFirth=0.1 \
