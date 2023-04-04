@@ -273,6 +273,10 @@ echo "SAMPLEIDS         = ${SAMPLEIDS}"
 echo "SAMPLEIDCOL       = ${SAMPLEIDCOL}"
 
 check_container_env $SINGULARITY
+ 
+if [[ "$PHENOCOL" =~ .*"-".* || "$PHENOCOL" =~ .*",".* || "$PHENOCOL" =~ .*"=".* ]]; then
+  echo "Phenotype name cannot contain \"-\" or \",\" or \"=\""
+fi
 
 if [[ ${SPARSEGRM} == "" || ${SPARSEGRMID} == "" ]]; then
   if [[ ${GENOTYPE_PLINK} == "" ]]; then
