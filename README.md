@@ -5,7 +5,7 @@ Run SAIGE preprocessing, step 1 and 2 without any hassle.
 ## System Requirements
 - Internet connection (to download [SAIGE docker image](https://hub.docker.com/r/wzhou88/saige))
 - Docker OR Singularity
-- Linux
+- Linux OR Mac
 
 ## Input data (required)
 - VCF or Plink WES data
