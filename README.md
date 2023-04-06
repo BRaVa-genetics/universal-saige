@@ -15,6 +15,23 @@ Run SAIGE preprocessing, step 1 and 2 without any hassle.
 - Genotyped sequences for every sample included in the WES data.
 
 ## Usage
+### Step 0 (once per cohort/biobank)
+Taking {vcf/plink/bgen} {genotype/WES/WGS} files generate plink file for the variance ratios and the GRM.  
+
+```
+usage: 00_step0_VR_and_GRM.sh
+  required:
+    --geneticDataDirectory: directory containing the genetic data (genotype/WES/WGS data in the format plink/vcf/bgen)
+    --geneticDataFormat: format of the genetic data {plink,vcf,bgen}.
+  optional:
+    -o,--outputPrefix:  output prefix of the SAIGE step 1 output.
+    -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
+    --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
+    --generate_GRM (default: false): generate GRM for the genetic data.
+    --generate_plink_for_vr (default: false): generate plink file for vr.
+```
+
+### Step 1 (once per phenotype)
 
 ```
 usage: 01_step1_fitNULLGLMM.sh
@@ -33,7 +50,10 @@ usage: 01_step1_fitNULLGLMM.sh
     --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
 ```
 
+### Step 2 (once per chromosome per phenotype)
+
 ```
+
 usage: 02_step2_SPAtests_variant_and_gene.sh
   required:
     --testType: type of test {variant,group}.
