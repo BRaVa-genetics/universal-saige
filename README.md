@@ -8,6 +8,7 @@ TODO:
 - ensure step 1 help matches this help
 - ensure step 2 help matches this help
 - add a proposed clean directory structure for inputs and outputs
+- should generate GRM and generate plink for VR be optional?
 
 # Universal SAIGE
 
