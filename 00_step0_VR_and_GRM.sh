@@ -32,158 +32,129 @@ run_container () {
   fi
 }
 
-generate_GRM(){
-  echo "Generating GRM..."
-  ls -l
-  pwd
-  unameOut="$(uname -s)"
-  case "${unameOut}" in
-      Linux*)     machine=Linux;;
-      Darwin*)    machine=Mac;;
-      *)          machine="UNKNOWN:${unameOut}"
-  esac
-  echo ${machine}
+subset_variants(){
+    echo "Subsetting genetic data for GRM / VR"
 
-  # download plink binary to resources:
-  if [[ $machine == "Mac" ]]; then
-    echo "Downloading OSX version of plink"
-    wget -nc https://s3.amazonaws.com/plink1-assets/plink_mac_20230116.zip --no-check-certificate -P resources/
-    unzip -o resources/plink_mac_20230116.zip -d resources/
-  elif [[ $machine == "Linux" ]]; then
-    echo "Downloading linux version of plink"
-    wget -nc https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20230116.zip --no-check-certificate -P resources/
-    unzip -o resources/plink_linux_x86_64_20230116.zip -d resources/
-  else
-    echo "Operating system not compatible with the code"
-  fi
+    unameOut="$(uname -s)"
+    case "${unameOut}" in
+        Linux*)     machine=Linux;;
+        Darwin*)    machine=Mac;;
+        *)          machine="UNKNOWN:${unameOut}"
+    esac
+    echo ${machine}
 
-  echo $SAMPLEIDS
-
-  if [[ $GENETIC_DATA_FORMAT == "vcf" || $GENETIC_DATA_FORMAT == "bgen" ]]; then
-    # get list of files with format in dir:
-    FILES=$(ls ${GENETIC_DATA_DIR}/*${GENETIC_DATA_FORMAT}*)
-    # iterate files (bash):
-    if [[ $GENETIC_DATA_FORMAT == "vcf" ]]; then
-        for FILE in $FILES
-        do
-            echo "Processing $f file..."
-            # take action on each file. $f store current file name
-            ./resources/plink \
-                --vcf ${GENETIC_DATA_DIR}/${FILE} \
-                --keep-fam ${SAMPLEIDS} \
-                --indep-pairwise 50 5 0.05 \
-                --out /tmp/${FILE}
-        done
-        for FILE in $FILES
-        do
-            ./resources/plink \
-                --vcf "${GENOTYPE_PLINK}" \
-                --keep-fam ${SAMPLEIDS} \
-                --extract "${OUT}.prune.in" \
-                --make-bed \
-                --out "${OUT}"
-            
-        done
-    elif [[ $GENETIC_DATA_FORMAT == "bgen" ]]; then
-        for FILE in $FILES
-        do
-            echo "Processing $f file..."
-            # take action on each file. $f store current file name
-            ./resources/plink \
-                --bgen ${GENETIC_DATA_DIR}/${FILE} \
-                --keep-fam ${SAMPLEIDS} \
-                --indep-pairwise 50 5 0.05 \
-                --out /tmp/${FILE}
-        done
-        for FILE in $FILES
-        do
-            ./resources/plink \
-                --bgen "${GENOTYPE_PLINK}" \
-                --keep-fam ${SAMPLEIDS} \
-                --extract /tmp/${FILE}.prune.in \
-                --make-bed \
-                --out "${OUT}"
-        done
+    # download plink binary to resources:
+    if [[ $machine == "Mac" ]]; then
+        echo "Downloading OSX version of plink"
+        wget -nc https://s3.amazonaws.com/plink1-assets/plink_mac_20230116.zip --no-check-certificate -P resources/
+        unzip -o resources/plink_mac_20230116.zip -d resources/
+    elif [[ $machine == "Linux" ]]; then
+        echo "Downloading linux version of plink"
+        wget -nc https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20230116.zip --no-check-certificate -P resources/
+        unzip -o resources/plink_linux_x86_64_20230116.zip -d resources/
+    else
+        echo "Operating system not compatible with the code"
     fi
-  elif [[ $GENETIC_DATA_FORMAT == "plink" ]]; then
-    FILES=$(ls ${GENETIC_DATA_DIR}/*.bed)
 
-    for FILE in $FILES
-    do
-        echo "Processing $f file..."
-        # take action on each file. $f store current file name
-        ./resources/plink \
-            --plink ${GENETIC_DATA_DIR}/${FILE%.bed} \
-            --keep-fam ${SAMPLEIDS} \
-            --indep-pairwise 50 5 0.05 \
-            --out /tmp/${FILE}
-    done
-    for FILE in $FILES
-    do
-        ./resources/plink \
-            --plink ${GENETIC_DATA_DIR}/${FILE%.bed} \
-            --keep-fam ${SAMPLEIDS} \
-            --extract /tmp/${FILE}.prune.in \
-            --make-bed \
-            --out "${OUT}"
-    done
+    # get list of files with format in dir:
+    if [[ $GENETIC_DATA_FORMAT == "vcf" ]]; then
 
-  fi
+        FILES=$(ls ${GENETIC_DATA_DIR}/*vcf)
+        echo "files found: ${FILES}"
 
-  # Extract set of pruned variants and export to bfile
-  
-  cmd="createSparseGRM.R \
-    --plinkFile="${HOME}/${OUT}" \
-    --nThreads=$(nproc) \
-    --outputPrefix="${HOME}/${OUT}" \
-    --numRandomMarkerforSparseKin=5000 \
-    --relatednessCutoff=0.05"
+        for file in ${FILES}; do
+            ./resources/plink --vcf "${file}" --make-bed --out "/tmp/${file%.vcf}.plink"
+        done
 
-  run_container
- 
-  echo "GRM generated!"
- 
-  SPARSEGRM="${OUT}.sparseGRM.mtx"
-  SPARSEGRMID="${OUT}.sparseGRM.mtx.sampleIDs.txt"
+        ls /tmp/*.plink.bed | sed 's/\.bed$//g' > /tmp/merge_list.txt
+
+        ./resources/plink --merge-list /tmp/merge_list.txt --make-bed --out /tmp/merged
+
+    elif [[ $GENETIC_DATA_FORMAT == "plink" ]]; then
+        FILES=$(ls ${GENETIC_DATA_DIR}/*bed)
+
+        for file in ${FILES}; do
+            echo "${file%.*}" >> /tmp/plink_prefixes.txt
+        done
+
+        # Remove duplicate prefixes
+        sort -u /tmp/plink_prefixes.txt > /tmp/unique_plink_prefixes.txt
+
+        # Merge the PLINK files
+        ./resources/plink --merge-list /tmp/unique_plink_prefixes.txt --make-bed --out /tmp/merged
+
+    fi
+}
+
+generate_GRM(){
+    echo "LD pruning file for GRM generation"
+
+    ./resources/plink \
+        --bfile "/tmp/merged" \
+        --indep-pairwise 50 5 0.05 \
+        --out "/tmp/${out}"
+
+    # Extract set of pruned variants and export to bfile
+    ./resources/plink \
+        --bfile "/tmp/merged" \
+        --extract "/tmp/${out}.prune.in" \
+        --make-bed \
+        --out "${HOME}/out/plink_for_grm"
+
+    cmd="createSparseGRM.R \
+        --plinkFile="${HOME}/out/plink_for_grm" \
+        --nThreads=$(nproc) \
+        --outputPrefix="${HOME}/${OUT}" \
+        --numRandomMarkerforSparseKin=5000 \
+        --relatednessCutoff=0.05"
+
+    run_container
+    
+    echo "GRM generated!"
+    
+    SPARSEGRM="${OUT}.sparseGRM.mtx"
+    SPARSEGRMID="${OUT}.sparseGRM.mtx.sampleIDs.txt"
 
 }
 
 generate_plink_for_vr(){
-  echo "Generating plink file for vr..."
+    # get count of variants in merged plink file:
 
-  wget -nc https://s3.amazonaws.com/plink2-assets/plink2_linux_x86_64_20230325.zip -P resources/
-  unzip -o resources/plink2_linux_x86_64_20230325.zip -d resources/
+    ./resources/plink \
+        --bfile "/tmp/merged" \
+        --freq counts \
+        --out "/tmp/${out}"
 
-  #1. Calculate allele counts for each marker in the large PLINK file with hard called genotypes
+    variants_lessthan_20_MAC=1000
+    variants_greaterthan_20_MAC=1000
 
-  ./resources/plink2 \
-    --keep <(awk '{ print $1,$1 }' ${SAMPLEIDS})  \
-    --bfile "${GENOTYPE_PLINK}" \
-    --freq counts \
-    --out "${OUT}"
+    cat <(
+        tail -n +2 "/tmp/${out}.frq.counts" \
+        | awk '(($6-$5) < 20 && ($6-$5) >= 10) || ($5 < 20 && $5 >= 10) {print $2}' \
+        | shuf -n $variants_lessthan_20_MAC ) \
+    <( \
+        tail -n +2 "/tmp/${out}.frq.counts" \
+        | awk ' $5 >= 20 && ($6-$5)>= 20 {print $2}' \
+        | shuf -n $variants_greaterthan_20_MAC \
+        ) > "/tmp/${out}.markerid.list"
 
-  #2. Randomly extract IDs for markers falling in the two MAC categories:
-  # * 1,000 markers with 10 <= MAC < 20
-  # * 1,000 markers with MAC >= 20
+    actual_variants_lessthan_20_MAC=$(awk '(($6-$5) < 20 && ($6-$5) >= 10) || ($5 < 20 && $5 >= 10)' "/tmp/${out}.frq.counts" | wc -l)
+    actual_variants_greaterthan_20_MAC=$(awk '$5 >= 20 && ($6-$5)>= 20' "/tmp/${out}.frq.counts" | wc -l)
 
-  cat <(
-    tail -n +2 "${OUT}.acount" \
-    | awk '(($6-$5) < 20 && ($6-$5) >= 10) || ($5 < 20 && $5 >= 10) {print $2}' \
-    | shuf -n 1000 ) \
-  <( \
-    tail -n +2 "${OUT}.acount" \
-    | awk ' $5 >= 20 && ($6-$5)>= 20 {print $2}' \
-    | shuf -n 1000 \
-    ) > "${OUT}.markerid.list"
+    if [[ $actual_variants_lessthan_20_MAC -ne $variants_lessthan_20_MAC ]]; then
+        echo "Error: ${actual_variants_lessthan_20_MAC} variants (MAC<20) found - less than the required ${variants_lessthan_20_MAC} variants."
+        exit 1
+    elif [[ $actual_variants_greaterthan_20_MAC -ne $variants_greaterthan_20_MAC ]]; then
+        echo "Error: ${actual_variants_greaterthan_20_MAC} variants (MAC>20) found - less than the required ${variants_greaterthan_20_MAC} variants."
+        exit 1
+    fi
 
-  # Make sure to still subset to Europeans
-  ./resources/plink2 \
-    --bfile "${GENOTYPE_PLINK}" \
-    --keep <(awk '{ print $1,$1 }' ${SAMPLEIDS}) \
-    --extract "${OUT}.markerid.list" \
-    --make-bed \
-    --out "${OUT}"
-
+    # Extract markers from the large PLINK file
+    ./resources/plink \
+        --bfile "/tmp/merged" \
+        --extract "/tmp/${out}.markerid.list" \
+        --make-bed \
+        --out "./in/variants_subset"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -207,6 +178,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --geneticDataType)
+      GENETIC_DATA_TYPE="$2"
+      shift # past argument
+      shift # past value
+      ;;
     --generate_GRM)
       shift # past argument
       shift # past value
@@ -222,15 +198,16 @@ while [[ $# -gt 0 ]]; do
       ;; 
     -h|--help)
       echo "usage: 00_step0_VR_and_GRM.sh
-  required:
-    --geneticDataDirectory: directory containing the genetic data (genotype/WES/WGS data in the format plink/vcf/bgen)
-    --geneticDataFormat: format of the genetic data {plink,vcf,bgen}.
-  optional:
-    -o,--outputPrefix:  output prefix of the SAIGE step 1 output.
-    -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
-    --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
-    --generate_GRM (default: false): generate GRM for the genetic data.
-    --generate_plink_for_vr (default: false): generate plink file for vr.
+            required:
+                --geneticDataDirectory: directory containing the genetic data (genotype/WES/WGS data in the format plink/vcf/bgen)
+                --geneticDataFormat: format of the genetic data {plink,vcf}.
+                --geneticDataType: type of the genetic data {WES,WGS,genotype}.
+            optional:
+                -o,--outputPrefix:  output prefix of the SAIGE step 0 output.
+                -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
+                --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
+                --generate_GRM (default: false): generate GRM for the genetic data.
+                --generate_plink_for_vr (default: false): generate plink file for vr.
       "
       shift # past argument
       ;;
@@ -249,9 +226,14 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 # Checks
 
-# check if genetic data format in vcf, bgen or plink:
-if [[ ${GENETIC_DATA_FORMAT} != "vcf" ]] && [[ ${GENETIC_DATA_FORMAT} != "bgen" ]] && [[ ${GENETIC_DATA_FORMAT} != "plink" ]]; then
-  echo "geneticDataFormat must be in {vcf,bgen,plink}"
+# check if genetic data format in vcf or plink:
+if [[ ${GENETIC_DATA_FORMAT} != "vcf" ]] && [[ ${GENETIC_DATA_FORMAT} != "plink" ]]; then
+  echo "geneticDataFormat must be in {vcf,plink}"
+  exit 1
+fi
+
+if [[ ${GENETIC_DATA_TYPE} != "WES" ]] && [[ ${GENETIC_DATA_TYPE} != "WGS" ]] && [[ ${GENETIC_DATA_TYPE} != "genotype" ]]; then
+  echo "geneticDataType must be in {WES,WGS,genotype}"
   exit 1
 fi
 
@@ -291,6 +273,8 @@ WD=$( pwd )
 
 # Get number of threads
 n_threads=$(( $(nproc --all) - 1 ))
+
+subset_variants
 
 if [[ ${GENERATE_GRM} = true ]]; then
   generate_GRM
