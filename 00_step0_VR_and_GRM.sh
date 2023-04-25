@@ -6,16 +6,9 @@ source ./check.sh
 POSITIONAL_ARGS=()
 
 SINGULARITY=false
-SAMPLEIDCOL="IID"
-OUT="out"
-TRAITTYPE=""
-PLINK=""
-SPARSEGRM=""
-SPARSEGRMID=""
-PHENOFILE=""
-PHENOCOL=""
-COVARCOLLIST=""
-CATEGCOVARCOLLIST=""
+generate_grm="false"
+generate_plink_for_vr="false"
+
 WD=$(pwd)
 
 saige_version="1.1.8"
