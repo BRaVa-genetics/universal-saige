@@ -18,6 +18,8 @@ COVARCOLLIST=""
 CATEGCOVARCOLLIST=""
 WD=$(pwd)
 
+saige_version="1.1.8"
+
 run_container () {
   if [[ ${SINGULARITY} = true ]]; then
     singularity exec \
@@ -30,102 +32,6 @@ run_container () {
       -v ${WD}/:$HOME/ \
       "wzhou88/saige:${saige_version}" $cmd
   fi
-}
-
-generate_GRM(){
-  echo "Generating GRM..."
-  ls -l
-  pwd
-  unameOut="$(uname -s)"
-  case "${unameOut}" in
-      Linux*)     machine=Linux;;
-      Darwin*)    machine=Mac;;
-      *)          machine="UNKNOWN:${unameOut}"
-  esac
-  echo ${machine}
-
-  # download plink binary to resources:
-  if [[ $machine == "Mac" ]]; then
-    echo "Downloading OSX version of plink"
-    wget -nc https://s3.amazonaws.com/plink1-assets/plink_mac_20230116.zip --no-check-certificate -P resources/
-    unzip -o resources/plink_mac_20230116.zip -d resources/
-  elif [[ $machine == "Linux" ]]; then
-    echo "Downloading linux version of plink"
-    wget -nc https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20230116.zip --no-check-certificate -P resources/
-    unzip -o resources/plink_linux_x86_64_20230116.zip -d resources/
-  else
-    echo "Operating system not compatible with the code"
-  fi
-  echo $SAMPLEIDS
-  ./resources/plink \
-    --bfile "${GENOTYPE_PLINK}" \
-    --keep-fam ${SAMPLEIDS} \
-    --indep-pairwise 50 5 0.05 \
-    --out "${OUT}"
-
-  # Extract set of pruned variants and export to bfile
-  ./resources/plink \
-    --bfile "${GENOTYPE_PLINK}" \
-    --keep-fam ${SAMPLEIDS} \
-    --extract "${OUT}.prune.in" \
-    --make-bed \
-    --out "${OUT}"
-  
-  cmd="createSparseGRM.R \
-    --plinkFile="${HOME}/${OUT}" \
-    --nThreads=$(nproc) \
-    --outputPrefix="${HOME}/${OUT}" \
-    --numRandomMarkerforSparseKin=5000 \
-    --relatednessCutoff=0.05"
-
-  run_container
- 
-  echo "GRM generated!"
- 
-  SPARSEGRM="${OUT}.sparseGRM.mtx"
-  SPARSEGRMID="${OUT}.sparseGRM.mtx.sampleIDs.txt"
-
-}
-generate_plink_for_vr_from_exome(){
-
-}
-
-generate_plink_for_vr_from_genotype(){
-  echo "Generating plink file for vr..."
-
-  wget -nc https://s3.amazonaws.com/plink2-assets/plink2_linux_x86_64_20230325.zip -P resources/
-  unzip -o resources/plink2_linux_x86_64_20230325.zip -d resources/
-
-  #1. Calculate allele counts for each marker in the large PLINK file with hard called genotypes
-
-  ./resources/plink2 \
-    --keep <(awk '{ print $1,$1 }' ${SAMPLEIDS})  \
-    --bfile "${GENOTYPE_PLINK}" \
-    --freq counts \
-    --out "${OUT}"
-
-  #2. Randomly extract IDs for markers falling in the two MAC categories:
-  # * 1,000 markers with 10 <= MAC < 20
-  # * 1,000 markers with MAC >= 20
-
-  cat <(
-    tail -n +2 "${OUT}.acount" \
-    | awk '(($6-$5) < 20 && ($6-$5) >= 10) || ($5 < 20 && $5 >= 10) {print $2}' \
-    | shuf -n 1000 ) \
-  <( \
-    tail -n +2 "${OUT}.acount" \
-    | awk ' $5 >= 20 && ($6-$5)>= 20 {print $2}' \
-    | shuf -n 1000 \
-    ) > "${OUT}.markerid.list"
-
-  # Make sure to still subset to Europeans
-  ./resources/plink2 \
-    --bfile "${GENOTYPE_PLINK}" \
-    --keep <(awk '{ print $1,$1 }' ${SAMPLEIDS}) \
-    --extract "${OUT}.markerid.list" \
-    --make-bed \
-    --out "${OUT}"
-
 }
 
 while [[ $# -gt 0 ]]; do
@@ -235,8 +141,7 @@ if [[ ${SAMPLEIDS} != "" ]]; then
 fi
 
 if [[ ${SPARSEGRM} == "" || ${SPARSEGRMID} == "" ]]; then
-  echo "Sparse GRM .mtx file not set. Generating sparse GRM from genotype or exome sequence data."
-  echo "Will attempt to generate GRM"
+  echo "Sparse GRM .mtx file not set. Generate a GRM in step 0."
 fi
 
 if [[ ${PHENOFILE} == "" ]]; then

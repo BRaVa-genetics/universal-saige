@@ -18,6 +18,8 @@ COVARCOLLIST=""
 CATEGCOVARCOLLIST=""
 WD=$(pwd)
 
+saige_version="1.1.8"
+
 run_container () {
   if [[ ${SINGULARITY} = true ]]; then
     singularity exec \
@@ -92,17 +94,17 @@ generate_GRM(){
     ./resources/plink \
         --bfile "/tmp/merged" \
         --indep-pairwise 50 5 0.05 \
-        --out "/tmp/${out}"
+        --out "/tmp/${OUT}"
 
     # Extract set of pruned variants and export to bfile
     ./resources/plink \
         --bfile "/tmp/merged" \
-        --extract "/tmp/${out}.prune.in" \
+        --extract "/tmp/${OUT}.prune.in" \
         --make-bed \
-        --out "${HOME}/out/plink_for_grm"
+        --out "${HOME}/${OUT}.plink_for_grm"
 
     cmd="createSparseGRM.R \
-        --plinkFile="${HOME}/out/plink_for_grm" \
+        --plinkFile="${HOME}/${OUT}.plink_for_grm" \
         --nThreads=$(nproc) \
         --outputPrefix="${HOME}/${OUT}" \
         --numRandomMarkerforSparseKin=5000 \
@@ -123,23 +125,23 @@ generate_plink_for_vr(){
     ./resources/plink \
         --bfile "/tmp/merged" \
         --freq counts \
-        --out "/tmp/${out}"
+        --out "/tmp/merged"
 
     variants_lessthan_20_MAC=1000
     variants_greaterthan_20_MAC=1000
 
     cat <(
-        tail -n +2 "/tmp/${out}.frq.counts" \
+        tail -n +2 "/tmp/merged.frq.counts" \
         | awk '(($6-$5) < 20 && ($6-$5) >= 10) || ($5 < 20 && $5 >= 10) {print $2}' \
         | shuf -n $variants_lessthan_20_MAC ) \
     <( \
-        tail -n +2 "/tmp/${out}.frq.counts" \
+        tail -n +2 "/tmp/merged.frq.counts" \
         | awk ' $5 >= 20 && ($6-$5)>= 20 {print $2}' \
         | shuf -n $variants_greaterthan_20_MAC \
-        ) > "/tmp/${out}.markerid.list"
+        ) > "/tmp/merged.markerid.list"
 
-    actual_variants_lessthan_20_MAC=$(awk '(($6-$5) < 20 && ($6-$5) >= 10) || ($5 < 20 && $5 >= 10)' "/tmp/${out}.frq.counts" | wc -l)
-    actual_variants_greaterthan_20_MAC=$(awk '$5 >= 20 && ($6-$5)>= 20' "/tmp/${out}.frq.counts" | wc -l)
+    actual_variants_lessthan_20_MAC=$(awk '(($6-$5) < 20 && ($6-$5) >= 10) || ($5 < 20 && $5 >= 10)' "/tmp/merged.frq.counts" | wc -l)
+    actual_variants_greaterthan_20_MAC=$(awk '$5 >= 20 && ($6-$5)>= 20' "/tmp/merged.frq.counts" | wc -l)
 
     if [[ $actual_variants_lessthan_20_MAC -ne $variants_lessthan_20_MAC ]]; then
         echo "Error: ${actual_variants_lessthan_20_MAC} variants (MAC<20) found - less than the required ${variants_lessthan_20_MAC} variants."
@@ -152,9 +154,9 @@ generate_plink_for_vr(){
     # Extract markers from the large PLINK file
     ./resources/plink \
         --bfile "/tmp/merged" \
-        --extract "/tmp/${out}.markerid.list" \
+        --extract "/tmp/merged.markerid.list" \
         --make-bed \
-        --out "./in/variants_subset"
+        --out "${out}"
 }
 
 while [[ $# -gt 0 ]]; do
