@@ -156,7 +156,7 @@ generate_plink_for_vr(){
         --bfile "/tmp/merged" \
         --extract "/tmp/merged.markerid.list" \
         --make-bed \
-        --out "${out}"
+        --out "${OUT}.plink_for_var_ratio"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -168,7 +168,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     -s|--isSingularity)
       shift # past argument
-      shift # past value
       ;;
     -p|--geneticDataDirectory)
       GENETIC_DATA_DIR="$2"
@@ -186,12 +185,12 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     --generate_GRM)
+      generate_grm="true"
       shift # past argument
-      shift # past value
       ;;
     --generate_plink_for_vr)
+      generate_plink_for_vr="true"
       shift # past argument
-      shift # past value
       ;;
     --sampleIDs)
       SAMPLEIDS="$2" 
@@ -278,8 +277,13 @@ n_threads=$(( $(nproc --all) - 1 ))
 
 subset_variants
 
-if [[ ${GENERATE_GRM} = true ]]; then
+if [[ ${generate_grm} = "true" ]]; then
+  echo "generating GRM"
   generate_GRM
-elif [[ ${GENERATE_PLINK_FOR_VR} = true ]]; then
+fi
+
+if [[ ${generate_plink_for_vr} = "true" ]]; then
+  echo "generating plink for vr"
+  
   generate_plink_for_vr
 fi
