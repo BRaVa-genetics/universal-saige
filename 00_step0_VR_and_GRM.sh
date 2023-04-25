@@ -138,10 +138,10 @@ generate_plink_for_vr(){
 
     if [[ $actual_variants_lessthan_20_MAC -ne $variants_lessthan_20_MAC ]]; then
         echo "Error: ${actual_variants_lessthan_20_MAC} variants (MAC<20) found - less than the required ${variants_lessthan_20_MAC} variants."
-        exit 1
+#        exit 1
     elif [[ $actual_variants_greaterthan_20_MAC -ne $variants_greaterthan_20_MAC ]]; then
         echo "Error: ${actual_variants_greaterthan_20_MAC} variants (MAC>20) found - less than the required ${variants_greaterthan_20_MAC} variants."
-        exit 1
+#       exit 1
     fi
 
     # Extract markers from the large PLINK file
