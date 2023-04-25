@@ -87,12 +87,12 @@ generate_GRM(){
     ./resources/plink \
         --bfile "/tmp/merged" \
         --indep-pairwise 50 5 0.05 \
-        --out "/tmp/${OUT}"
+        --out "/tmp/merged"
 
     # Extract set of pruned variants and export to bfile
     ./resources/plink \
         --bfile "/tmp/merged" \
-        --extract "/tmp/${OUT}.prune.in" \
+        --extract "/tmp/merged.prune.in" \
         --make-bed \
         --out "${HOME}/${OUT}.plink_for_grm"
 
@@ -106,10 +106,6 @@ generate_GRM(){
     run_container
     
     echo "GRM generated!"
-    
-    SPARSEGRM="${OUT}.sparseGRM.mtx"
-    SPARSEGRMID="${OUT}.sparseGRM.mtx.sampleIDs.txt"
-
 }
 
 generate_plink_for_vr(){
@@ -277,6 +273,5 @@ fi
 
 if [[ ${generate_plink_for_vr} = "true" ]]; then
   echo "generating plink for vr"
-  
   generate_plink_for_vr
 fi
