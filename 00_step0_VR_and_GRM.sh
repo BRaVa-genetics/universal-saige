@@ -61,14 +61,7 @@ subset_variants(){
             ./resources/plink --vcf "${file}" --make-bed --out "/tmp/${file%.vcf}.plink"
         done
 
-        ls /tmp/*.plink.bed | sed 's/\.bed$//g' > /tmp/merge_list.txt
-
-        if [[ -n "$SAMPLEIDS" ]]; then
-          ./resources/plink --merge-list /tmp/merge_list.txt --make-bed --out /tmp/merged --keep <(awk '{print $1, $1}' "$SAMPLEIDS")
-        else
-          ./resources/plink --merge-list /tmp/merge_list.txt --make-bed --out /tmp/merged 
-        fi
-          
+        ls /tmp/*.plink.bed | sed 's/\.bed$//g' > /tmp/merge_list.txt          
 
     elif [[ $GENETIC_DATA_FORMAT == "plink" ]]; then
         FILES=$(ls ${GENETIC_DATA_DIR}/*bed)
@@ -78,17 +71,15 @@ subset_variants(){
         done
 
         # Remove duplicate prefixes
-        sort -u /tmp/plink_prefixes.txt > /tmp/unique_plink_prefixes.txt
-
-        # Merge the PLINK files
-        if [[ -n "$SAMPLEIDS" ]]; then
-          ./resources/plink --merge-list /tmp/unique_plink_prefixes.txt --make-bed --out /tmp/merged --keep <(awk '{print $1, $1}' "$SAMPLEIDS")
-        else
-          ./resources/plink --merge-list /tmp/unique_plink_prefixes.txt --make-bed --out /tmp/merged
-        fi
-
-
+        sort -u /tmp/plink_prefixes.txt > /tmp/merge_list.txt
     fi
+
+    if [[ -n "$SAMPLEIDS" ]]; then
+      ./resources/plink --merge-list /tmp/merge_list.txt --make-bed --out /tmp/merged --keep <(awk '{print $1, $1}' "$SAMPLEIDS")
+    else
+      ./resources/plink --merge-list /tmp/merge_list.txt --make-bed --out /tmp/merged 
+    fi
+
 }
 
 generate_GRM(){
