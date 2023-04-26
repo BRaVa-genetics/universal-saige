@@ -63,7 +63,7 @@ subset_variants(){
 
         ls /tmp/*.plink.bed | sed 's/\.bed$//g' > /tmp/merge_list.txt
 
-        ./resources/plink --merge-list /tmp/merge_list.txt --make-bed --out /tmp/merged
+        ./resources/plink --keep "$SAMPLEIDS" --merge-list /tmp/merge_list.txt --make-bed --out /tmp/merged
 
     elif [[ $GENETIC_DATA_FORMAT == "plink" ]]; then
         FILES=$(ls ${GENETIC_DATA_DIR}/*bed)
@@ -76,7 +76,7 @@ subset_variants(){
         sort -u /tmp/plink_prefixes.txt > /tmp/unique_plink_prefixes.txt
 
         # Merge the PLINK files
-        ./resources/plink --merge-list /tmp/unique_plink_prefixes.txt --make-bed --out /tmp/merged
+        ./resources/plink --keep "$SAMPLEIDS" --merge-list /tmp/unique_plink_prefixes.txt --make-bed --out /tmp/merged
 
     fi
 }
@@ -86,7 +86,6 @@ generate_GRM(){
 
     ./resources/plink \
         --bfile "/tmp/merged" \
-        --keep "$SAMPLEIDS" \
         --indep-pairwise 50 5 0.05 \
         --out "/tmp/merged"
 
@@ -114,7 +113,6 @@ generate_plink_for_vr(){
 
     ./resources/plink \
         --bfile "/tmp/merged" \
-        --keep "$SAMPLEIDS" \
         --freq counts \
         --out "/tmp/merged"
 
@@ -145,7 +143,6 @@ generate_plink_for_vr(){
     # Extract markers from the large PLINK file
     ./resources/plink \
         --bfile "/tmp/merged" \
-        --keep "$SAMPLEIDS" \
         --extract "/tmp/merged.markerid.list" \
         --make-bed \
         --out "${OUT}.plink_for_var_ratio"
