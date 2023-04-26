@@ -63,7 +63,12 @@ subset_variants(){
 
         ls /tmp/*.plink.bed | sed 's/\.bed$//g' > /tmp/merge_list.txt
 
-        ./resources/plink --keep "$SAMPLEIDS" --merge-list /tmp/merge_list.txt --make-bed --out /tmp/merged
+        if [[ -n "$SAMPLEIDS" ]]; then
+          ./resources/plink --merge-list /tmp/merge_list.txt --make-bed --out /tmp/merged --keep <(awk '{print $1, $1}' "$SAMPLEIDS")
+        else
+          ./resources/plink --merge-list /tmp/merge_list.txt --make-bed --out /tmp/merged 
+        fi
+          
 
     elif [[ $GENETIC_DATA_FORMAT == "plink" ]]; then
         FILES=$(ls ${GENETIC_DATA_DIR}/*bed)
@@ -76,7 +81,12 @@ subset_variants(){
         sort -u /tmp/plink_prefixes.txt > /tmp/unique_plink_prefixes.txt
 
         # Merge the PLINK files
-        ./resources/plink --keep "$SAMPLEIDS" --merge-list /tmp/unique_plink_prefixes.txt --make-bed --out /tmp/merged
+        if [[ -n "$SAMPLEIDS" ]]; then
+          ./resources/plink --merge-list /tmp/unique_plink_prefixes.txt --make-bed --out /tmp/merged --keep <(awk '{print $1, $1}' "$SAMPLEIDS")
+        else
+          ./resources/plink --merge-list /tmp/unique_plink_prefixes.txt --make-bed --out /tmp/merged
+        fi
+
 
     fi
 }
