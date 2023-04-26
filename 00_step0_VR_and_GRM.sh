@@ -85,6 +85,8 @@ subset_variants(){
 generate_GRM(){
     echo "LD pruning file for GRM generation"
 
+    numRandomMarkerforSparseKin=5000
+
     ./resources/plink \
         --bfile "/tmp/merged" \
         --indep-pairwise 50 5 0.05 \
@@ -101,10 +103,17 @@ generate_GRM(){
         --plinkFile="${HOME}/${OUT}.plink_for_grm" \
         --nThreads=$(nproc) \
         --outputPrefix="${HOME}/${OUT}" \
-        --numRandomMarkerforSparseKin=5000 \
+        --numRandomMarkerforSparseKin=$numRandomMarkerforSparseKin \
         --relatednessCutoff=0.05"
 
-    run_container
+    variant_count=$(wc -l < "${HOME}/${OUT}.plink_for_grm.bim")
+    if [[ $variant_count -ge $numRandomMarkerforSparseKin ]]; then
+      run_container
+    else
+      echo "Error: ${variant_count} variants found in ${OUT}.plink_for_grm, which is less than the required ${numRandomMarkerforSparseKin} variants."
+      exit 1
+    fi
+
     
     echo "GRM generated!"
 }
