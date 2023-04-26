@@ -16,6 +16,8 @@ SPARSEGRM=""
 SPARSEGRMID=""
 GROUPFILE=""
 
+saige_version="1.1.8"
+
 while [[ $# -gt 0 ]]; do
   case $1 in
     -o|--outputPrefix)

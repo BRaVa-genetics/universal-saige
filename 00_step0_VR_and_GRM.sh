@@ -54,11 +54,11 @@ subset_variants(){
     # get list of files with format in dir:
     if [[ $GENETIC_DATA_FORMAT == "vcf" ]]; then
 
-        FILES=$(ls ${GENETIC_DATA_DIR}/*vcf)
+        FILES=$(ls ${GENETIC_DATA_DIR}/*vcf.gz)
         echo "files found: ${FILES}"
 
         for file in ${FILES}; do
-            ./resources/plink --vcf "${file}" --make-bed --out "/tmp/${file%.vcf}.plink"
+            ./resources/plink --vcf "${file}" --make-bed --out "/tmp/${file%.vcf.gz}.plink"
         done
 
         ls /tmp/*.plink.bed | sed 's/\.bed$//g' > /tmp/merge_list.txt          
