@@ -86,6 +86,7 @@ generate_GRM(){
 
     ./resources/plink \
         --bfile "/tmp/merged" \
+        --keep "$SAMPLEIDS" \
         --indep-pairwise 50 5 0.05 \
         --out "/tmp/merged"
 
@@ -113,6 +114,7 @@ generate_plink_for_vr(){
 
     ./resources/plink \
         --bfile "/tmp/merged" \
+        --keep "$SAMPLEIDS" \
         --freq counts \
         --out "/tmp/merged"
 
@@ -143,6 +145,7 @@ generate_plink_for_vr(){
     # Extract markers from the large PLINK file
     ./resources/plink \
         --bfile "/tmp/merged" \
+        --keep "$SAMPLEIDS" \
         --extract "/tmp/merged.markerid.list" \
         --make-bed \
         --out "${OUT}.plink_for_var_ratio"
@@ -234,11 +237,11 @@ if [[ ! -d ${GENETIC_DATA_DIR} ]]; then
 fi
 
 if [[ ${SAMPLEIDS} != "" ]]; then
-  SAMPLEIDS=${HOME}/$SAMPLEIDS
+  SAMPLEIDS=${HOME}/${SAMPLEIDS}
 fi
 
 if [[ $OUT = "out" ]]; then
-  echo "Warning: outputPrefix not set, setting outputPrefix to ${PHENOCOL}. Check that this will not overwrite existing files."
+  echo "Warning: outputPrefix not set, setting outputPrefix. Check that this will not overwrite existing files."
   OUT="${PHENOCOL}"
 fi
 
