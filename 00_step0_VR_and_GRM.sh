@@ -58,7 +58,8 @@ subset_variants(){
         echo "files found: ${FILES}"
 
         for file in ${FILES}; do
-            ./resources/plink --vcf "${file}" --make-bed --out "/tmp/${file%.vcf.gz}.plink"
+            file_basename=$(basename "${file}")
+            ./resources/plink --vcf "${file}" --make-bed --out "/tmp/${file_basename%.*}.plink"
         done
 
         ls /tmp/*.plink.bed | sed 's/\.bed$//g' > /tmp/merge_list.txt          
