@@ -1,33 +1,14 @@
 #!/bin/bash
 
-source ./setup.sh
-source ./check.sh
+source ./run_container.sh
 
 POSITIONAL_ARGS=()
 
 SINGULARITY=false
-generate_grm="false"
-generate_plink_for_vr="false"
+generate_grm=false
+generate_plink_for_vr=false
 
 WD=$(pwd)
-
-run_container () {
-  if [[ ${SINGULARITY} = true ]]; then
-    singularity exec \
-      --env HOME=${WD} \
-      --bind ${WD}/:$HOME/ \
-      "resources/saige.sif" $cmd
-  else
-    # Load the Docker image from the tar.gz file
-    docker load -i "resources/saige.tar"
-    image_id=$(docker images --filter=reference='wzhou88/saige:*' --format "{{.ID}}" | head -n 1)
-
-    docker run \
-      -e HOME=${WD} \
-      -v ${WD}/:$HOME/ \
-      "${image_id}" $cmd
-  fi
-}
 
 subset_variants(){
     echo "Subsetting genetic data for GRM / VR"
@@ -166,11 +147,11 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     --generate_GRM)
-      generate_grm="true"
+      generate_grm=true
       shift # past argument
       ;;
     --generate_plink_for_vr)
-      generate_plink_for_vr="true"
+      generate_plink_for_vr=true
       shift # past argument
       ;;
     --sampleIDs)
@@ -209,7 +190,7 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 # Checks
 
 # check if either generate_GRM or generate_plink_for_vr:
-if [[ ${generate_grm} != "true" ]] && [[ ${generate_plink_for_vr} != "true" ]]; then
+if [[ ${generate_grm} = false ]] && [[ ${generate_plink_for_vr} = false ]]; then
   echo "Error: either generate_GRM or generate_plink_for_vr must be set to true"
   exit 1
 fi
@@ -229,10 +210,6 @@ fi
 if [[ ! -d ${GENETIC_DATA_DIR} ]]; then
   echo "geneticDataDirectory does not exist"
   exit 1
-fi
-
-if [[ ${SAMPLEIDS} != "" ]]; then
-  SAMPLEIDS=${HOME}/${SAMPLEIDS}
 fi
 
 if [[ $OUT = "out" ]]; then
@@ -255,12 +232,12 @@ WD=$( pwd )
 
 subset_variants
 
-if [[ ${generate_grm} = "true" ]]; then
+if [[ ${generate_grm} = true ]]; then
   echo "generating GRM"
   generate_GRM
 fi
 
-if [[ ${generate_plink_for_vr} = "true" ]]; then
+if [[ ${generate_plink_for_vr} = true ]]; then
   echo "generating plink for vr"
   generate_plink_for_vr
 fi
