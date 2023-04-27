@@ -1,7 +1,6 @@
 #!/bin/bash
 
-source ./setup.sh
-source ./check.sh
+source ./run_container.sh
 
 POSITIONAL_ARGS=()
 
@@ -113,18 +112,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
-
-check_container_env $SINGULARITY
-
-echo $SINGULARITY
-if [[ ${SINGULARITY} = true ]]; then
-  # check if saige sif exists:
-  if !(test -f "saige-${saige_version}.sif"); then
-    singularity pull "saige-${saige_version}.sif" "docker://wzhou88/saige:${saige_version}"
-  fi
-else
-  docker pull wzhou88/saige:${saige_version}
-fi
 
 # Checks
 if [[ ${TESTTYPE} == "" ]]; then
@@ -246,18 +233,4 @@ cmd="step2_SPAtests.R \
 
 echo "Running variant based tests for all variants in with MAC > 20"
 
-if [[ ${SINGULARITY} = true ]]; then
-  singularity exec \
-    --env HOME=${WD} \
-    --bind ${WD}/:$HOME/,${WD}/tmp/:/tmp/ \
-    "saige-${saige_version}.sif" $cmd
-else
-  echo '''Running gene based tests and variant based tests for all variants present in the annotations.
-  This includes the collapsed variants in the set-based tests'''
-
-  # Check --AlleleOrder=ref-first
-  docker run \
-    -e HOME=${WD} \
-    -v ${WD}/:$HOME/ \
-    "wzhou88/saige:${saige_version}" $cmd
-fi
+run_container

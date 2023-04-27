@@ -1,7 +1,6 @@
 #!/bin/bash
 
-source ./setup.sh
-source ./check.sh
+source ./run_container.sh
 
 POSITIONAL_ARGS=()
 
@@ -17,22 +16,6 @@ PHENOCOL=""
 COVARCOLLIST=""
 CATEGCOVARCOLLIST=""
 WD=$(pwd)
-
-saige_version="1.1.8"
-
-run_container () {
-  if [[ ${SINGULARITY} = true ]]; then
-    singularity exec \
-      --env HOME=${WD} \
-      --bind ${WD}/:$HOME/ \
-      "saige-${saige_version}.sif" $cmd
-  else
-    docker run \
-      -e HOME=${WD} \
-      -v ${WD}/:$HOME/ \
-      "wzhou88/saige:${saige_version}" $cmd
-  fi
-}
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -180,8 +163,6 @@ echo "CATEGCOVARCOLLIST = ${CATEGCOVARCOLLIST}"
 echo "SAMPLEIDS         = ${SAMPLEIDS}"
 echo "SAMPLEIDCOL       = ${SAMPLEIDCOL}"
 
-check_container_env $SINGULARITY
- 
 if [[ "$PHENOCOL" =~ .*"-".* || "$PHENOCOL" =~ .*",".* || "$PHENOCOL" =~ .*"=".* ]]; then
   echo "Phenotype name cannot contain \"-\" or \",\" or \"=\""
   exit 1
@@ -193,12 +174,6 @@ if [[ ${SPARSEGRM} == "" || ${SPARSEGRMID} == "" ]]; then
     exit 1
   fi
   generate_GRM
-fi
-
-if [[ ${SINGULARITY} = true && ! $( test -f "saige-${saige_version}.sif" ) ]]; then
-  singularity pull "saige-${saige_version}.sif" "docker://wzhou88/saige:${saige_version}"
-elif [[ ${SINGULARITY} = false ]]; then
-  docker pull wzhou88/saige:${saige_version}
 fi
 
 # For debugging

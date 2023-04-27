@@ -11,45 +11,26 @@ generate_plink_for_vr="false"
 
 WD=$(pwd)
 
-saige_version="1.1.8"
-
 run_container () {
   if [[ ${SINGULARITY} = true ]]; then
     singularity exec \
       --env HOME=${WD} \
       --bind ${WD}/:$HOME/ \
-      "saige-${saige_version}.sif" $cmd
+      "resources/saige.sif" $cmd
   else
+    # Load the Docker image from the tar.gz file
+    docker load -i "resources/saige.tar"
+    image_id=$(docker images --filter=reference='wzhou88/saige:*' --format "{{.ID}}" | head -n 1)
+
     docker run \
       -e HOME=${WD} \
       -v ${WD}/:$HOME/ \
-      "wzhou88/saige:${saige_version}" $cmd
+      "${image_id}" $cmd
   fi
 }
 
 subset_variants(){
     echo "Subsetting genetic data for GRM / VR"
-
-    unameOut="$(uname -s)"
-    case "${unameOut}" in
-        Linux*)     machine=Linux;;
-        Darwin*)    machine=Mac;;
-        *)          machine="UNKNOWN:${unameOut}"
-    esac
-    echo ${machine}
-
-    # download plink binary to resources:
-    if [[ $machine == "Mac" ]]; then
-        echo "Downloading OSX version of plink"
-        wget -nc https://s3.amazonaws.com/plink1-assets/plink_mac_20230116.zip --no-check-certificate -P resources/
-        unzip -o resources/plink_mac_20230116.zip -d resources/
-    elif [[ $machine == "Linux" ]]; then
-        echo "Downloading linux version of plink"
-        wget -nc https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20230116.zip --no-check-certificate -P resources/
-        unzip -o resources/plink_linux_x86_64_20230116.zip -d resources/
-    else
-        echo "Operating system not compatible with the code"
-    fi
 
     # get list of files with format in dir:
     if [[ $GENETIC_DATA_FORMAT == "vcf" ]]; then
@@ -227,6 +208,12 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 # Checks
 
+# check if either generate_GRM or generate_plink_for_vr:
+if [[ ${generate_grm} != "true" ]] && [[ ${generate_plink_for_vr} != "true" ]]; then
+  echo "Error: either generate_GRM or generate_plink_for_vr must be set to true"
+  exit 1
+fi
+
 # check if genetic data format in vcf or plink:
 if [[ ${GENETIC_DATA_FORMAT} != "vcf" ]] && [[ ${GENETIC_DATA_FORMAT} != "plink" ]]; then
   echo "geneticDataFormat must be in {vcf,plink}"
@@ -259,21 +246,12 @@ echo "PLINK             = ${PLINK_WES}.{bim/bed/fam}"
 echo "SAMPLEIDS         = ${SAMPLEIDS}"
 
 check_container_env $SINGULARITY
- 
-if [[ ${SINGULARITY} = true && ! $( test -f "saige-${saige_version}.sif" ) ]]; then
-  singularity pull "saige-${saige_version}.sif" "docker://wzhou88/saige:${saige_version}"
-elif [[ ${SINGULARITY} = false ]]; then
-  docker pull wzhou88/saige:${saige_version}
-fi
 
 # For debugging
 set -exo pipefail
 
 ## Set up directories
 WD=$( pwd )
-
-# Get number of threads
-n_threads=$(( $(nproc --all) - 1 ))
 
 subset_variants
 
