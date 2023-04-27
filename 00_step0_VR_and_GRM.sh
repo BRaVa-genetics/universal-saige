@@ -105,10 +105,10 @@ generate_plink_for_vr(){
     actual_variants_lessthan_20_MAC=$(awk '(($6-$5) < 20 && ($6-$5) >= 10) || ($5 < 20 && $5 >= 10)' "/tmp/merged.frq.counts" | wc -l)
     actual_variants_greaterthan_20_MAC=$(awk '$5 >= 20 && ($6-$5)>= 20' "/tmp/merged.frq.counts" | wc -l)
 
-    if [[ $actual_variants_lessthan_20_MAC -ne $variants_lessthan_20_MAC ]]; then
+    if [[ $actual_variants_lessthan_20_MAC -gt $variants_lessthan_20_MAC ]]; then
         echo "Error: ${actual_variants_lessthan_20_MAC} variants (MAC<20) found - less than the required ${variants_lessthan_20_MAC} variants."
 #        exit 1
-    elif [[ $actual_variants_greaterthan_20_MAC -ne $variants_greaterthan_20_MAC ]]; then
+    elif [[ $actual_variants_greaterthan_20_MAC -gt $variants_greaterthan_20_MAC ]]; then
         echo "Error: ${actual_variants_greaterthan_20_MAC} variants (MAC>20) found - less than the required ${variants_greaterthan_20_MAC} variants."
 #       exit 1
     fi
