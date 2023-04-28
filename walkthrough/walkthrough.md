@@ -90,7 +90,7 @@ This took X hours with X cores and M GB memory. Checking my out directory I can 
 
 ## Step 1
 
-In step 1 we will be estimating the variance ratios for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the binary/cont trait X as an example.
+In step 1 we will be estimating the variance ratios for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait height as an example.
 
 `head phenoFile.txt`
 
@@ -102,29 +102,29 @@ In step 1 we will be estimating the variance ratios for the association tests in
 ```
 bash 01_step1_fitNULLGLMM.sh \
     -t binary \
-    --genotypePlink "genotype" \
-    --phenoFile in/pheno_list/* \
+    --genotypePlink out/walkthrough.plink_for_var_ratio \
+    --phenoFile in/phenoFile.txt \
     --phenoCol "female_infertility_binary" \
     --covarColList "age,assessment_centre" \
     --categCovarColList "assessment_centre" \
-    --sampleIDs in/sample_ids/* \
+    --sampleIDs in/sample_ids.txt \
     --sampleIDCol "IID" \
-    --outputPrefix ${output_prefix} \
+    --outputPrefix out/walkthrough \
     --isSingularity false \
-    --sparseGRM GRM \
-    --sparseGRMID in/GRM_samples/*
+    --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
+    --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
 
 ## Step 2
 
 ```
 bash 02_step2_SPAtests_variant_and_gene.sh \
-    --chr $chrom \
+    --chr chr1 \
     --testType "variant" \
     --plink "in/exome" \
-    --modelFile in/model_file/* \
-    --varianceRatio in/variance_ratio/* \
-    --groupFile in/group_file/* \
+    --modelFile out/walkthrough \
+    --varianceRatio out/walkthrough \
+    --groupFile in/ \
     --outputPrefix $output_prefix \
     --isSingularity false \
     --subSampleFile in/subsample_file/* \
