@@ -10,7 +10,8 @@ saige_version="1.1.8"
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
-        --saige-image)
+        
+        )
         SAIGE_IMAGE=true
         shift
         ;;
