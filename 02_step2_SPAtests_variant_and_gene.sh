@@ -97,7 +97,7 @@ while [[ $# -gt 0 ]]; do
     -o,--outputPrefix:  output prefix of the SAIGE step 2 output.
     -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
     -g,--groupFile: required if group test is selected. Filename of the annotation file used for group tests. This must be in relation to the working directory.
-    --annotations: required if group test is selected. Semicolon seperated list of annotations to test found in groupfile.
+    --annotations: required if group test is selected. comma seperated list of annotations to test found in groupfile.
       "
       shift # past argument
       ;;
@@ -236,7 +236,7 @@ cmd="step2_SPAtests.R \
         --is_fastTest=TRUE \
         --is_output_markerList_in_groupTest=TRUE \
         --is_single_in_groupTest=TRUE \
-        --SAIGEOutputFile=${HOME}/${OUT}_variant.tsv
+        --SAIGEOutputFile=${HOME}/${OUT}.txt
     "
 
 echo "Running variant based tests for all variants in with MAC > 20"
