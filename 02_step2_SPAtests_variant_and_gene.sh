@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     --vcf)
-	  VCF="$2"
+      VCF="$2"
       shift # past argument
       shift # past value
       ;;
@@ -68,7 +68,7 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     --annotations)
-      GROUPFILE="$2"
+      ANNOTATIONS="$2"
       shift # past argument
       shift # past value
       ;;
