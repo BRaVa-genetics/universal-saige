@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-	--vcf)
+    --vcf)
 	  VCF="$2"
       shift # past argument
       shift # past value
@@ -97,6 +97,7 @@ while [[ $# -gt 0 ]]; do
     -o,--outputPrefix:  output prefix of the SAIGE step 2 output.
     -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
     -g,--groupFile: required if group test is selected. Filename of the annotation file used for group tests. This must be in relation to the working directory.
+    --annotations: required if group test is selected. Semicolon seperated list of annotations to test found in groupfile.
       "
       shift # past argument
       ;;
@@ -149,6 +150,11 @@ if [[ $GROUPFILE == "" ]] && [[ ${TESTTYPE} == "group" ]]; then
   exit 1
 fi
 
+if [[ $ANNOTATIONS == "" ]] && [[ ${TESTTYPE} == "group" ]]; then
+  echo "attempting to run group tests without selected annotations"
+  exit 1
+fi
+
 if [[ $SUBSAMPLES != "" ]]; then
   SUBSAMPLES="${HOME}/${SUBSAMPLES}"
 fi
@@ -164,6 +170,7 @@ echo "PLINK             = ${PLINK}.{bim/bed/fam}"
 echo "MODELFILE         = ${MODELFILE}"
 echo "VARIANCERATIO     = ${VARIANCERATIO}"
 echo "GROUPFILE         = ${GROUPFILE}"
+echo "ANNOTATIONS"      = ${ANNOTATIONS}
 echo "SPARSEGRM         = ${SPARSEGRM}"
 echo "SPARSEGRMID       = ${SPARSEGRMID}"
 
@@ -211,6 +218,7 @@ cmd="step2_SPAtests.R \
         --bimFile=$BIM \
         --famFile=$FAM \
         --groupFile=$GROUPFILE \
+        --annotation_in_groupTest=$ANNOTATIONS \
 	      --vcfFile=${VCF} \
         --vcfField="DS" \
         --chrom="$CHR" \
