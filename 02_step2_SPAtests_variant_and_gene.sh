@@ -199,7 +199,7 @@ if [[ "$TESTTYPE" = "variant" ]]; then
 else
   echo "gene testing"
   min_mac=20
-  GROUPFILE="${HOME}/in/${GROUPFILE}"
+  GROUPFILE="${HOME}/${GROUPFILE}"
 fi
 
 if [[ ${PLINK} != "" ]]; then
