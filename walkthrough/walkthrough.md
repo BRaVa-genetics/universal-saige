@@ -2,12 +2,12 @@
 
 ## Introduction
 
-Universal-saige has been created to standardise and ease the usage of [SAIGE](https://github.com/saigegit/SAIGE) for [BRaVa](https://brava-genetics.github.io/BRaVa/) across a variety of different computing environments.
+Universal-saige has been created to standardise the usage of [SAIGE](https://github.com/saigegit/SAIGE) for [BRaVa](https://brava-genetics.github.io/BRaVa/) across a variety of different computing environments.
 In this walkthrough we will demonstrate how to generate gene and variant associations for the BRaVa phenotype on chromosome 22 with a final section on sanity-checking results. 
 
 ## Support
 
-If at any point you run into issues or have any questions please create an issue in this (public) repository. You can also email `barney.hill (at) ndph.ox.ac.uk`
+If at any point you run into issues or have any questions please create an issue in this (public) repository. You can also email `barney.hill@ndph.ox.ac.uk`
 
 ## Requirements
 
@@ -74,7 +74,7 @@ bash 00_step0_VR_and_GRM.sh \
     --generate_GRM
 ```
 
-This took X hours with X cores and M GB memory. Checking my out directory I can now see:
+This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Checking the out directory I can now see:
 
 ```
 .
@@ -90,44 +90,150 @@ This took X hours with X cores and M GB memory. Checking my out directory I can 
 
 ## Step 1
 
-In step 1 we will be estimating the variance ratios for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait height as an example.
+In step 1 we will be estimating the variance ratios for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait HDL cholesterol as an example. 
 
 `head phenoFile.txt`
 
-| IID | Type_two_diabetes | age | assessment_centre | PC1 |
-|---|---|---|---|---|
-| 3421 | 1 | 68 | 42 | 0.013412 |
-| 4567 | 0 | 51 | 66 | -0.200134 |
+| IID | HDL_cholesterol | age | assessment_centre | PC1 | ... |
+|---|---|---|---|---|---|
+| 3421 | 0.422 | 68 | 412 | 0.013412 | ... |
+| 4567 | 0.342 | 51 | 6116 | -0.200134 | ... |
 
 ```
 bash 01_step1_fitNULLGLMM.sh \
-    -t binary \
+    -t quantitative \
     --genotypePlink out/walkthrough.plink_for_var_ratio \
     --phenoFile in/phenoFile.txt \
     --phenoCol "female_infertility_binary" \
-    --covarColList "age,assessment_centre" \
-    --categCovarColList "assessment_centre" \
+    --covarColList "is_female,assessment_centre,genotyping_batch,age,pc1,pc2,pc3,pc4,pc5,pc6,pc7,pc8,pc9,pc10,pc11,pc12,pc13,pc14,pc15,pc16,pc17,pc18,pc19,pc20,pc21,age2,is_female_age,is_female_age2" \
+    --categCovarColList "is_female,assessment_centre,genotyping_batch" \
     --sampleIDs in/sample_ids.txt \
     --sampleIDCol "IID" \
-    --outputPrefix out/walkthrough \
+    --outputPrefix out/HDL_cholesterol \
     --isSingularity false \
     --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
 
+This took 10 minutes with 4 cores. Checking the out directory I can now see:
+
+```
+.
+├── ...
+├── out/
+│   ├── walkthrough.plink_for_var_ratio.bed
+│   ├── walkthrough.plink_for_var_ratio.bed
+│   ├── walkthrough.plink_for_var_ratio.bed
+│   ├── walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx
+│   ├── walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
+│   ├── HDL_cholesterol.rda
+│   ├── HDL_cholesterol.varianceRatio.txt
+```
+
+
 ## Step 2
 
 ```
 bash 02_step2_SPAtests_variant_and_gene.sh \
-    --chr chr1 \
-    --testType "variant" \
-    --plink "in/exome" \
-    --modelFile out/walkthrough \
+    --chr chr11 \
+    --testType "group" \
+    --plink in/ukb_wes_450k.qced.chr$chr.bed
     --varianceRatio out/walkthrough \
-    --groupFile in/ \
-    --outputPrefix $output_prefix \
+    --groupFile out/walkthrough \
+    --outputPrefix out/chr11_HDL_cholesterol \
+    --annotations in/ukb_brava_annotations.txt \
     --isSingularity false \
-    --subSampleFile in/subsample_file/* \
-    --sparseGRM in/GRM/* \
-    --sparseGRMID in/GRM_samples/*
+    --subSampleFile in/sample_ids.txt \
+    --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
+    --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
+
+This took 1 hour 47 minutes with 8 cores. For verification of rare variant [genebass](https://app.genebass.org/) is a useful resource. Looking at [HDL Cholesterol](https://app.genebass.org/gene/undefined/phenotype/continuous-30760-both_sexes--irnt?resultIndex=gene-manhattan&resultLayout=full) we can see that APOC3 (ENSG00000110245) (pLoF, SKAT-O) has a association with p=1.24e-322. Looking at the gene result file `out/chr11_HDL_cholesterol.txt` we see the result:
+```
+Region	Group	max_MAF	Pvalue	Pvalue_Burden	Pvalue_SKAT	BETA_Burden	SE_Burden	MAC	Number_rare	Number_ultra_rare
+ENSG00000110245	pLoF	0.0100	3.318754e-305	4.741078e-306	5.078064e-288	0.034034	0.000910	1753.0	2.0	0.0
+```
+
+Replication! Of course we are using approximately the same cohort here (UK Biobank, European) but if you are following along with a HDL Cholesterol phenotype you will likely be able to observe similar results given sufficient power.
+
+Another method of verification we reccomend is the QQ-plot, the expected vs observed p-values given the null hypothesis. Below we plot the variant qq-plot using Python:
+
+```
+# Plot qqplot:
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.stats as stats
+
+
+def qqplot(results, pheno, type, max_maf=None, anno=None):
+
+    def get_expected(n):
+        exp = -np.log10(np.linspace(start=1,stop=1/n,num=n))
+        return exp
+
+    # Get 95% confidence interval
+    def get_CI_intervals(n, CI=0.95):
+        k = np.arange(1,n+1)
+        a = k
+        b = n+1-k
+        intervals=stats.beta.interval(CI, a, b)
+        return intervals
+
+    def get_lambda_gc(chisq_vec):
+        return np.median(chisq_vec)/stats.chi2.ppf(q=0.5, df=1)
+
+    if type == "gene":
+        pvals = results["Pvalue"][
+                                  (results["max_MAF"] == max_maf) & 
+                                  (results["Group"] == anno)]
+
+    elif type == "variant":
+        pvals = results["p.value"]
+
+    if len(pvals) == 0:
+        print(f"No results for {pheno} {sex}")
+        return
+
+    pvals = np.sort(pvals)
+    pvals = pvals[pvals > 0]
+    n = len(pvals)
+
+    exp = get_expected(n)
+    intervals = get_CI_intervals(n)
+
+    x = exp[::-1]
+    y = -np.log10(pvals)
+
+    plt.figure(figsize=(10,10))
+    if type == "gene": 
+        plt.title(f"SAIGE-{type} results: {pheno} \nMax Allele Frequency:{max_maf} annotation:{anno} lambda_gc:{get_lambda_gc(pvals):.2f}")
+    elif type == "variant": 
+        plt.title(f"SAIGE-{type} results: {pheno}\nlambda_gc:{get_lambda_gc(pvals):.2f}")
+
+    plt.xlabel("Expected -log10(p)")
+    plt.ylabel("Observed -log10(p)")
+
+    plt.fill_between(x=exp[::-1], y1=-np.log10(intervals[0]), y2=-np.log10(intervals[1]), color="gray", alpha=0.3, label="95% CI")
+
+    plt.plot([0, max(exp[::-1])], [0, max(exp[::-1])], color="red")
+    plt.plot(x, y, 'o')
+
+gene_results = results_dir + "chr11_HDL_cholesterol.txt"
+gene_results = pd.read_csv(gene_results, sep="\t")
+
+qqplot(gene_results, "HDL_cholesterol", "gene", max_maf=0.01, anno="damaging_missense")
+
+variant_results = results_dir + "chr11_HDL_cholesterol.txt.singleAssoc.txt"
+variant_results = pd.read_csv(variant_results, sep="\t")
+
+qqplot(variant_results, "HDL_cholesterol", "variant")
+```
+![image](https://user-images.githubusercontent.com/43707014/236252715-93df0a07-9799-4e50-85af-c679631a4bc3.png)
+
+Taking a closer look:
+
+`qqplot(variant_results[variant_results["p.value"] > 5E-8], "HDL_cholesterol", "variant")`
+
+![image](https://user-images.githubusercontent.com/43707014/236253166-f298e828-1954-4edf-96c9-c7638032dde9.png)
+
+
