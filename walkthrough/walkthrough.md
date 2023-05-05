@@ -74,7 +74,7 @@ bash 00_step0_VR_and_GRM.sh \
     --generate_GRM
 ```
 
-This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Checking the out directory I can now see:
+This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Checking the out directory we can see:
 
 ```
 .
@@ -90,7 +90,7 @@ This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Checking 
 
 ## Step 1
 
-In step 1 we will be estimating the variance ratios for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait HDL cholesterol as an example. 
+In step 1 we will be fitting then null model for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait HDL cholesterol as an example. 
 
 `head phenoFile.txt`
 
@@ -115,7 +115,7 @@ bash 01_step1_fitNULLGLMM.sh \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
 
-This took 10 minutes with 4 cores. Checking the out directory I can now see:
+This took 10 minutes with 4 cores. Checking the out/ directory we can see:
 
 ```
 .
@@ -148,15 +148,15 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
 
-This took 1 hour 47 minutes with 8 cores. For verification of rare variant [genebass](https://app.genebass.org/) is a useful resource. Looking at [HDL Cholesterol](https://app.genebass.org/gene/undefined/phenotype/continuous-30760-both_sexes--irnt?resultIndex=gene-manhattan&resultLayout=full) we can see that APOC3 (ENSG00000110245) (pLoF, SKAT-O) has a association with p=1.24e-322. Looking at the gene result file `out/chr11_HDL_cholesterol.txt` we see the result:
+This took 1 hour 47 minutes with 8 cores. For verification of rare variant association results [genebass](https://app.genebass.org/) is a useful resource. Checking [HDL Cholesterol](https://app.genebass.org/gene/undefined/phenotype/continuous-30760-both_sexes--irnt?resultIndex=gene-manhattan&resultLayout=full) we can see that APOC3 (ENSG00000110245) (pLoF, SKAT-O) has a association with p=1.24e-322. Looking at the gene result file `out/chr11_HDL_cholesterol.txt` we see the result:
 ```
 Region	Group	max_MAF	Pvalue	Pvalue_Burden	Pvalue_SKAT	BETA_Burden	SE_Burden	MAC	Number_rare	Number_ultra_rare
 ENSG00000110245	pLoF	0.0100	3.318754e-305	4.741078e-306	5.078064e-288	0.034034	0.000910	1753.0	2.0	0.0
 ```
 
-Replication! Of course we are using approximately the same cohort here (UK Biobank, European) but if you are following along with a HDL Cholesterol phenotype you will likely be able to observe similar results given sufficient power.
+Replication! Of course we are using approximately the same cohort here (UK Biobank, European) but if you are following along with a HDL Cholesterol phenotype you will hopefully be able to observe similar results given sufficient power.
 
-Another method of verification we reccomend is the QQ-plot, the expected vs observed p-values given the null hypothesis. Below we plot the variant qq-plot using Python:
+Another method of verification we reccomend is checking the QQ-plot, the expected vs observed p-values given the null hypothesis. Below we plot the variant qq-plot using Python:
 
 ```
 # Plot qqplot:
@@ -228,6 +228,9 @@ variant_results = pd.read_csv(variant_results, sep="\t")
 
 qqplot(variant_results, "HDL_cholesterol", "variant")
 ```
+
+Note that due to fast testing enables results with p<0.05 may be skewed and effect the lambda value. 
+
 ![image](https://user-images.githubusercontent.com/43707014/236252715-93df0a07-9799-4e50-85af-c679631a4bc3.png)
 
 Taking a closer look:
