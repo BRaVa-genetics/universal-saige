@@ -1,15 +1,3 @@
-TODO: 
-- change step 1 to use the plink file for VR to restrict samples use awk to extract the right column and pass to SAIGE
-- remove GRM and VR creation from step 1, and create an error message telling the user to run step 0.
-- ensure that all samples in the vcf are present in the plink files
-- code to generate the groupFiles
-- step 2: add description of what the SUBSAMPLES file is and it's format to this document
-- ensure step 0 help matches this help
-- ensure step 1 help matches this help
-- ensure step 2 help matches this help
-- add a proposed clean directory structure for inputs and outputs
-- should generate GRM and generate plink for VR be optional?
-
 # Universal SAIGE
 
 Run SAIGE preprocessing and steps 1 and 2 without any hassle.
