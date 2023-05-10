@@ -3,7 +3,7 @@
 ## Introduction
 
 Universal-saige has been created to standardise the usage of [SAIGE](https://github.com/saigegit/SAIGE) for [BRaVa](https://brava-genetics.github.io/BRaVa/) across a variety of different computing environments.
-In this walkthrough we will demonstrate how to generate gene and variant associations for the BRaVa phenotype on chromosome 22 with a final section on sanity-checking results. 
+In this walkthrough we will demonstrate how to generate gene and variant associations for the BRaVa phenotype HDL Cholesterol on chromosome 11 with a final section on sanity-checking results. 
 
 ## Support
 
@@ -26,7 +26,7 @@ giving guarantees that analyses across cohorts are equivalent and easily reprodu
 
 ## Setup
 
-To run universal-saige we need to download plink and the SAIGE container. These steps are seperated out into `download_resources.sh`:
+To run universal-saige we need to download plink and the SAIGE image. These steps are seperated out into `download_resources.sh`:
 
 ### Setup (if using Docker)
 `bash download_resources.sh --saige-image --plink`
@@ -46,7 +46,7 @@ cd universal-saige
 mkdir out in
 ```
 
-For this walkthrough we will be running step 0 with genotype plinks.
+For this walkthrough we will be running step 0 with genotype plink files. sample_ids.txt is a file with newline seperated sample IDs.
 NOTE: Docker and Singularity require all input files to be within one directory that must not contain any linked files (so no `ln -s` your input files into your dir).
 Currently my directory looks like:
 
@@ -57,8 +57,8 @@ Currently my directory looks like:
 ├── out/
 ├── in/
 │   ├── ukb_genotypes_chr*.bed   # genotype bed files
-│   ├── ukb_genotypes_chr*.bim.  # genotype bim files
-│   ├── ukb_genotypes_chr*.fam.  # genotype fam files
+│   ├── ukb_genotypes_chr*.bim   # genotype bim files
+│   ├── ukb_genotypes_chr*.fam   # genotype fam files
 │   ├── sample_ids.txt           # --sampleIDs
 ```
 
@@ -74,7 +74,7 @@ bash 00_step0_VR_and_GRM.sh \
     --generate_GRM
 ```
 
-This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Checking the out directory we can see:
+This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspecting the out directory we can see:
 
 ```
 .
@@ -90,7 +90,7 @@ This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Checking 
 
 ## Step 1
 
-In step 1 we will be fitting then null model for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait HDL cholesterol as an example. 
+In step 1 we will be fitting the null model for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait HDL Cholesterol as an example. 
 
 `head phenoFile.txt`
 
@@ -133,11 +133,22 @@ This took 10 minutes with 4 cores. Checking the out/ directory we can see:
 
 ## Step 2
 
+Step 2 requires variant annotations which can be generated here [annotation repo]. 
+`head in/ukb_brava_annotations.txt`
+```
+ENSG00000187634 var chr1:943315:T:C
+ENSG00000187634 anno damaging_missense
+ENSG00000187961 var chr1:961514:T:C chr1:962037:C:T chr1:962807:T:C
+ENSG00000187961 anno damaging_missense damaging_missense damaging_missense
+```
+
+Finally we perform the chromosome-phenotype specific association test:
+
 ```
 bash 02_step2_SPAtests_variant_and_gene.sh \
     --chr chr11 \
     --testType "group" \
-    --plink in/ukb_wes_450k.qced.chr$chr.bed
+    --plink in/ukb_wes_450k.qced.chr$chr.bed \
     --varianceRatio out/walkthrough \
     --groupFile out/walkthrough \
     --outputPrefix out/chr11_HDL_cholesterol \
@@ -156,14 +167,14 @@ ENSG00000110245	pLoF	0.0100	3.318754e-305	4.741078e-306	5.078064e-288	0.034034	0
 
 Replication! Of course we are using approximately the same cohort here (UK Biobank, European) but if you are following along with a HDL Cholesterol phenotype you will hopefully be able to observe similar results given sufficient power.
 
-Another method of verification we reccomend is checking the QQ-plot, the expected vs observed p-values given the null hypothesis. Below we plot the variant qq-plot using Python:
+Another method of verification we reccomend is checking the QQ-plot, the expected vs observed p-values given the null hypothesis of the test. Below we plot the variant qq-plot using Python:
 
 ```
 # Plot qqplot:
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as stats
-
+import pandas as pd
 
 def qqplot(results, pheno, type, max_maf=None, anno=None):
 
@@ -218,6 +229,8 @@ def qqplot(results, pheno, type, max_maf=None, anno=None):
     plt.plot([0, max(exp[::-1])], [0, max(exp[::-1])], color="red")
     plt.plot(x, y, 'o')
 
+results_dir = "out/"
+
 gene_results = results_dir + "chr11_HDL_cholesterol.txt"
 gene_results = pd.read_csv(gene_results, sep="\t")
 
@@ -239,4 +252,4 @@ Taking a closer look:
 
 ![image](https://user-images.githubusercontent.com/43707014/236253166-f298e828-1954-4edf-96c9-c7638032dde9.png)
 
-
+In this QQ-plot while we see some inflation from the expected p-values this is plausibly polygenicity given what we know about the trait. 
