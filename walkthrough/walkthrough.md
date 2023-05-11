@@ -3,11 +3,11 @@
 ## Introduction
 
 Universal-saige has been created to standardise the usage of [SAIGE](https://github.com/saigegit/SAIGE) for [BRaVa](https://brava-genetics.github.io/BRaVa/) across a variety of different computing environments.
-In this walkthrough we will demonstrate how to generate gene and variant associations for the BRaVa phenotype HDL Cholesterol on chromosome 11 with a final section on sanity-checking results. 
+In this walkthrough we will demonstrate how to generate gene and variant associations for the BRaVa phenotype HDL cholesterol on chromosome 11 with a final section on sanity-checking results. 
 
 ## Support
 
-If at any point you run into issues or have any questions please create an issue in this (public) repository. You can also email `barney.hill@ndph.ox.ac.uk`
+If at any point you run into issues or have any questions please create an issue in this (public) repository. You can also email `barney.hill@ndph.ox.ac.uk` or `duncan.palmer@ndph.ox.ac.uk`.
 
 ## Requirements
 
@@ -15,14 +15,13 @@ If at any point you run into issues or have any questions please create an issue
 
 - Genotype data, plink (optional), ideally used in place of exome data for step 0
 - Exome data, vcf or plink. 
-- Sample IDs, a list of sampleIDs to analyse.
+- Sample IDs, a list of sample IDs to analyse.
 - Annotation file
 - BRaVa phenotype file (provided)
 
 ### Environment
 
-The only env requirement for this walkthrough is access to a linux machine with either Docker or Singularity available. With Docker or Singularity we can run Wei Zhou's [SAIGE Docker container](https://hub.docker.com/r/wzhou88/saige)
-giving guarantees that analyses across cohorts are equivalent and easily reproducible. 
+The only env requirement for this walkthrough is access to a linux machine with either Docker or Singularity available. With Docker or Singularity we can run Wei Zhou's [SAIGE Docker container](https://hub.docker.com/r/wzhou88/saige), giving guarantees that analyses across cohorts are equivalent and easily reproducible. 
 
 ## Setup
 
@@ -35,18 +34,18 @@ To run universal-saige we need to download plink and the SAIGE image. These step
 
 ## Step 0 
 
-To start we must generate the sparse GRM (genetic relatedness matrix) and processed plink files for usage in variance ratio estimation during step 1. While this step may take several hours to run it only has to be executed once per biobank.
+To start we must generate the sparse genetic relatedness matrix (GRM) and processed plink files for usage in variance ratio estimation during step 1. While this step may take several hours to run, it only has to be executed once per biobank/cohort.
 Step 0 supports (genotype data, plink format), (exome data, vcf format) and (exome data, plink format) as inputs although we reccomend the usage of (genotype, plink format) in order to reduce runtime and maximise the number of independent sites.
-For this step we reccomend using a larger machine - most functions in this step are parallelised across CPU cores and will benefit from high RAM. 
+For this step we recommend using a larger machine - most functions in this step are parallelised across CPU cores and will benefit from high RAM. 
 
-To begin clone the latest version of universal-saige
+To begin, clone the latest version of universal-saige
 ```
 git clone git@github.com:BRaVa-genetics/universal-saige.git
 cd universal-saige
 mkdir out in
 ```
 
-For this walkthrough we will be running step 0 with genotype plink files. sample_ids.txt is a file with newline seperated sample IDs.
+For this walkthrough we will be running step 0 with plink files based on genotype array data. sample_ids.txt is a file with newline seperated sample IDs.
 NOTE: Docker and Singularity require all input files to be within one directory that must not contain any linked files (so no `ln -s` your input files into your dir).
 Currently my directory looks like:
 
@@ -63,6 +62,7 @@ Currently my directory looks like:
 ```
 
 And I run step 0 with the arguments:
+
 ```
 bash 00_step0_VR_and_GRM.sh \
     --geneticDataDirectory in/ \
@@ -74,7 +74,7 @@ bash 00_step0_VR_and_GRM.sh \
     --generate_GRM
 ```
 
-This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspecting the out directory we can see:
+This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspecting the `out/` directory, we can see:
 
 ```
 .
@@ -90,7 +90,7 @@ This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspectin
 
 ## Step 1
 
-In step 1 we will be fitting the null model for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait HDL Cholesterol as an example. 
+In step 1 we will be fitting the null model for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait HDL cholesterol as an example. 
 
 `head phenoFile.txt`
 
@@ -115,7 +115,7 @@ bash 01_step1_fitNULLGLMM.sh \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
 
-This took 10 minutes with 4 cores. Checking the out/ directory we can see:
+This took 10 minutes with 4 cores. Checking the `out/` directory we can see:
 
 ```
 .
@@ -133,14 +133,18 @@ This took 10 minutes with 4 cores. Checking the out/ directory we can see:
 
 ## Step 2
 
-Step 2 requires variant annotations which can be generated here [annotation repo]. 
+Step 2 requires variant annotations which can be generated here [annotation repo]. A summary of the thresholds and software versioning used for variant annotation within BRaVa can be found [here](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1). The top of the file looks like this:
+
 `head in/ukb_brava_annotations.txt`
+
 ```
 ENSG00000187634 var chr1:943315:T:C
 ENSG00000187634 anno damaging_missense
 ENSG00000187961 var chr1:961514:T:C chr1:962037:C:T chr1:962807:T:C
 ENSG00000187961 anno damaging_missense damaging_missense damaging_missense
 ```
+
+Here, each gene (coded according to Ensembl ID in column 1) receives two lines, a variant line (`var`) and an annotation line `anno` (column two). All subsequent information on each pair of gene specific lines contains space delimited information mapping the variant information onto the assocated annotation(s). 
 
 Finally we perform the chromosome-phenotype specific association test:
 
@@ -159,7 +163,7 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
 
-This took 1 hour 47 minutes with 8 cores. For verification of rare variant association results [genebass](https://app.genebass.org/) is a useful resource. Checking [HDL Cholesterol](https://app.genebass.org/gene/undefined/phenotype/continuous-30760-both_sexes--irnt?resultIndex=gene-manhattan&resultLayout=full) we can see that APOC3 (ENSG00000110245) (pLoF, SKAT-O) has a association with p=1.24e-322. Looking at the gene result file `out/chr11_HDL_cholesterol.txt` we see the result:
+This took 1 hour 47 minutes with 8 cores. For verification of rare variant association results [genebass](https://app.genebass.org/) is a useful resource. Checking [HDL cholesterol](https://app.genebass.org/gene/undefined/phenotype/continuous-30760-both_sexes--irnt?resultIndex=gene-manhattan&resultLayout=full) we can see that APOC3 (ENSG00000110245) (pLoF, SKAT-O) has a association with p=1.24e-322. Looking at the gene result file `out/chr11_HDL_cholesterol.txt` we see the result:
 ```
 Region	Group	max_MAF	Pvalue	Pvalue_Burden	Pvalue_SKAT	BETA_Burden	SE_Burden	MAC	Number_rare	Number_ultra_rare
 ENSG00000110245	pLoF	0.0100	3.318754e-305	4.741078e-306	5.078064e-288	0.034034	0.000910	1753.0	2.0	0.0
@@ -242,7 +246,7 @@ variant_results = pd.read_csv(variant_results, sep="\t")
 qqplot(variant_results, "HDL_cholesterol", "variant")
 ```
 
-Note that due to fast testing enables results with p<0.05 may be skewed and effect the lambda value. 
+Note that due to fast testing enables results with p>0.05 may be skewed and affect the lambda value. 
 
 ![image](https://user-images.githubusercontent.com/43707014/236252715-93df0a07-9799-4e50-85af-c679631a4bc3.png)
 
