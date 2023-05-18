@@ -1,15 +1,25 @@
-# Universal SAIGE
+<h1 align="center">
+  Universal-SAIGE
+</h1>
 
 Run SAIGE preprocessing and steps 1 and 2 without any hassle.
 
+- Containerised SAIGE (Docker / Singularity) ✅
+- Supporting VCF and PLINK exome data formats ✅
+- Parallelised across ancestry, phenotypes and chromosomes ✅
+- Sanity Checks ✅
+- Walkthrough and support ✅
+
 ## System Requirements
-- Internet connection (to download [SAIGE docker image](https://hub.docker.com/r/wzhou88/saige))
+- Internet connection (only needed once for download_resources.sh)
 - Docker OR Singularity
 - Linux OR Mac
 
 ## Input data (required)
 - `{WES, WGS}` data in plink (`.bim/.bed/.fam`) or VCF format
-- Sample ID file containing the corresponding phenotype and covariate values.
+- Sample IDs, ancestry specific sample IDs to analyse
+- Annotation file ([details found here](https://docs.google.com/document/d/1emWqbX8ohi-9rYIW_pKSAFiMHZZUV6zyXwg7qWJNdlc/edit#heading=h.puz6ua3vxnca))
+- BRaVa phenotype file (details found here)
 
 ## Input data (optional)
 - Genotyping array data for every sample included in the WES data above.
