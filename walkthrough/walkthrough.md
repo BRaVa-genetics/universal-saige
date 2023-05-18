@@ -31,7 +31,7 @@ The only env requirement for this walkthrough is access to a linux machine with 
 
 ## Setup
 
-To run universal-saige we need to download plink and the SAIGE image. These steps are seperated out into `download_resources.sh`:
+To run universal-saige we need to download plink and the SAIGE image. These steps are separated out into `download_resources.sh`:
 
 ### Setup (if using Docker)
 `bash download_resources.sh --saige-image --plink`
@@ -51,7 +51,7 @@ cd universal-saige
 mkdir out in
 ```
 
-For this walkthrough we will be running step 0 with plink files based on genotype array data. sample_ids.txt is a file with newline seperated sample IDs.
+For this walkthrough we will be running step 0 with plink files based on genotype array data. sample_ids.txt is a file with newline separated sample IDs.
 NOTE: Docker and Singularity require all input files to be within one directory that must not contain any linked files (so no `ln -s` your input files into your dir).
 Currently my directory looks like:
 
