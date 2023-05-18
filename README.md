@@ -21,7 +21,7 @@ _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 - Linux OR Mac
 
 ## Input data (required)
-- `{WES, WGS}` data in PLINK (`.bim/.bed/.fam`) or VCF format
+- WES data in PLINK (`.bim/.bed/.fam`) or VCF format
 - Sample IDs, (ancestry specific)
 - Annotation file ([details found here]([https://docs.google.com/document/d/1emWqbX8ohi-9rYIW_pKSAFiMHZZUV6zyXwg7qWJNdlc/edit#heading=h.puz6ua3vxnca](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1)))
 - BRaVa phenotype file (tsv) with 'IID' (sample ID) column and covariates
