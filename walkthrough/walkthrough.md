@@ -2,12 +2,18 @@
 
 ## Introduction
 
-Universal-saige has been created to standardise the usage of [SAIGE](https://github.com/saigegit/SAIGE) for [BRaVa](https://brava-genetics.github.io/BRaVa/) across a variety of different computing environments.
+Universal-SAIGE has been created to standardise the usage of [SAIGE](https://github.com/saigegit/SAIGE) for [BRaVa](https://brava-genetics.github.io/BRaVa/) across a variety of different computing environments.
 In this walkthrough we will demonstrate how to generate gene and variant associations for the BRaVa phenotype HDL cholesterol on chromosome 11 with a final section on sanity-checking results. 
 
 ## Support
 
 If at any point you run into issues or have any questions please create an issue in this (public) repository. You can also email `barney.hill@ndph.ox.ac.uk` or `duncan.palmer@ndph.ox.ac.uk`.
+
+## Caution
+
+A few things to be aware of:
+- SAIGE can fail in a variety of ways due to low case count - we don't handle this within universal-SAIGE but step1 / step2 failing across an entire phenotype x ancestry is a likely indicator for this
+- When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results / crashes.
 
 ## Requirements
 
