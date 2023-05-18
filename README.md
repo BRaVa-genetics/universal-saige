@@ -2,6 +2,11 @@
   Universal-SAIGE
 </h1>
 
+<p align="center">
+  <img src="universal-saige.png" alt="VroomAI"/>
+</p>
+
+
 Run SAIGE preprocessing and steps 1 and 2 without any hassle.
 
 - Containerised SAIGE (Docker / Singularity) ✅
