@@ -87,8 +87,8 @@ This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspectin
 ├── ...
 ├── out/
 │   ├── walkthrough.plink_for_var_ratio.bed
-│   ├── walkthrough.plink_for_var_ratio.bed
-│   ├── walkthrough.plink_for_var_ratio.bed
+│   ├── walkthrough.plink_for_var_ratio.bim
+│   ├── walkthrough.plink_for_var_ratio.fam
 │   ├── walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx
 │   ├── walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 
@@ -128,8 +128,8 @@ This took 10 minutes with 4 cores. Checking the `out/` directory we can see:
 ├── ...
 ├── out/
 │   ├── walkthrough.plink_for_var_ratio.bed
-│   ├── walkthrough.plink_for_var_ratio.bed
-│   ├── walkthrough.plink_for_var_ratio.bed
+│   ├── walkthrough.plink_for_var_ratio.bim
+│   ├── walkthrough.plink_for_var_ratio.fam
 │   ├── walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx
 │   ├── walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 │   ├── HDL_cholesterol.rda
