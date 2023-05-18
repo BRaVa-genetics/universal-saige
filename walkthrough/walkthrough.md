@@ -144,10 +144,10 @@ Step 2 requires variant annotations which can be generated here [annotation repo
 `head in/ukb_brava_annotations.txt`
 
 ```
-ENSG00000187634 var chr1:943315:T:C
-ENSG00000187634 anno damaging_missense
-ENSG00000187961 var chr1:961514:T:C chr1:962037:C:T chr1:962807:T:C
-ENSG00000187961 anno damaging_missense damaging_missense damaging_missense
+ENSG00000187634 var chr1:943315:T:C chr1:962890:T:A
+ENSG00000187634 anno damaging_missense non_coding
+ENSG00000187961 var chr1:961514:T:C chr1:962037:C:T chr1:962807:T:C 
+ENSG00000187961 anno synonymous damaging_missense pLoF
 ```
 
 Here, each gene (coded according to Ensembl ID in column 1) receives two lines, a variant line (`var`) and an annotation line `anno` (column two). All subsequent information on each pair of gene specific lines contains space delimited information mapping the variant information onto the assocated annotation(s). 
