@@ -139,7 +139,7 @@ This took 10 minutes with 4 cores. Checking the `out/` directory we can see:
 
 ## Step 2
 
-Step 2 requires variant annotations which can be generated here [annotation repo]. A summary of the thresholds and software versioning used for variant annotation within BRaVa can be found [here](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1). The top of the file looks like this:
+Step 2 requires variant annotations which can be generated [here](https://github.com/BRaVa-genetics/variant-annotation). A summary of the thresholds and software versioning used for variant annotation within BRaVa can be found [here](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1). The top of the file looks like this:
 
 `head in/ukb_brava_annotations.txt`
 
