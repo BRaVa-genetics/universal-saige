@@ -212,7 +212,7 @@ elif [[ ${VCF} != "" ]]; then
   BED=""
   BIM=""
   FAM="" 
-  VCF="${HOME}/${VCF}"
+  VCF="${VCF}"
 else
   echo "No plink or vcf found!"
   exit 1
