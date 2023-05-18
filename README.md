@@ -13,7 +13,7 @@ _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 - Supporting VCF and PLINK exome data formats ✅
 - Parallelised across ancestry, phenotypes and chromosomes ✅
 - Sanity Checks ✅
-- Walkthrough and support ✅
+- [Walkthrough](https://github.com/BRaVa-genetics/universal-saige/blob/main/walkthrough/walkthrough.md) and support ✅
 
 ## System Requirements
 - Internet connection (only needed once for download_resources.sh)
