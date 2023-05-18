@@ -21,9 +21,9 @@ A few things to be aware of:
 
 - Genotype data, plink (optional), ideally used in place of exome data for step 0
 - Exome data, vcf or plink. 
-- Sample IDs, a list of sample IDs to analyse.
-- Annotation file
-- BRaVa phenotype file (provided)
+- Sample IDs, (ancestry specific)
+- Annotation file ([details found here](https://docs.google.com/document/d/1emWqbX8ohi-9rYIW_pKSAFiMHZZUV6zyXwg7qWJNdlc/edit#heading=h.puz6ua3vxnca](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1)))
+- BRaVa phenotype file (tsv) with 'IID' (sample ID) column and covariates
 
 ### Environment
 
