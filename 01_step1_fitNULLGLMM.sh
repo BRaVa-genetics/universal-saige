@@ -196,7 +196,7 @@ fi
 
 cmd="""step1_fitNULLGLMM.R \
       --plinkFile "${HOME}/${GENOTYPE_PLINK}" \
-	    --sparseGRMFile ${HOME}/${SPARSEGRM} \
+      --sparseGRMFile ${HOME}/${SPARSEGRM} \
       --sparseGRMSampleIDFile ${HOME}/${SPARSEGRMID} \
       --useSparseGRMtoFitNULL=TRUE \
       --phenoFile ${HOME}/${PHENOFILE} \
@@ -212,6 +212,6 @@ cmd="""step1_fitNULLGLMM.R \
       --nThreads=${n_threads} \
       --isCateVarianceRatio=TRUE \
       --relatednessCutoff=0.125 \
-	    --SampleIDIncludeFile=${SAMPLEIDS}"""
+      --SampleIDIncludeFile=${SAMPLEIDS}"""
 
 run_container
