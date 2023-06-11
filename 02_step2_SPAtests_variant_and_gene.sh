@@ -194,11 +194,11 @@ WD=$( pwd )
 
 if [[ "$TESTTYPE" = "variant" ]]; then
   echo "variant testing"
-  min_mac="0.5"
+  min_mac="20"
   GROUPFILE=""
 else
   echo "gene testing"
-  min_mac=20
+  min_mac="0.5"
   GROUPFILE="${HOME}/${GROUPFILE}"
 fi
 
@@ -241,9 +241,8 @@ cmd="step2_SPAtests.R \
         --is_fastTest=TRUE \
         --is_output_markerList_in_groupTest=TRUE \
         --is_single_in_groupTest=TRUE \
+	--maxMAF_in_groupTest=0.0001,0.001,0.01 \
         --SAIGEOutputFile=${HOME}/${OUT}.txt
     "
-
-echo "Running variant based tests for all variants in with MAC > 20"
 
 run_container
