@@ -15,7 +15,7 @@ SPARSEGRM=""
 SPARSEGRMID=""
 GROUPFILE=""
 
-saige_version="1.1.8"
+saige_version="1.1.9"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -194,7 +194,7 @@ WD=$( pwd )
 
 if [[ "$TESTTYPE" = "variant" ]]; then
   echo "variant testing"
-  min_mac=0.5
+  min_mac="0.5"
   GROUPFILE=""
 else
   echo "gene testing"
@@ -224,16 +224,16 @@ cmd="step2_SPAtests.R \
         --famFile=$FAM \
         --groupFile=$GROUPFILE \
         --annotation_in_groupTest=$ANNOTATIONS \
-	      --vcfFile=${VCF} \
+        --vcfFile=${VCF} \
         --vcfField="DS" \
         --chrom="$CHR" \
-		    --minMAF=0 \
+        --minMAF=0 \
         --minMAC=${min_mac} \
         --GMMATmodelFile=${HOME}/${MODELFILE} \
         --varianceRatioFile=${HOME}/${VARIANCERATIO} \
         --sparseGRMFile=${HOME}/${SPARSEGRM} \
         --sparseGRMSampleIDFile=${HOME}/${SPARSEGRMID} \
-	      --subSampleFile=${SUBSAMPLES} \
+        --subSampleFile=${SUBSAMPLES} \
         --LOCO=FALSE \
         --is_Firth_beta=TRUE \
         --pCutoffforFirth=0.1 \
