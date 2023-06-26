@@ -236,7 +236,6 @@ cmd="""step1_fitNULLGLMM.R \
       --IsOverwriteVarianceRatioFile=TRUE \
       --nThreads=${n_threads} \
       --isCateVarianceRatio=TRUE \
-      --relatednessCutoff=0.125 \
       --SampleIDIncludeFile=${SAMPLEIDS}"""
 
 run_container
