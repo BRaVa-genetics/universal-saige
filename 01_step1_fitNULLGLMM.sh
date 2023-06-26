@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source ./run_container.sh
+source ./check_pheno.sh
 
 POSITIONAL_ARGS=()
 
@@ -162,6 +163,11 @@ echo "COVARCOLLIST      = ${COVARCOLLIST}"
 echo "CATEGCOVARCOLLIST = ${CATEGCOVARCOLLIST}"
 echo "SAMPLEIDS         = ${SAMPLEIDS}"
 echo "SAMPLEIDCOL       = ${SAMPLEIDCOL}"
+
+
+if is_valid_r_var "$PHENOCOL"; then
+    echo "The variable name '$PHENOCOL' is not valid for an R variable."
+fi
 
 if [[ "$PHENOCOL" =~ .*"-".* || "$PHENOCOL" =~ .*",".* || "$PHENOCOL" =~ .*"=".* ]]; then
   echo "Phenotype name cannot contain \"-\" or \",\" or \"=\""

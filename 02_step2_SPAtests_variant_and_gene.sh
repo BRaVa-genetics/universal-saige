@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source ./run_container.sh
+source ./check_pheno.sh
 
 POSITIONAL_ARGS=()
 
@@ -116,6 +117,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+if is_valid_r_var "$PHENOCOL"; then
+    echo "The variable name '$PHENOCOL' is not valid for an R variable."
+fi
 
 # Checks
 if [[ ${TESTTYPE} == "" ]]; then
