@@ -193,12 +193,9 @@ if [[ "$PHENOCOL" =~ .*"-".* || "$PHENOCOL" =~ .*",".* || "$PHENOCOL" =~ .*"=".*
   exit 1
 fi
 
-if [[ ${SPARSEGRM} == "" || ${SPARSEGRMID} == "" ]]; then
-  if [[ ${GENOTYPE_PLINK} == "" ]]; then
-    echo "Genotype plink files plink.{bim,bed,fam} not set - cannot generate GRM!"
-    exit 1
-  fi
-  generate_GRM
+if [[ ${GENOTYPE_PLINK} == "" ]]; then
+  echo "Plink file not specified. Note, this is the plink file used to determine the variance ratio."
+  echo "You can automatically generate it in step 0, the collection of plink files end with .plink_for_var_ratio.{bim,bed,fam}."
 fi
 
 # For debugging
