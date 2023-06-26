@@ -90,7 +90,7 @@ while [[ $# -gt 0 ]]; do
       GROUPFILE="$2"
       shift # past argument
       shift # past value
-      ;;
+      ;; 
     --annotations)
       ANNOTATIONS="$2"
       shift # past argument
@@ -106,8 +106,13 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-    --sparseGRMID)
-      SPARSEGRMID="$2"
+    --phenotype)
+      PHENOCOL="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --phenoFile)
+      PHENOFILE="$2"
       shift # past argument
       shift # past value
       ;;
