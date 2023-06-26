@@ -122,11 +122,11 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 if [[ ${SEX} == "M" || ${SEX} == "F" ]]; then
   # Getting column numbers
-  sex_col=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w 'sex' | cut -d: -f1)
-  pheno_col=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w $pheno | cut -d: -f1)
+  sex_col_num=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w 'sex' | cut -d: -f1)
+  pheno_col_num=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w $PHENOCOL | cut -d: -f1)
 
   # Checking for wrong entries
-  awk -v sex_col=$sex_col -v pheno_col=$pheno_col -v sex=$sex 'NR>1 && $pheno_col != "NA" && $sex_col != sex' $pheno_file | while read line
+  awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num -v sex=$sex 'NR>1 && $pheno_col != "NA" && $sex_col != sex' $pheno_file | while read line
   do
       echo "Error: Unexpected sex in line: $line"
       exit 1
