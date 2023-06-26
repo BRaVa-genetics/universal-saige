@@ -28,7 +28,7 @@ _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 - BRaVa phenotype file (tsv) with 'IID' (sample ID) column and covariates
 
 ## Input data (optional)
-- Genotyping array data for every sample included in the WES data above. Reccomended.
+- Genotyping array data for every sample included in the WES data above. Recommended.
 
 ## Usage
 ### Step 0 (once per cohort/biobank)
