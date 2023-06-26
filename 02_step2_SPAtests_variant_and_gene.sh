@@ -18,6 +18,16 @@ GROUPFILE=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --ancestry)
+      ANC="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --sex)
+      SEX="$2"
+      shift # past argument
+      shift # past value
+      ;;
     --dataset)
       DATASET="$2"
       shift # past argument
@@ -202,7 +212,7 @@ if [[ $trait_type = "continuous" ]]; then
     N=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="M") && ($pheno_col!="NA") {count++} END {print count}' $pheno_file)
   fi
 
-  OUT="${DATASET}.${LAST_NAME}.chr${CHR}_${phenoCol}.${FREEZE_NUMBER}.${SEX}.${anc}.${N}.SAIGE.$(date '+%Y%m%d')"
+  OUT="${DATASET}.${LAST_NAME}.chr${CHR}_${phenoCol}.${FREEZE_NUMBER}.${SEX}.${ANC}.${N}.SAIGE.$(date '+%Y%m%d')"
 
 elif [[ $trait_type = "binary" ]]; then
   if [[ $SEX == "BOTH" ]]; then
@@ -216,7 +226,7 @@ elif [[ $trait_type = "binary" ]]; then
     N_control=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="M") && ($pheno_col=="0") {count++} END {print count}' $pheno_file)
   fi
 
-  OUT="${DATASET}.${LAST_NAME}.chr${CHR}_${phenoCol}.${FREEZE_NUMBER}.${SEX}.${anc}.${N_case}.${N_control}.SAIGE.$(date '+%Y%m%d')"
+  OUT="${DATASET}.${LAST_NAME}.chr${CHR}_${phenoCol}.${FREEZE_NUMBER}.${SEX}.${ANC}.${N_case}.${N_control}.SAIGE.$(date '+%Y%m%d')"
 fi
 
 echo "OUT               = ${OUT}"
