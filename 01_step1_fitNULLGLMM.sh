@@ -221,6 +221,7 @@ fi
 
 cmd="""step1_fitNULLGLMM.R \
       --plinkFile "${HOME}/${GENOTYPE_PLINK}" \
+      --relatednessCutoff 0.05 \
       --sparseGRMFile ${HOME}/${SPARSEGRM} \
       --sparseGRMSampleIDFile ${HOME}/${SPARSEGRMID} \
       --useSparseGRMtoFitNULL=TRUE \
