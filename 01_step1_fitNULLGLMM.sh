@@ -83,6 +83,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --sex)
+      SEX="$2"
+      shift # past argument
+      shift # past value
+      ;;
     -h|--help)
       echo "usage: 01_step1_fitNULLGLMM.sh
   required:
@@ -98,6 +103,7 @@ while [[ $# -gt 0 ]]; do
     -c,--covarColList: comma separated column names (e.g. age,pc1,pc2) of continuous covariates to include as fixed effects in the file specified in --phenoFile.
     --categCovarColList: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
     --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
+    --sex ('M' or 'F')
       "
       shift # past argument
       ;;
@@ -113,6 +119,19 @@ while [[ $# -gt 0 ]]; do
 done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+if [[ ${SEX} == "M" || ${SEX} == "F" ]]; then
+  # Getting column numbers
+  sex_col=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w 'sex' | cut -d: -f1)
+  pheno_col=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w $pheno | cut -d: -f1)
+
+  # Checking for wrong entries
+  awk -v sex_col=$sex_col -v pheno_col=$pheno_col -v sex=$sex 'NR>1 && $pheno_col != "NA" && $sex_col != sex' $pheno_file | while read line
+  do
+      echo "Error: Unexpected sex in line: $line"
+      exit 1
+  done
+fi
 
 # Checks
 if [[ ${TRAITTYPE} == "" ]]; then
