@@ -106,6 +106,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --sparseGRMID)
+      SPARSEGRMID="$2"
+      shift # past argument
+      shift # past value
+      ;;
     --phenotype)
       PHENOCOL="$2"
       shift # past argument
