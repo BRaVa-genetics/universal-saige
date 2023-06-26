@@ -18,6 +18,21 @@ GROUPFILE=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --dataset)
+      DATASET="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --lastName)
+      LAST_NAME="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --freezeNumber)
+      FREEZE_NUMBER="$2"
+      shift # past argument
+      shift # past value
+      ;;  
     -o|--outputPrefix)
       OUT="$2"
       shift # past argument
@@ -167,8 +182,41 @@ if [[ $SUBSAMPLES != "" ]]; then
   SUBSAMPLES="${HOME}/${SUBSAMPLES}"
 fi
 
-if [[ $OUT = "out" ]]; then
-  echo "Warning: outputPrefix not set, setting outputPrefix to 'out'. Check that this will not overwrite existing files."
+# Get output file name
+
+# Get column numbers for 'sex' and the specified phenotype
+sex_col_num=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w 'sex' | cut -d: -f1)
+pheno_col_num=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w $PHENOCOL | cut -d: -f1)
+
+# Subtract 1 from column numbers because awk counts from 1 but grep from 0
+sex_col_num=$((sex_col_num - 1))
+pheno_col_num=$((pheno_col_num - 1))
+
+if [[ $trait_type = "continuous" ]]; then
+  # Count valid phenotype values for males (M), females (F), and both sexes
+  if [[ $SEX == "BOTH" ]]; then
+    N=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '(($sex_col=="M") || ($sex_col=="F")) && ($pheno_col!="NA") {count++} END {print count}' $pheno_file)
+  elif [[ $SEX == "F" ]]; then
+    N=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="F") && ($pheno_col!="NA") {count++} END {print count}' $pheno_file)
+  elif [[ $SEX == "M" ]]; then
+    N=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="M") && ($pheno_col!="NA") {count++} END {print count}' $pheno_file)
+  fi
+
+  OUT="${DATASET}.${LAST_NAME}.chr${CHR}_${phenoCol}.${FREEZE_NUMBER}.${SEX}.${anc}.${N}.SAIGE.$(date '+%Y%m%d')"
+
+elif [[ $trait_type = "binary" ]]; then
+  if [[ $SEX == "BOTH" ]]; then
+    N_case=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '(($sex_col=="M") || ($sex_col=="F")) && ($pheno_col=="1") {count++} END {print count}' $pheno_file)
+    N_control=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '(($sex_col=="M") || ($sex_col=="F")) && ($pheno_col=="0") {count++} END {print count}' $pheno_file)
+  elif [[ $SEX == "F" ]]; then
+    N_case=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="F") && ($pheno_col=="1") {count++} END {print count}' $pheno_file)
+    N_control=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="F") && ($pheno_col=="0") {count++} END {print count}' $pheno_file)
+  elif [[ $SEX == "M" ]]; then
+    N_case=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="M") && ($pheno_col=="1") {count++} END {print count}' $pheno_file)
+    N_control=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="M") && ($pheno_col=="0") {count++} END {print count}' $pheno_file)
+  fi
+
+  OUT="${DATASET}.${LAST_NAME}.chr${CHR}_${phenoCol}.${FREEZE_NUMBER}.${SEX}.${anc}.${N_case}.${N_control}.SAIGE.$(date '+%Y%m%d')"
 fi
 
 echo "OUT               = ${OUT}"
@@ -244,7 +292,7 @@ cmd="step2_SPAtests.R \
         --is_fastTest=TRUE \
         --is_output_markerList_in_groupTest=TRUE \
         --is_single_in_groupTest=TRUE \
-	--maxMAF_in_groupTest=0.0001,0.001,0.01 \
+	      --maxMAF_in_groupTest=0.0001,0.001,0.01 \
         --SAIGEOutputFile=${HOME}/${OUT}.txt
     "
 
