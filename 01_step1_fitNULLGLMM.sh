@@ -249,11 +249,11 @@ if [[ $OUT = "out" ]]; then
 fi
 
 if [[ $COVARCOLLIST = "" ]]; then
-  echo "Warning: no continuous fixed effeect covariates included."
+  echo "Warning: no continuous fixed effect covariates included."
 fi
 
 if [[ $CATEGCOVARCOLLIST = "" ]]; then
-  echo "Warning: no categorical fixed effeect covariates included."
+  echo "Warning: no categorical fixed effect covariates included."
 fi
 
 echo "OUT               = ${OUT}"
@@ -298,9 +298,11 @@ n_threads=$(( $(nproc --all) - 1 ))
 if [[ ${TRAITTYPE} == "quantitative" ]]; then
   echo "Quantitative trait passed to SAIGE, perform IRNT"
   INVNORMALISE=TRUE
+  TOL="0.00001"
 else
   echo "Binary trait passed to SAIGE"
   INVNORMALISE=FALSE
+  TOL="0.2" # SAIGE DEFAULT
 fi
 
 cmd="""step1_fitNULLGLMM.R \
@@ -319,6 +321,7 @@ cmd="""step1_fitNULLGLMM.R \
       --outputPrefix="${HOME}/${OUT}" \
       --IsOverwriteVarianceRatioFile=TRUE \
       --nThreads=${n_threads} \
-      --isCateVarianceRatio=TRUE"""
+      --isCateVarianceRatio=TRUE \
+      --tol ${TOL}"""
 
 run_container
