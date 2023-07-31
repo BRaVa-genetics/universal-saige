@@ -1,7 +1,7 @@
 #!/bin/bash
 
-source ./setup.sh
-source ./check.sh
+source ./run_container.sh
+source ./check_pheno.sh
 
 POSITIONAL_ARGS=()
 
@@ -18,8 +18,38 @@ GROUPFILE=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --ancestry)
+      ANC="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --sex)
+      SEX="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --dataset)
+      DATASET="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --lastName)
+      LAST_NAME="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --freezeNumber)
+      FREEZE_NUMBER="$2"
+      shift # past argument
+      shift # past value
+      ;;  
     -o|--outputPrefix)
       OUT="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --chr)
+      CHR="$2"
       shift # past argument
       shift # past value
       ;;
@@ -33,7 +63,6 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     -s|--isSingularity)
-      SINGULARITY=true
       shift # past argument
       shift # past value
       ;;
@@ -42,8 +71,8 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-	--vcf)
-	  VCF="$2"
+    --vcf)
+      VCF="$2"
       shift # past argument
       shift # past value
       ;;
@@ -59,6 +88,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     -g|--groupFile)
       GROUPFILE="$2"
+      shift # past argument
+      shift # past value
+      ;; 
+    --annotations)
+      ANNOTATIONS="$2"
       shift # past argument
       shift # past value
       ;;
@@ -77,6 +111,16 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --phenotype)
+      PHENOCOL="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --phenoFile)
+      PHENOFILE="$2"
+      shift # past argument
+      shift # past value
+      ;;
     -h|--help)
       echo "usage: 02_step2_SPAtests_variant_and_gene.sh
   required:
@@ -87,10 +131,12 @@ while [[ $# -gt 0 ]]; do
     --varianceRatio: filename of the varianceRatio file output from step 1. This must be in relation to the working directory.
     --sparseGRM: filename of the sparseGRM .mtx file. This must be present in the working directory at ./in/sparse_grm/
     --sparseGRMID: filename of the sparseGRM ID file. This must be present in the working directory at ./in/sparse_grm/
+	--chr: chromosome to test.
   optional:
     -o,--outputPrefix:  output prefix of the SAIGE step 2 output.
     -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
     -g,--groupFile: required if group test is selected. Filename of the annotation file used for group tests. This must be in relation to the working directory.
+    --annotations: required if group test is selected. comma seperated list of annotations to test found in groupfile.
       "
       shift # past argument
       ;;
@@ -107,16 +153,8 @@ done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
-check_container_env $SINGULARITY
-
-echo $SINGULARITY
-if [[ ${SINGULARITY} = true ]]; then
-  # check if saige sif exists:
-  if !(test -f "saige-${saige_version}.sif"); then
-    singularity pull "saige-${saige_version}.sif" "docker://wzhou88/saige:${saige_version}"
-  fi
-else
-  docker pull wzhou88/saige:${saige_version}
+if is_valid_r_var "$PHENOCOL"; then
+    echo "The variable name '$PHENOCOL' is not valid for an R variable."
 fi
 
 # Checks
@@ -155,8 +193,50 @@ if [[ $GROUPFILE == "" ]] && [[ ${TESTTYPE} == "group" ]]; then
   exit 1
 fi
 
-if [[ $OUT = "out" ]]; then
-  echo "Warning: outputPrefix not set, setting outputPrefix to 'out'. Check that this will not overwrite existing files."
+if [[ $ANNOTATIONS == "" ]] && [[ ${TESTTYPE} == "group" ]]; then
+  echo "attempting to run group tests without selected annotations"
+  exit 1
+fi
+
+if [[ $SUBSAMPLES != "" ]]; then
+  SUBSAMPLES="${HOME}/${SUBSAMPLES}"
+fi
+
+# Get output file name
+
+# Get column numbers for 'sex' and the specified phenotype
+sex_col_num=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w 'sex' | cut -d: -f1)
+pheno_col_num=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w $PHENOCOL | cut -d: -f1)
+
+# Subtract 1 from column numbers because awk counts from 1 but grep from 0
+sex_col_num=$((sex_col_num - 1))
+pheno_col_num=$((pheno_col_num - 1))
+
+if [[ $trait_type = "continuous" ]]; then
+  # Count valid phenotype values for males (M), females (F), and both sexes
+  if [[ $SEX == "BOTH" ]]; then
+    N=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '(($sex_col=="M") || ($sex_col=="F")) && ($pheno_col!="NA") {count++} END {print count}' $pheno_file)
+  elif [[ $SEX == "F" ]]; then
+    N=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="F") && ($pheno_col!="NA") {count++} END {print count}' $pheno_file)
+  elif [[ $SEX == "M" ]]; then
+    N=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="M") && ($pheno_col!="NA") {count++} END {print count}' $pheno_file)
+  fi
+
+  OUT="${DATASET}.${LAST_NAME}.chr${CHR}_${phenoCol}.${FREEZE_NUMBER}.${SEX}.${ANC}.${N}.SAIGE.$(date '+%Y%m%d')"
+
+elif [[ $trait_type = "binary" ]]; then
+  if [[ $SEX == "BOTH" ]]; then
+    N_case=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '(($sex_col=="M") || ($sex_col=="F")) && ($pheno_col=="1") {count++} END {print count}' $pheno_file)
+    N_control=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '(($sex_col=="M") || ($sex_col=="F")) && ($pheno_col=="0") {count++} END {print count}' $pheno_file)
+  elif [[ $SEX == "F" ]]; then
+    N_case=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="F") && ($pheno_col=="1") {count++} END {print count}' $pheno_file)
+    N_control=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="F") && ($pheno_col=="0") {count++} END {print count}' $pheno_file)
+  elif [[ $SEX == "M" ]]; then
+    N_case=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="M") && ($pheno_col=="1") {count++} END {print count}' $pheno_file)
+    N_control=$(awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num '($sex_col=="M") && ($pheno_col=="0") {count++} END {print count}' $pheno_file)
+  fi
+
+  OUT="${DATASET}.${LAST_NAME}.chr${CHR}_${phenoCol}.${FREEZE_NUMBER}.${SEX}.${ANC}.${N_case}.${N_control}.SAIGE.$(date '+%Y%m%d')"
 fi
 
 echo "OUT               = ${OUT}"
@@ -166,6 +246,7 @@ echo "PLINK             = ${PLINK}.{bim/bed/fam}"
 echo "MODELFILE         = ${MODELFILE}"
 echo "VARIANCERATIO     = ${VARIANCERATIO}"
 echo "GROUPFILE         = ${GROUPFILE}"
+echo "ANNOTATIONS"      = ${ANNOTATIONS}
 echo "SPARSEGRM         = ${SPARSEGRM}"
 echo "SPARSEGRMID       = ${SPARSEGRMID}"
 
@@ -178,21 +259,18 @@ WD=$( pwd )
 # Get number of threads
 n_threads=$(( $(nproc --all) - 1 ))
 
-# For debugging
-set -exo pipefail
-
 ## Set up directories
 WD=$( pwd )
 
 
 if [[ "$TESTTYPE" = "variant" ]]; then
   echo "variant testing"
-  min_mac=0.5
+  min_mac="20"
   GROUPFILE=""
 else
   echo "gene testing"
-  min_mac=20
-  GROUPFILE="${HOME}/in/${GROUPFILE}"
+  min_mac="0.5"
+  GROUPFILE="${HOME}/${GROUPFILE}"
 fi
 
 if [[ ${PLINK} != "" ]]; then
@@ -205,7 +283,7 @@ elif [[ ${VCF} != "" ]]; then
   BED=""
   BIM=""
   FAM="" 
-  VCF="${HOME}/${VCF}"
+  VCF="${VCF}"
 else
   echo "No plink or vcf found!"
   exit 1
@@ -215,16 +293,18 @@ cmd="step2_SPAtests.R \
         --bedFile=$BED \
         --bimFile=$BIM \
         --famFile=$FAM \
-	    --groupFile=$GROUPFILE \
-	    --vcfFile ${VCF} \
-        --chrom="chr21" \
-		--minMAF=0 \
+        --groupFile=$GROUPFILE \
+        --annotation_in_groupTest=$ANNOTATIONS \
+        --vcfFile=${VCF} \
+        --vcfField="DS" \
+        --chrom="$CHR" \
+        --minMAF=0 \
         --minMAC=${min_mac} \
-        --GMMATmodelFile ${HOME}/${MODELFILE} \
-        --varianceRatioFile ${HOME}/${VARIANCERATIO} \
-        --sparseGRMFile ${HOME}/in/sparse_grm/${SPARSEGRM} \
-        --sparseGRMSampleIDFile ${HOME}/in/sparse_grm/${SPARSEGRMID} \
-	    --subSampleFile ${HOME}/${SUBSAMPLES} \
+        --GMMATmodelFile=${HOME}/${MODELFILE} \
+        --varianceRatioFile=${HOME}/${VARIANCERATIO} \
+        --sparseGRMFile=${HOME}/${SPARSEGRM} \
+        --sparseGRMSampleIDFile=${HOME}/${SPARSEGRMID} \
+        --subSampleFile=${SUBSAMPLES} \
         --LOCO=FALSE \
         --is_Firth_beta=TRUE \
         --pCutoffforFirth=0.1 \
@@ -232,23 +312,8 @@ cmd="step2_SPAtests.R \
         --is_fastTest=TRUE \
         --is_output_markerList_in_groupTest=TRUE \
         --is_single_in_groupTest=TRUE \
-        --SAIGEOutputFile=${HOME}/${OUT}_variant.tsv
+        --maxMAF_in_groupTest=0.0001,0.001,0.01 \
+        --SAIGEOutputFile=${HOME}/${OUT}.txt
     "
 
-echo "Running variant based tests for all variants in with MAC > 20"
-
-if [[ ${SINGULARITY} = true ]]; then
-  singularity exec \
-    --env HOME=${WD} \
-    --bind ${WD}/:$HOME/,${WD}/tmp/:/tmp/ \
-    "saige-${saige_version}.sif" $cmd
-else
-  echo '''Running gene based tests and variant based tests for all variants present in the annotations.
-  This includes the collapsed variants in the set-based tests'''
-
-  # Check --AlleleOrder=ref-first
-  docker run \
-    -e HOME=${WD} \
-    -v ${WD}/:$HOME/ \
-    "wzhou88/saige:${saige_version}" $cmd
-fi
+run_container
