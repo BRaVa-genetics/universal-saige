@@ -89,8 +89,8 @@ generate_plink_for_vr(){
         --freq counts \
         --out "/tmp/merged"
 
-    variants_lessthan_20_MAC=1000
-    variants_greaterthan_20_MAC=1000
+    variants_lessthan_20_MAC=10000
+    variants_greaterthan_20_MAC=10000
 
     cat <(
         tail -n +2 "/tmp/merged.frq.counts" \
