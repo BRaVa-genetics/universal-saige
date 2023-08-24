@@ -237,7 +237,7 @@ cmd="""step1_fitNULLGLMM.R \
       --nThreads=${n_threads} \
       --isCateVarianceRatio=TRUE \
       --tol ${TOL} \
-      --SampleIDIncludeFile=${SAMPLEIDS} \ 
+      --SampleIDIncludeFile=${SAMPLEIDS} \
       --isCovariateOffset FALSE"""
 
 run_container
