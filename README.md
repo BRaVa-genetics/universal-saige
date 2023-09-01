@@ -69,6 +69,9 @@ optional:
 - `--generate_GRM` (default: false): generate GRM for the genetic data.
 - `--generate_plink_for_vr` (default: false): generate plink file for vr.
 
+> **Important**
+> All files contained within `--geneticDataDirectory` of the type flagged by `--geneticDataFormat` will be globbed! So please ensure that this contains _just_ the one biobank/cohort and not multiple!
+
 ### Step 1 (once per phenotype)
 
 ```
