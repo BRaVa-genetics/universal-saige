@@ -7,7 +7,9 @@
 </p>
 
 > **Important**
-> If you are a BRaVa analyst looking to run these steps in your biobank/cohort, check out these helpful templates
+> If you are a BRaVa analyst looking to run these steps in your biobank/cohort, check out these helpful templates:
+>
+> You'll need to replace filepaths, column names etc with the corresponding column names in your data. Portions of the commands to be changed are placed in square brackets [like this]. 
 
 ## Overview
 
