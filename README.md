@@ -70,7 +70,7 @@ optional:
 - `--generate_plink_for_vr` (default: false): generate plink file for vr.
 
 > **Important**
-> All files contained within `--geneticDataDirectory` of the type flagged by `--geneticDataFormat` will be globbed! So please ensure that this contains all of the autosomes for _just one biobank/cohort__ and not multiple!
+> All files contained within `--geneticDataDirectory` of the type flagged by `--geneticDataFormat` will be globbed! So please ensure that this contains all of the autosomes for _just one biobank/cohort_ and not multiple!
 
 ### Step 1 (once per phenotype)
 
