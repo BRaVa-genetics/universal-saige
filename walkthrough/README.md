@@ -1,8 +1,9 @@
-# Walkthrough
+# Universal-SAIGE walkthrough
 
 ## Introduction
 
 Universal-SAIGE has been created to standardise the usage of [SAIGE](https://github.com/saigegit/SAIGE) for [BRaVa](https://brava-genetics.github.io/BRaVa/) across a variety of different computing environments.
+
 In this walkthrough we will demonstrate how to generate gene and variant associations for the BRaVa phenotype HDL cholesterol on chromosome 11 with a final section on sanity-checking results. 
 
 ## Support
@@ -12,25 +13,24 @@ If at any point you run into issues or have any questions please create an issue
 ## Caution
 
 A few things to be aware of:
-- SAIGE can fail in a variety of ways due to low case count - we don't handle this within universal-SAIGE but step1 / step2 failing across an entire phenotype x ancestry is a likely indicator for this
-- When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results / crashes.
+- SAIGE can fail in a variety of ways due to low case count - we don't handle this within universal-SAIGE but step1/step2 failing across an entire phenotype x ancestry is a likely indicator for this
+- When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results/crashes
 
 ## Requirements
 
 ### Data
 
 - Genotype data, plink (optional), ideally used in place of exome data for step 0
-- Exome data, vcf or plink. 
+- Exome data, VCF or plink. 
 - Sample IDs, (ancestry specific)
 - Annotation file ([details found here](https://docs.google.com/document/d/1emWqbX8ohi-9rYIW_pKSAFiMHZZUV6zyXwg7qWJNdlc/edit#heading=h.puz6ua3vxnca](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1)))
-- BRaVa phenotype file (tsv) with 'IID' (sample ID) column and covariates
+- BRaVa phenotype file (.tsv) with 'IID' (sample ID) column and covariates
 
 ### Environment
 
 The only env requirement for this walkthrough is access to a linux machine with either Docker or Singularity available. With Docker or Singularity we can run Wei Zhou's [SAIGE Docker container](https://hub.docker.com/r/wzhou88/saige), giving guarantees that analyses across cohorts are equivalent and easily reproducible. 
 
 ## Setup
-
 To run universal-saige we need to download plink and the SAIGE image. These steps are separated out into `download_resources.sh`:
 
 ### Setup (if using Docker)
@@ -39,9 +39,10 @@ To run universal-saige we need to download plink and the SAIGE image. These step
 `bash download_resources.sh --saige-image --plink --singularity`
 
 ## Step 0 
-
 To start we must generate the sparse genetic relatedness matrix (GRM) and processed plink files for usage in variance ratio estimation during step 1. While this step may take several hours to run, it only has to be executed once per biobank/cohort.
-Step 0 supports (genotype data, plink format), (exome data, vcf format) and (exome data, plink format) as inputs although we reccomend the usage of (genotype, plink format) in order to reduce runtime and maximise the number of independent sites.
+
+Step 0 supports (genotype data, plink format), (exome data, VCF format) and (exome data, plink format) as inputs although we reccomend the usage of (genotype, plink format) in order to reduce runtime and maximise the number of independent sites.
+
 For this step we recommend using a larger machine - most functions in this step are parallelised across CPU cores and will benefit from high RAM. 
 
 To begin, clone the latest version of universal-saige
@@ -52,7 +53,9 @@ mkdir out in
 ```
 
 For this walkthrough we will be running step 0 with plink files based on genotype array data. sample_ids.txt is a file with newline separated sample IDs.
+
 NOTE: Docker and Singularity require all input files to be within one directory that must not contain any linked files (so no `ln -s` your input files into your dir).
+
 Currently my directory looks like:
 
 ```
@@ -68,7 +71,6 @@ Currently my directory looks like:
 ```
 
 And I run step 0 with the arguments:
-
 ```
 bash 00_step0_VR_and_GRM.sh \
     --geneticDataDirectory in/ \
@@ -81,7 +83,6 @@ bash 00_step0_VR_and_GRM.sh \
 ```
 
 This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspecting the `out/` directory, we can see:
-
 ```
 .
 ├── ...
@@ -98,21 +99,21 @@ This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspectin
 
 In step 1 we will be fitting the null model for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait HDL cholesterol as an example. 
 
-`head phenoFile.txt`
+`head in/phenoFile.txt`
 
-| IID | HDL_cholesterol | age | assessment_centre | PC1 | ... |
-|---|---|---|---|---|---|
-| 3421 | 0.422 | 68 | 412 | 0.013412 | ... |
-| 4567 | 0.342 | 51 | 6116 | -0.200134 | ... |
+| IID | HDL_cholesterol | age | PC1       | ... |
+| --- | --------------- | --- | --------- | --- |
+| 3421 | 0.422          | 68  | 0.013412  | ... |
+| 4567 | 0.342          | 51  | -0.200134 | ... |
 
 ```
 bash 01_step1_fitNULLGLMM.sh \
     -t quantitative \
     --genotypePlink out/walkthrough.plink_for_var_ratio \
     --phenoFile in/phenoFile.txt \
-    --phenoCol "female_infertility_binary" \
-    --covarColList "is_female,assessment_centre,genotyping_batch,age,pc1,pc2,pc3,pc4,pc5,pc6,pc7,pc8,pc9,pc10,pc11,pc12,pc13,pc14,pc15,pc16,pc17,pc18,pc19,pc20,pc21,age2,is_female_age,is_female_age2" \
-    --categCovarColList "is_female,assessment_centre,genotyping_batch" \
+    --phenoCol "HDL_cholesterol" \
+    --covarColList "age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10" \
+    --categCovarColList "sex" \
     --sampleIDs in/sample_ids.txt \
     --sampleIDCol "IID" \
     --outputPrefix out/HDL_cholesterol \
@@ -121,7 +122,12 @@ bash 01_step1_fitNULLGLMM.sh \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
 
-This took 10 minutes with 4 cores. Checking the `out/` directory we can see:
+As few things to note here:
+- The column names flagged in `--phenoCol`, `--covarColList` and `--categCovarColList` must _exactly_ match the column names in the filepath flagged by `--phenoFile`
+- The comma separated list of covariates flagged by `--covarColList` and `--categCovarColList` should not contain spaces (e.g. `age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10`)
+- If a categorical variable is to be included as a covariate, it should be flagged by _both_ `--covarColList` and `--categCovarColList` (e.g. `sex` in the above command)
+  
+This command took 10 minutes with 4 cores. Checking the `out/` directory we can see:
 
 ```
 .
@@ -136,7 +142,6 @@ This took 10 minutes with 4 cores. Checking the `out/` directory we can see:
 │   ├── HDL_cholesterol.varianceRatio.txt
 ```
 
-
 ## Step 2
 
 Step 2 requires variant annotations which can be generated [here](https://github.com/BRaVa-genetics/variant-annotation). A summary of the thresholds and software versioning used for variant annotation within BRaVa can be found [here](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1). The top of the file looks like this:
@@ -150,15 +155,15 @@ ENSG00000187961 var chr1:961514:T:C chr1:962037:C:T chr1:962807:T:C
 ENSG00000187961 anno synonymous damaging_missense pLoF
 ```
 
-Here, each gene (coded according to Ensembl ID in column 1) receives two lines, a variant line (`var`) and an annotation line `anno` (column two). All subsequent information on each pair of gene specific lines contains space delimited information mapping the variant information onto the assocated annotation(s). 
+Here, each gene (coded according to ensembl ID in column 1) receives two lines, a variant line (`var`) and an annotation line `anno` (column two). All subsequent information on each pair of gene specific lines contains space delimited information mapping the variant information onto the associated annotation(s). 
 
-Finally we perform the chromosome-phenotype specific association test:
+Finally, we perform the chromosome-phenotype specific association test:
 
 ```
 bash 02_step2_SPAtests_variant_and_gene.sh \
     --chr chr11 \
     --testType "group" \
-    --plink in/ukb_wes_450k.qced.chr$chr.bed \
+    --plink in/ukb_wes_450k.qced.chr11.bed \
     --varianceRatio out/walkthrough \
     --groupFile out/walkthrough \
     --outputPrefix out/chr11_HDL_cholesterol \
@@ -168,8 +173,9 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
+There's one more 'gotcha' here - you'll need to ensure that the chromosome name flagged by `--chr` _exactly_ matches the chromosome name in the .bim file. For example, if the chromosome is labelled as '11' in the first column of the .bim, `--chr chr11` will not work (but `--chr 11` will).
 
-This took 1 hour 47 minutes with 8 cores. For verification of rare variant association results [genebass](https://app.genebass.org/) is a useful resource. Checking [HDL cholesterol](https://app.genebass.org/gene/undefined/phenotype/continuous-30760-both_sexes--irnt?resultIndex=gene-manhattan&resultLayout=full) we can see that APOC3 (ENSG00000110245) (pLoF, SKAT-O) has a association with p=1.24e-322. Looking at the gene result file `out/chr11_HDL_cholesterol.txt` we see the result:
+This command took 1 hour 47 minutes with 8 cores. For verification of rare variant association results [genebass](https://app.genebass.org/) is a useful resource. Checking [HDL cholesterol](https://app.genebass.org/gene/undefined/phenotype/continuous-30760-both_sexes--irnt?resultIndex=gene-manhattan&resultLayout=full) we can see that APOC3 (ENSG00000110245) (pLoF, SKAT-O) has a association with $P=1.24\times 10^{-322}$. Looking at the gene result file `out/chr11_HDL_cholesterol.txt` we see the result:
 ```
 Region	Group	max_MAF	Pvalue	Pvalue_Burden	Pvalue_SKAT	BETA_Burden	SE_Burden	MAC	Number_rare	Number_ultra_rare
 ENSG00000110245	pLoF	0.0100	3.318754e-305	4.741078e-306	5.078064e-288	0.034034	0.000910	1753.0	2.0	0.0
@@ -177,9 +183,9 @@ ENSG00000110245	pLoF	0.0100	3.318754e-305	4.741078e-306	5.078064e-288	0.034034	0
 
 Replication! Of course we are using approximately the same cohort here (UK Biobank, European) but if you are following along with a HDL Cholesterol phenotype you will hopefully be able to observe similar results given sufficient power.
 
-Another method of verification we reccomend is checking the QQ-plot, the expected vs observed p-values given the null hypothesis of the test. Below we plot the variant qq-plot using Python:
+Another method of verification we reccomend is checking the QQ-plot, the expected vs observed _P_-values given the null hypothesis of the test. Below we plot the variant QQ-plot using Python:
 
-```
+```python
 # Plot qqplot:
 import matplotlib.pyplot as plt
 import numpy as np
