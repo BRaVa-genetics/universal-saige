@@ -34,9 +34,13 @@ The only env requirement for this walkthrough is access to a linux machine with 
 To run universal-saige we need to download plink and the SAIGE image. These steps are separated out into `download_resources.sh`:
 
 ### Setup (if using Docker)
-`bash download_resources.sh --saige-image --plink`
+```
+bash download_resources.sh --saige-image --plink
+```
 ### Setup (if using Singularity)
-`bash download_resources.sh --saige-image --plink --singularity`
+```
+bash download_resources.sh --saige-image --plink --singularity
+```
 
 ## Step 0 
 To start we must generate the sparse genetic relatedness matrix (GRM) and processed plink files for usage in variance ratio estimation during step 1. While this step may take several hours to run, it only has to be executed once per biobank/cohort.
@@ -99,7 +103,9 @@ This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspectin
 
 In step 1 we will be fitting the null model for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait HDL cholesterol as an example. 
 
-`head in/phenoFile.txt`
+```
+head in/phenoFile.txt
+```
 
 | IID | HDL_cholesterol | age | PC1       | ... |
 | --- | --------------- | --- | --------- | --- |
