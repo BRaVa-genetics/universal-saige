@@ -238,6 +238,6 @@ cmd="""step1_fitNULLGLMM.R \
       --isCateVarianceRatio=TRUE \
       --tol ${TOL} \
       --SampleIDIncludeFile=${SAMPLEIDS} \
-      --isCovariateOffset FALSE"""
+      --isCovariateOffset TRUE"""
 
 run_container
