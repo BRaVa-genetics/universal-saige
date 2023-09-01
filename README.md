@@ -6,7 +6,7 @@
   <img src="universal-saige.png" alt="VroomAI"/>
 </p>
 
-> **Note**
+> **Important**
 > If you are a BRaVa analyst looking to run these steps in your biobank/cohort, check out these helpful templates
 
 ## Overview
