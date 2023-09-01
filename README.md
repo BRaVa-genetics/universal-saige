@@ -43,7 +43,7 @@ _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 - Linux OR Mac
 
 ## Input data (required)
-- WES data in PLINK (`.bim/.bed/.fam`) or VCF format
+- WES data in PLINK (`.bim/.bed/.fam`) or VCF format (.gz compressed)
 - Sample IDs, (ancestry specific)
 - SAIGE annotation file ([details found here](https://docs.google.com/document/d/1emWqbX8ohi-9rYIW_pKSAFiMHZZUV6zyXwg7qWJNdlc/edit#heading=h.puz6ua3vxnca](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1)))
 - BRaVa phenotype file (tsv) with 'IID' (sample ID) column and covariates
@@ -59,9 +59,9 @@ Take genotyping array data in `plink` format, or `{WES, WGS}` files in `{vcf, pl
 usage: 00_step0_VR_and_GRM.sh
 ```
 required:
-- `--geneticDataDirectory`: directory containing the genetic data (genotyping array data in `plink` format, or `{WES, WGS}` files in `{vcf, plink}` format)
-- `--geneticDataFormat`: format of the genetic data `{vcf, plink}`.
-- `--sampleIDs`: `.fam` file of the sample IDs that are present in the `{WES, WGS}` data. Note, if this is not _all_ of the samples in the `{WES, WGS}` dataset, the `{WES, WGS}` data must be filtered to these samples before running step 1.
+- `--geneticDataDirectory`: directory containing the genetic data (genotyping array data in `plink` format, or `{WES, WGS}` files in `{vcf, plink}` format).
+- `--geneticDataFormat`: format of the genetic data `{vcf, plink}`. **Note, VCF files must be gzipped with `.vcf.gz` file extensions.**
+- `--sampleIDs`: `.fam` file of the sample IDs that are present in the `{WES, WGS}` data. **Note, if this is not _all_ of the samples in the `{WES, WGS}` dataset, the `{WES, WGS}` data must be filtered to these samples before running step 1**
 
 optional:
 - `-o`,`--outputPrefix`: output prefix from this program (SAIGE step 0) to be used as SAIGE step 1 input.
