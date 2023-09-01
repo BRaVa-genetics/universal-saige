@@ -60,7 +60,9 @@ usage: 00_step0_VR_and_GRM.sh
 ```
 required:
 - `--geneticDataDirectory`: directory containing the genetic data (genotyping array data in `plink` format, or `{WES, WGS}` files in `{vcf, plink}` format).
-- `--geneticDataFormat`: format of the genetic data `{vcf, plink}`. **Note, VCF files must be gzipped with `.vcf.gz` file extensions.**
+- `--geneticDataFormat`: format of the genetic data `{vcf, plink}`.
+> **Note**
+> VCF files must be gzipped with `.vcf.gz` file extensions.**
 - `--sampleIDs`: `.fam` file of the sample IDs that are present in the `{WES, WGS}` data. **Note, if this is not _all_ of the samples in the `{WES, WGS}` dataset, the `{WES, WGS}` data must be filtered to these samples before running step 1**
 
 optional:
