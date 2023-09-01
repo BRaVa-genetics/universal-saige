@@ -6,6 +6,9 @@
   <img src="universal-saige.png" alt="VroomAI"/>
 </p>
 
+> **Note**
+> If you are a BRaVa analyst looking to run these steps in your biobank/cohort, check out these helpful templates
+
 ## Overview
 
 _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
