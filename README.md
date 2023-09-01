@@ -12,7 +12,10 @@
 > - placeholder for step 1
 > - placeholder for step 2
 >   
-> You'll need to replace filepaths, column names etc with the corresponding column names in your data. Portions of the commands to be changed are placed in square brackets [like this]. 
+> You'll need to replace filepaths, column names etc in the commands with the corresponding column names in your data. Portions of the commands to be changed are placed in square brackets [like this].
+
+> **Note**
+> An example walking through a single trait and chromosome 11 for all three steps is [here](https://github.com/BRaVa-genetics/universal-saige/tree/main/walkthrough) 
 
 ## Overview
 
