@@ -1,5 +1,19 @@
 # Universal-SAIGE walkthrough
 
+### Contents
+* [Introduction](#introduction)
+* [Support](#support)
+* [Caution](#caution)
+* [Requirements](#requirements)
+  * [Data](#data)
+  * [Environment](#environment)
+* [Setup](#setup)
+  * [Setup (if using Docker)](#setup-if-using-docker)
+  * [Setup (if using Singularity)](#setup-if-using-singularity)
+* [Step 0](#step-0)
+* [Step 1](#step-1)
+* [Step 2](#step-2)
+
 ## Introduction
 
 Universal-SAIGE has been created to standardise the usage of [SAIGE](https://github.com/saigegit/SAIGE) for [BRaVa](https://brava-genetics.github.io/BRaVa/) across a variety of different computing environments.
