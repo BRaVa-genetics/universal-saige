@@ -11,6 +11,7 @@
 > - placeholder for step 0
 > - placeholder for step 1
 > - placeholder for step 2
+>   
 > You'll need to replace filepaths, column names etc with the corresponding column names in your data. Portions of the commands to be changed are placed in square brackets [like this]. 
 
 ## Overview
