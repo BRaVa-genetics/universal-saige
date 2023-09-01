@@ -150,7 +150,9 @@ This command took 10 minutes with 4 cores. Checking the `out/` directory we can 
 
 ## Step 2
 
-Step 2 requires variant annotations which can be generated [here](https://github.com/BRaVa-genetics/variant-annotation). A summary of the thresholds and software versioning used for variant annotation within BRaVa can be found [here](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1). The top of the file looks like this:
+Step 2 requires variant annotations which can be generated [here](https://github.com/BRaVa-genetics/variant-annotation). A summary of the thresholds and software versioning used for variant annotation within BRaVa can be found [here](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1), but you don't need to worry about the annoying version alignment if you follow our [steps](https://github.com/BRaVa-genetics/variant-annotation).
+
+The top of the file looks like this:
 
 `head in/ukb_brava_annotations.txt`
 
@@ -163,7 +165,7 @@ ENSG00000187961 anno synonymous damaging_missense pLoF
 
 Here, each gene (coded according to ensembl ID in column 1) receives two lines, a variant line (`var`) and an annotation line `anno` (column two). All subsequent information on each pair of gene specific lines contains space delimited information mapping the variant information onto the associated annotation(s). 
 
-Finally, we perform the chromosome-phenotype specific association test:
+Finally, we perform the association testing for chromosome 11:
 
 ```
 bash 02_step2_SPAtests_variant_and_gene.sh \
@@ -182,11 +184,11 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
 There's one more 'gotcha' here - you'll need to ensure that the chromosome name flagged by `--chr` _exactly_ matches the chromosome name in the .bim file. For example, if the chromosome is labelled as '11' in the first column of the .bim, `--chr chr11` will not work (but `--chr 11` will).
 
 This command took 1 hour 47 minutes with 8 cores. For verification of rare variant association results [genebass](https://app.genebass.org/) is a useful resource. Checking [HDL cholesterol](https://app.genebass.org/gene/undefined/phenotype/continuous-30760-both_sexes--irnt?resultIndex=gene-manhattan&resultLayout=full) we can see that APOC3 (ENSG00000110245) (pLoF, SKAT-O) has a association with $P=1.24\times 10^{-322}$. Looking at the gene result file `out/chr11_HDL_cholesterol.txt` we see the result:
+
 ```
 Region	Group	max_MAF	Pvalue	Pvalue_Burden	Pvalue_SKAT	BETA_Burden	SE_Burden	MAC	Number_rare	Number_ultra_rare
 ENSG00000110245	pLoF	0.0100	3.318754e-305	4.741078e-306	5.078064e-288	0.034034	0.000910	1753.0	2.0	0.0
 ```
-
 Replication! Of course we are using approximately the same cohort here (UK Biobank, European) but if you are following along with a HDL Cholesterol phenotype you will hopefully be able to observe similar results given sufficient power.
 
 Another method of verification we reccomend is checking the QQ-plot, the expected vs observed _P_-values given the null hypothesis of the test. Below we plot the variant QQ-plot using Python:
@@ -264,14 +266,14 @@ variant_results = pd.read_csv(variant_results, sep="\t")
 qqplot(variant_results, "HDL_cholesterol", "variant")
 ```
 
-Note that due to fast testing enables results with p>0.05 may be skewed and affect the lambda value. 
+Note that due to fast testing enables results with $P > 0.05$ may be skewed and affect the $\lambda_{GC}$ value. 
 
-![image](https://user-images.githubusercontent.com/43707014/236252715-93df0a07-9799-4e50-85af-c679631a4bc3.png)
+<img src="https://user-images.githubusercontent.com/43707014/236252715-93df0a07-9799-4e50-85af-c679631a4bc3.png" width="500">
 
 Taking a closer look:
 
 `qqplot(variant_results[variant_results["p.value"] > 5E-8], "HDL_cholesterol", "variant")`
 
-![image](https://user-images.githubusercontent.com/43707014/236253166-f298e828-1954-4edf-96c9-c7638032dde9.png)
+<img src="https://user-images.githubusercontent.com/43707014/236253166-f298e828-1954-4edf-96c9-c7638032dde9.png" width="500">
 
 In this QQ-plot while we see some inflation from the expected p-values this is plausibly polygenicity given what we know about the trait. 
