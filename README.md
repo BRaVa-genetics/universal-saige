@@ -18,6 +18,16 @@
 > Here's a [walkthrough](https://github.com/BRaVa-genetics/universal-saige/tree/main/walkthrough) 
  of a single trait and chromosome 11 for all three steps
 
+### Contents
+* [Overview](#overview)
+* [System Requirements](#system-requirements)
+* [Input data (required)](#input-data-required)
+* [Input data (optional)](#input-data-optional)
+* [Usage](#usage)
+  * [Step 0 (once per cohort/biobank)](#step-0-once-per-cohortbiobank)
+  * [Step 1 (once per phenotype)](#step-1-once-per-phenotype)
+  * [Step 2 (once per chromosome per phenotype)](#step-2-once-per-chromosome-per-phenotype)
+
 ## Overview
 
 _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
