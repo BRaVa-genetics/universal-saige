@@ -11,10 +11,10 @@ In this walkthrough we will demonstrate how to generate gene and variant associa
 If at any point you run into issues or have any questions please create an issue in this (public) repository. You can also email `barney.hill@ndph.ox.ac.uk` or `duncan.palmer@ndph.ox.ac.uk`.
 
 ## Caution
-
-A few things to be aware of:
-- SAIGE can fail in a variety of ways due to low case count - we don't handle this within universal-SAIGE but step1/step2 failing across an entire phenotype x ancestry is a likely indicator for this
-- When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results/crashes
+> **Warning**
+> A few things to be aware of:
+> - SAIGE can fail in a variety of ways due to low case count - we don't handle this within universal-SAIGE but step1/step2 failing across an entire phenotype x ancestry is a likely indicator for this
+> - When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results/crashes
 
 ## Requirements
 
@@ -58,7 +58,8 @@ mkdir out in
 
 For this walkthrough we will be running step 0 with plink files based on genotype array data. sample_ids.txt is a file with newline separated sample IDs.
 
-NOTE: Docker and Singularity require all input files to be within one directory that must not contain any linked files (so no `ln -s` your input files into your dir).
+> **Note**
+> Docker and Singularity require all input files to be within one directory that must not contain any linked files (so no `ln -s` your input files into your dir).
 
 Currently my directory looks like:
 
@@ -127,11 +128,11 @@ bash 01_step1_fitNULLGLMM.sh \
     --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
-
-As few things to note here:
-- The column names flagged in `--phenoCol`, `--covarColList` and `--categCovarColList` must _exactly_ match the column names in the filepath flagged by `--phenoFile`
-- The comma separated list of covariates flagged by `--covarColList` and `--categCovarColList` should not contain spaces (e.g. `age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10`)
-- If a categorical variable is to be included as a covariate, it should be flagged by _both_ `--covarColList` and `--categCovarColList` (e.g. `sex` in the above command)
+> **Warning**
+> A few things to note here:
+> - The column names flagged in `--phenoCol`, `--covarColList` and `--categCovarColList` must _exactly_ match the column names in the filepath flagged by `--phenoFile`
+> - The comma separated list of covariates flagged by `--covarColList` and `--categCovarColList` should not contain spaces (e.g. `age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10`)
+> - If a categorical variable is to be included as a covariate, it should be flagged by _both_ `--covarColList` and `--categCovarColList` (e.g. `sex` in the above command)
   
 This command took 10 minutes with 4 cores. Checking the `out/` directory we can see:
 
@@ -181,7 +182,8 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
-There's one more 'gotcha' here - you'll need to ensure that the chromosome name flagged by `--chr` _exactly_ matches the chromosome name in the .bim file. For example, if the chromosome is labelled as '11' in the first column of the .bim, `--chr chr11` will not work (but `--chr 11` will).
+> **Warning**
+> There's one more 'gotcha' here - you'll need to ensure that the chromosome name flagged by `--chr` _exactly_ matches the chromosome name in the .bim file. For example, if the chromosome is labelled as '11' in the first column of the .bim, `--chr chr11` will not work (but `--chr 11` will).
 
 This command took 1 hour 47 minutes with 8 cores. For verification of rare variant association results [genebass](https://app.genebass.org/) is a useful resource. Checking [HDL cholesterol](https://app.genebass.org/gene/undefined/phenotype/continuous-30760-both_sexes--irnt?resultIndex=gene-manhattan&resultLayout=full) we can see that APOC3 (ENSG00000110245) (pLoF, SKAT-O) has a association with $P=1.24\times 10^{-322}$. Looking at the gene result file `out/chr11_HDL_cholesterol.txt` we see the result:
 
