@@ -15,7 +15,8 @@
 > You'll need to replace filepaths, column names etc in the commands with the corresponding column names in your data. Portions of the commands to be changed are placed in square brackets [like this].
 
 > **Note**
-> An example walking through a single trait and chromosome 11 for all three steps is [here](https://github.com/BRaVa-genetics/universal-saige/tree/main/walkthrough) 
+> Here's a [walkthrough](https://github.com/BRaVa-genetics/universal-saige/tree/main/walkthrough) 
+ of a single trait and chromosome 11 for all three steps
 
 ## Overview
 
@@ -24,8 +25,7 @@ _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 - Containerised SAIGE (Docker / Singularity) ✅
 - Supporting VCF and PLINK exome data formats ✅
 - Parallelised across ancestry, phenotypes and chromosomes ✅
-- Sanity Checks ✅
-- [Walkthrough](https://github.com/BRaVa-genetics/universal-saige/blob/main/walkthrough/walkthrough.md) and support ✅
+- Sanity checks ✅
 
 ## System Requirements
 - Internet connection (only needed once for download_resources.sh)
