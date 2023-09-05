@@ -98,6 +98,7 @@ optional:
 usage: 02_step2_SPAtests_variant_and_gene.sh
 ```
 required:
+- `--chr`: chromosome to test.
 - `--testType`: type of test `{variant,group}`.
 - `-p`,`--plink`: plink filename prefix of `.bim/.bed/.fam` for WES (or WGS restricted to exons). These must be relative to the current working directory.
 - `--vcf` vcf exome file. If a set of plink files for the WES (or WGS restricted to exons) is not available then this vcf file will be used. This must be present in the current working directory.
@@ -105,9 +106,10 @@ required:
 - `--varianceRatio`: filename of the varianceRatio file output from SAIGE step 1. This must be relative to the current working directory.
 - `--sparseGRM`: filename of the sparseGRM `.mtx` file output from SAIGE step 0. This must be relative to the current working directory.
 - `--sparseGRMID`: filename of the sparseGRM ID file output from SAIGE step 0. This must be relative to the current working directory.
-- `--chr`: chromosome to test.
 
 optional:
 - `-o`,`--outputPrefix`: output prefix from this program (SAIGE step 2).
 - `-s`,`--isSingularity` (default: false): is singularity available? If not, it is assumed that docker is available.
 - `-g`,`--groupFile`: required if group test is selected. Filename of the annotation file used for group tests. This must be in relation to the working directory.
+- `--annotations`: required if group test is selected. The collection of annotations in the group file to be tested. Please use `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`
+
