@@ -2,10 +2,6 @@
   Universal-SAIGE
 </h1>
 
-<p align="center">
-  <img src="universal-saige.png" alt="VroomAI"/>
-</p>
-
 > **Important**
 > If you are a BRaVa analyst looking to run these steps in your biobank/cohort, check out these helpful templates:
 > - placeholder for step 0
@@ -13,6 +9,10 @@
 > - placeholder for step 2
 >   
 > You'll need to replace filepaths, column names etc in the commands with the corresponding column names in your data. Portions of the commands to be changed are placed in square brackets [like this].
+
+<p align="center">
+  <img src="universal-saige.png" alt="VroomAI"/>
+</p>
 
 > **Note**
 > Here's a [walkthrough](https://github.com/BRaVa-genetics/universal-saige/tree/main/walkthrough) 
