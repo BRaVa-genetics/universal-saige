@@ -166,11 +166,12 @@ while [[ $# -gt 0 ]]; do
                 --geneticDataFormat: format of the genetic data {plink,vcf}.
                 --geneticDataType: type of the genetic data {WES,WGS,genotype}.
             optional:
-                -o,--outputPrefix:  output prefix of the SAIGE step 0 output.
+                -o,--outputPrefix: output prefix of the SAIGE step 0 output.
                 -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
-                --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
                 --generate_GRM (default: false): generate GRM for the genetic data.
                 --generate_plink_for_vr (default: false): generate plink file for vr.
+                --sampleIDs: path to a file containing sampleIDs (as a single column) to be used to define the GRM.
+                Note that if nothing is passed, then all of the samples in the plink/vcf files will be used.
       "
       shift # past argument
       ;;
