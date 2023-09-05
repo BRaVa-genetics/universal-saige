@@ -187,12 +187,11 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --chr chr11 \
     --testType "group" \
     --plink in/ukb_wes_450k.qced.chr11.bed \
-    --varianceRatio out/walkthrough \
-    --groupFile out/walkthrough \
+    --modelFile out/HDL_cholesterol.rda \
+    --varianceRatio out/HDL_cholesterol.varianceRatio.txt \
+    --groupFile in/ukb_brava_annotations.txt \ \
     --outputPrefix out/chr11_HDL_cholesterol \
-    --annotations in/ukb_brava_annotations.txt \
-    --isSingularity false \
-    --subSampleFile in/sample_ids.txt \
+    --annotations "pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous" \
     --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
