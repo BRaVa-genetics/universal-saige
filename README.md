@@ -4,11 +4,11 @@
 
 > **Important**
 > If you are a BRaVa analyst looking to run these steps in your biobank/cohort, check out these helpful templates:
-> - placeholder for step 0
-> - placeholder for step 1
-> - placeholder for step 2
+> - [step 0](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_0_template.sh)
+> - [step 1](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_1_template.sh)
+> - [step 2](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh)
 >   
-> You'll need to replace filepaths, column names etc in the commands with the corresponding column names in your data. Portions of the commands to be changed are placed in square brackets [like this].
+> You'll need to replace filepaths, column names etc in the commands with the corresponding column names in your data. Free text portions of the commands to be changed are placed in square brackets [like this], portions of the commands where you'll need to make a choice between a collection of options are placed in braces {like this}.
 
 <p align="center">
   <img src="universal-saige.png" alt="VroomAI"/>
