@@ -76,7 +76,6 @@ generate_GRM(){
       echo "Error: ${variant_count} variants found in ${OUT}.plink_for_grm, which is less than the required ${numRandomMarkerforSparseKin} variants."
       exit 1
     fi
-
     
     echo "GRM generated!"
 }
@@ -89,8 +88,8 @@ generate_plink_for_vr(){
         --freq counts \
         --out "/tmp/merged"
 
-    variants_lessthan_20_MAC=10000
-    variants_greaterthan_20_MAC=10000
+    variants_lessthan_20_MAC=1000
+    variants_greaterthan_20_MAC=1000
 
     cat <(
         tail -n +2 "/tmp/merged.frq.counts" \
@@ -107,10 +106,10 @@ generate_plink_for_vr(){
 
     if [[ $actual_variants_lessthan_20_MAC -gt $variants_lessthan_20_MAC ]]; then
         echo "Error: ${actual_variants_lessthan_20_MAC} variants (MAC<20) found - less than the required ${variants_lessthan_20_MAC} variants."
-#        exit 1
+        exit 1
     elif [[ $actual_variants_greaterthan_20_MAC -gt $variants_greaterthan_20_MAC ]]; then
         echo "Error: ${actual_variants_greaterthan_20_MAC} variants (MAC>20) found - less than the required ${variants_greaterthan_20_MAC} variants."
-#       exit 1
+        exit 1
     fi
 
     # Extract markers from the large PLINK file
@@ -233,12 +232,12 @@ WD=$( pwd )
 
 subset_variants
 
-if [[ ${generate_grm} = true ]]; then
-  echo "generating GRM"
-  generate_GRM
-fi
-
 if [[ ${generate_plink_for_vr} = true ]]; then
   echo "generating plink for vr"
   generate_plink_for_vr
+fi
+
+if [[ ${generate_grm} = true ]]; then
+  echo "generating GRM"
+  generate_GRM
 fi
