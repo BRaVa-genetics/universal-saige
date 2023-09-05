@@ -165,7 +165,7 @@ while [[ $# -gt 0 ]]; do
                 --geneticDataFormat: format of the genetic data {plink,vcf}.
                 --geneticDataType: type of the genetic data {WES,WGS,genotype}.
             optional:
-                -o,--outputPrefix: output prefix of the SAIGE step 0 output.
+                -o,--outputPrefix: output prefix of the SAIGE step 0 output. This must be relative to, and contained within, the current working directory.
                 -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
                 --generate_GRM (default: false): generate GRM for the genetic data.
                 --generate_plink_for_vr (default: false): generate plink file for vr.
