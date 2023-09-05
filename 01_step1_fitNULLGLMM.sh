@@ -93,12 +93,12 @@ while [[ $# -gt 0 ]]; do
   required:
     -t,--traitType: type of the trait {quantitative,binary}.
     --genotypePlink: plink filename prefix of bim/bed/fam files. This must be relative to, and contained within, the working directory from which the docker/singularity was launched.
-    --sparseGRM: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the working directory from which the docker/singularity was launched.
-    --sparseGRMID: filename of the sparseGRM ID file. This must be relative to, and contained within, the working directory from which the docker/singularity was launched.
-    --phenoFile: filename of the phenotype file. This must be relative to, and contained within, the working directory from which the docker/singularity was launched.
+    --sparseGRM: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the current working directory.
+    --sparseGRMID: filename of the sparseGRM ID file. This must be relative to, and contained within, the current working directory.
+    --phenoFile: filename of the phenotype file. This must be relative to, and contained within, the current working directory.
     --phenoCol: the column names of the phenotype to be analysed in the file specified in --phenoFile.
   optional:
-    -o,--outputPrefix:  output prefix of the SAIGE step 1 output.
+    -o,--outputPrefix: output prefix of the SAIGE step 1 output.
     -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
     -c,--covarColList: comma separated column names (e.g. age,pc1,pc2) of continuous covariates to include as fixed effects in the file specified in --phenoFile.
     --categCovarColList: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
