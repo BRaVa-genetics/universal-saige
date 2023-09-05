@@ -92,10 +92,10 @@ while [[ $# -gt 0 ]]; do
       echo "usage: 01_step1_fitNULLGLMM.sh
   required:
     -t,--traitType: type of the trait {quantitative,binary}.
-    --genotypePlink: plink filename prefix of bim/bed/fam files. This must be relative to, and contained within, in the working directory.
-    --sparseGRM: filename of the sparseGRM .mtx file. This must be relative to, and contained within, in the working directory.
-    --sparseGRMID: filename of the sparseGRM ID file. This must be relative to, and contained within, in the working directory.
-    --phenoFile: filename of the phenotype file. This must be relative to, and contained within, in the working directory.
+    --genotypePlink: plink filename prefix of bim/bed/fam files. This must be relative to, and contained within, the working directory from which the docker/singularity was launched.
+    --sparseGRM: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the working directory from which the docker/singularity was launched.
+    --sparseGRMID: filename of the sparseGRM ID file. This must be relative to, and contained within, the working directory from which the docker/singularity was launched.
+    --phenoFile: filename of the phenotype file. This must be relative to, and contained within, the working directory from which the docker/singularity was launched.
     --phenoCol: the column names of the phenotype to be analysed in the file specified in --phenoFile.
   optional:
     -o,--outputPrefix:  output prefix of the SAIGE step 1 output.
