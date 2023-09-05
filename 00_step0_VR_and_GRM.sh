@@ -232,12 +232,12 @@ WD=$( pwd )
 
 subset_variants
 
-if [[ ${generate_plink_for_vr} = true ]]; then
-  echo "generating plink for vr"
-  generate_plink_for_vr
-fi
-
 if [[ ${generate_grm} = true ]]; then
   echo "generating GRM"
   generate_GRM
+fi
+
+if [[ ${generate_plink_for_vr} = true ]]; then
+  echo "generating plink for vr"
+  generate_plink_for_vr
 fi
