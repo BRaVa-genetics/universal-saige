@@ -92,10 +92,10 @@ while [[ $# -gt 0 ]]; do
       echo "usage: 01_step1_fitNULLGLMM.sh
   required:
     -t,--traitType: type of the trait {quantitative,binary}.
-    --genotypePlink: plink filename prefix of bim/bed/fam files. These must be present in the working directory at ./in/plink_for_vr_bed/
-    --sparseGRM: filename of the sparseGRM .mtx file. This must be present in the working directory at ./in/sparse_grm/
-    --sparseGRMID: filename of the sparseGRM ID file. This must be present in the working directory at ./in/sparse_grm/
-    --phenoFile: filename of the phenotype file. This must be present in the working directory at ./in/pheno_files/
+    --genotypePlink: plink filename prefix of bim/bed/fam files. This must be relative to, and contained within, in the working directory.
+    --sparseGRM: filename of the sparseGRM .mtx file. This must be relative to, and contained within, in the working directory.
+    --sparseGRMID: filename of the sparseGRM ID file. This must be relative to, and contained within, in the working directory.
+    --phenoFile: filename of the phenotype file. This must be relative to, and contained within, in the working directory.
     --phenoCol: the column names of the phenotype to be analysed in the file specified in --phenoFile.
   optional:
     -o,--outputPrefix:  output prefix of the SAIGE step 1 output.
