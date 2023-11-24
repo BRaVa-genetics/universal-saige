@@ -215,7 +215,7 @@ if [[ ${TRAITTYPE} == "quantitative" ]]; then
 else
   echo "Binary trait passed to SAIGE"
   INVNORMALISE=FALSE
-  TOL="0.2" # SAIGE DEFAULT
+  TOL="0.02" # SAIGE DEFAULT
 fi
 
 cmd="""step1_fitNULLGLMM.R \
