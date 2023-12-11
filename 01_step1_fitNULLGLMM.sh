@@ -229,7 +229,7 @@ cmd="""step1_fitNULLGLMM.R \
       --traitType=${TRAITTYPE} \
       --invNormalize=${INVNORMALISE} \
       --phenoCol ""${PHENOCOL}"" \
-      --covarColList ""${COVARCOLLIST}"" \
+      --covarColList=""${COVARCOLLIST}"" \
       --qCovarColList=""${CATEGCOVARCOLLIST}"" \
       --sampleIDColinphenoFile=${SAMPLEIDCOL} \
       --outputPrefix="${HOME}/${OUT}" \
