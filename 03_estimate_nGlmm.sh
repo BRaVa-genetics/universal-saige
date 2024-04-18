@@ -1,3 +1,66 @@
+binary_phenos=""
+cont_phenos=""
+PHENO_FILE=""
+COVAR_LIST=""
+SPARSE_GRM_FILE=""
+SPARSE_GRM_ID_FILE=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --binaryPhenos)
+      binary_phenos="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --contPhenos)
+      cont_phenos="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    ---phenoFile)
+      PHENO_FILE="$2" # past argument
+      shift # past value
+      ;;
+    --covarList)
+      COVAR_LIST="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --sparseGRM)
+      SPARSE_GRM_FILE="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --sparseGRMID)
+      SPARSE_GRM_ID_FILE="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -h|--help)
+      echo "usage: 03_estimate_nGlmm.sh
+  required:
+    --binaryPhenos: space separated list of binary phenotypes.
+    --contPhenos: space separated list of continuous phenotypes.
+    --phenoFile: filename of the phenotype file. This must be relative to, and contained within, the current working directory.
+    --sparseGRM: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the current working directory.
+    --sparseGRMID: filename of the sparseGRM ID file. This must be relative to, and contained within, the current working directory.
+      "
+      shift # past argument
+      ;;
+    -*|--*)
+      echo "Unknown option $1"
+      exit 1
+      ;;
+    *)
+      POSITIONAL_ARGS+=("$1") # save positional arg
+      shift # past argument
+      ;;
+  esac
+done
+
+set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+
 docker run -i -e HOME=${WD} -v ${WD}/:$HOME/ -v /mnt/project/:/mnt/project/ wzhou88/saige:1.3.4 /bin/bash << 'EOF'
 for anc in AFR AMR EAS EUR SAS; do 
 
@@ -7,15 +70,6 @@ for anc in AFR AMR EAS EUR SAS; do
         R CMD INSTALL .
 
         # Define phenotype variables (binary and continuous)
-        binary_phenos="Gout Coronary_artery_disease Heart_Failure__HF_ Chronic_obstructive_pulmonary_disease__COPD_ Age_related_macular_degeneration Benign_and_in_situ_intestinal_neoplasms Colon_and_rectum_cancer Inflammatory_bowel_disease Inguinal__femoral__and_abdominal_hernia Interstitial_lung_disease_and_pulmonary_sarcoidosis Non_rheumatic_valvular_heart_disease Pancreatitis Peptic_ulcer_disease Type_2_diabetes Psoriasis Rheumatic_heart_disease Rheumatoid_arthritis Urolithiasis Peripheral_artery_disease Atrial_Fibrillation Varicose_Veins Hypertension Chronic_Renal_Failure Hip_replacement__operation_"
-
-        cont_phenos="BMI Height Alcohol_consumption__drinks_per_week_ Total_cholesterol LDLC HDLC Triglycerides C_reactive_protein__CRP_ Aspartate_aminotransferase__AST_"
-
-        PHENO_FILE="/mnt/project/brava/inputs/phenotypes/brava_with_covariates.tsv"
-        COVAR_LIST="age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10"
-        SPARSE_GRM_FILE="/mnt/project/brava/outputs/step0/brava_${anc}_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx"
-        SPARSE_GRM_ID_FILE="/mnt/project/brava/outputs/step0/brava_${anc}_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt"
-
 
         echo "pheno,nglmm" >> Nglmm_$anc
 

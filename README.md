@@ -113,3 +113,14 @@ optional:
 - `-g`,`--groupFile`: required if group test is selected. Filename of the annotation file used for group tests. This must be in relation to the working directory.
 - `--annotations`: required if group test is selected. The collection of annotations in the group file to be tested. Please use `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`
 
+### Step 3
+
+```
+usage: 03_estimate_nGlmm.sh
+```
+required:
+    - `--binaryPhenos`: space separated list of binary phenotypes.
+    - `--contPhenos`: space separated list of continuous phenotypes.
+    - `--phenoFile`: filename of the phenotype file. This must be relative to, and contained within, the current working directory.
+    - `--sparseGRM`: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the current working directory.
+    - `--sparseGRMID`: filename of the sparseGRM ID file. This must be relative to, and contained within, the current working directory.
