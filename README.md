@@ -119,8 +119,8 @@ optional:
 usage: 03_estimate_nGlmm.sh
 ```
 required:
-    - `--binaryPhenos`: space separated list of binary phenotypes.
-    - `--contPhenos`: space separated list of continuous phenotypes.
-    - `--phenoFile`: filename of the phenotype file. This must be relative to, and contained within, the current working directory.
-    - `--sparseGRM`: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the current working directory.
-    - `--sparseGRMID`: filename of the sparseGRM ID file. This must be relative to, and contained within, the current working directory.
+- `--binaryPhenos`: space separated list of binary phenotypes.
+- `--contPhenos`: space separated list of continuous phenotypes.
+- `--phenoFile`: filename of the phenotype file. This must be relative to, and contained within, the current working directory.
+- `--sparseGRM`: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the current working directory.
+- `--sparseGRMID`: filename of the sparseGRM ID file. This must be relative to, and contained within, the current working directory.
