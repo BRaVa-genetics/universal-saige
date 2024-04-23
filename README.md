@@ -41,6 +41,17 @@ _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 - Internet connection (only needed once for download_resources.sh)
 - Docker OR Singularity
 - Linux OR Mac
+### Getting started
+To run universal-saige we need to download plink and the SAIGE image. These steps are separated out into download_resources.sh:
+#### Setup (if using Docker)
+```
+bash download_resources.sh --saige-image --plink
+```
+#### Setup (if using Singularity)
+```
+bash download_resources.sh --saige-image --plink --singularity
+```
+You should now have all the relevant software installed to run all three steps.
 
 ## Input data (required)
 - WES data in PLINK (`.bim/.bed/.fam`) or VCF format (.gz compressed)
