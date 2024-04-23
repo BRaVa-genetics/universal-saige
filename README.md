@@ -2,7 +2,7 @@
   Universal-SAIGE
 </h1>
 
-> **Important**
+> [!IMPORTANT]
 > If you are a BRaVa analyst looking to run these steps in your biobank/cohort, check out these helpful templates:
 > - [step 0](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_0_template.sh)
 > - [step 1](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_1_template.sh)
@@ -14,7 +14,7 @@
   <img src="universal-saige.png" alt="VroomAI"/>
 </p>
 
-> **Note**
+> [!TIP]
 > Here's a [walkthrough](https://github.com/BRaVa-genetics/universal-saige/tree/main/walkthrough) 
  of a single trait and chromosome 11 for all three steps
 
@@ -80,7 +80,7 @@ optional:
 - `--generate_GRM` (default: false): generate GRM for the genetic data.
 - `--generate_plink_for_vr` (default: false): generate plink file for vr.
 
-> **Important**
+> [!IMPORTANT]
 > All files contained within `--geneticDataDirectory` of the type flagged by `--geneticDataFormat` will be globbed, so please ensure that this contains all of the autosomes for _just one biobank/cohort_ and not multiple!
 
 ### Step 1 (once per phenotype)
