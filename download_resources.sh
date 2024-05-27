@@ -4,7 +4,7 @@ SAIGE_IMAGE=false
 PLINK1_9=false
 SINGULARITY=false
 machine=$(uname)
-saige_version="1.1.9"
+saige_version="1.3.6"
 
 
 while [[ $# -gt 0 ]]; do
