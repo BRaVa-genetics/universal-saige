@@ -235,7 +235,7 @@ WD=$( pwd )
 
 if [[ "$TESTTYPE" = "variant" ]]; then
   echo "variant testing"
-  min_mac="0"
+  min_mac="0.5"
   GROUPFILE=""
 else
   echo "gene testing"
