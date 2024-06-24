@@ -110,6 +110,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --condition)
+      CONDITION="$2"
+      shift # past argument
+      shift # past value
+      ;;
     # --phenotype)
     #   PHENOCOL="$2"
     #   shift # past argument
@@ -137,6 +142,7 @@ while [[ $# -gt 0 ]]; do
     -g,--groupFile: required if group test is selected. Filename of the annotation file used for group tests. This must be relative to, and contained within, the current working directory.
     --annotations: required if group test is selected. comma seperated list of annotations to test found in groupfile. Please use
     'pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous'
+    --condition: comma seperated list of SNPs to condition on. This must be in order of the SNP occurance in the dosage file.
       "
       shift # past argument
       ;;
@@ -212,6 +218,7 @@ echo "GROUPFILE         = ${GROUPFILE}"
 echo "ANNOTATIONS"      = ${ANNOTATIONS}
 echo "SPARSEGRM         = ${SPARSEGRM}"
 echo "SPARSEGRMID       = ${SPARSEGRMID}"
+echo "CONDITION         = ${CONDITION}"
 
 # For debugging
 set -exo pipefail
@@ -276,7 +283,8 @@ cmd="step2_SPAtests.R \
         --is_output_markerList_in_groupTest=TRUE \
         --is_single_in_groupTest=TRUE \
         --maxMAF_in_groupTest=0.0001,0.001,0.01 \
-        --SAIGEOutputFile=${HOME}/${OUT}.txt
+        --SAIGEOutputFile=${HOME}/${OUT}.txt \
+        --condition="$CONDITION"
     "
 
 run_container
