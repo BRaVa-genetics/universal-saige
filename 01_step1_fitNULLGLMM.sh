@@ -240,6 +240,6 @@ cmd="""step1_fitNULLGLMM.R \
       --SampleIDIncludeFile=${SAMPLEIDS} \
       --isCovariateOffset TRUE \
       --maxiter 1000 \
-      --maxiterPCG 1000"""
+      --maxiterPCG 10000"""
 
 run_container
