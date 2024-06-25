@@ -238,6 +238,8 @@ cmd="""step1_fitNULLGLMM.R \
       --isCateVarianceRatio=TRUE \
       --tol ${TOL} \
       --SampleIDIncludeFile=${SAMPLEIDS} \
-      --isCovariateOffset TRUE"""
+      --isCovariateOffset TRUE \
+      --maxiter 1000 \
+      --maxiterPCG 1000"""
 
 run_container
