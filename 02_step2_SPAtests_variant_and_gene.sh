@@ -285,7 +285,8 @@ cmd="step2_SPAtests.R \
         --maxMAF_in_groupTest=0.0001,0.001,0.01 \
         --SAIGEOutputFile=${HOME}/${OUT}.txt \
         --condition="$CONDITION" \
-        --maxMissing=1
+        --maxMissing=1 \
+        --impute_method="mean"
     "
 
 run_container
