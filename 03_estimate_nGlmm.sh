@@ -72,8 +72,8 @@ R CMD INSTALL .
 
 echo "pheno,nglmm" >> neff.csv
 
-# Process binary phenotypes
 for pheno in $binary_phenos; do
+    echo "Estimating neff for $pheno"
     Rscript extdata/extractNglmm.R \
         --phenoFile $PHENO_FILE \
         --phenoCol $pheno \
@@ -86,6 +86,7 @@ done
 
 # Process continuous phenotypes
 for pheno in $cont_phenos; do
+    echo "Estimating neff for $pheno"
     Rscript extdata/extractNglmm.R \
         --phenoFile $PHENO_FILE \
         --phenoCol $pheno \
@@ -95,5 +96,7 @@ for pheno in $cont_phenos; do
         --sparseGRMSampleIDFile $SPARSE_GRM_ID_FILE \
         --useSparseGRMtoFitNULL TRUE 2>&1 | grep 'Nglmm' | awk -v pheno_var="$pheno" '{print pheno_var "," $2}' >> neff.csv
 done
+
+echo "Finished estimating neff"
 
 EOF
