@@ -72,6 +72,7 @@ R CMD INSTALL .
 
 echo "pheno,nglmm" >> neff.csv
 
+echo "Estimating neff for binary phenotypes: $binary_phenos"
 for pheno in $binary_phenos; do
     echo "Estimating neff for $pheno"
     Rscript extdata/extractNglmm.R \
@@ -85,6 +86,8 @@ for pheno in $binary_phenos; do
 done
 
 # Process continuous phenotypes
+echo "Estimating neff for continuous phenotypes: $cont_phenos"
+
 for pheno in $cont_phenos; do
     echo "Estimating neff for $pheno"
     Rscript extdata/extractNglmm.R \
