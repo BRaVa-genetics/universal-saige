@@ -60,6 +60,7 @@ done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
+WD=$( pwd )
 
 docker run -i \
   -e HOME=${WD} \
