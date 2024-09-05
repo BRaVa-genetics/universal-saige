@@ -61,7 +61,17 @@ done
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 
-docker run -i -e HOME=${WD} -v ${WD}/:$HOME/ -v /mnt/project/:/mnt/project/ wzhou88/saige:1.3.4 /bin/bash << 'EOF'
+docker run -i \
+  -e HOME=${WD} \
+  -e BINARY_PHENOS="$binary_phenos" \
+  -e CONT_PHENOS="$cont_phenos" \
+  -e PHENO_FILE="$PHENO_FILE" \
+  -e COVAR_LIST="$COVAR_LIST" \
+  -e SPARSE_GRM_FILE="$SPARSE_GRM_FILE" \
+  -e SPARSE_GRM_ID_FILE="$SPARSE_GRM_ID_FILE" \
+  -v ${WD}/:$HOME/ \
+  -v /mnt/project/:/mnt/project/ \
+  wzhou88/saige:1.3.4 /bin/bash << EOF
 
 sed -i '/setgeno/d' R/SAIGE_extractNeff.R
 
@@ -69,35 +79,34 @@ sed -i '/setgeno/d' R/SAIGE_extractNeff.R
 R CMD INSTALL .
 
 # Define phenotype variables (binary and continuous)
-
 echo "pheno,nglmm" >> neff.csv
 
-echo "Estimating neff for binary phenotypes: $binary_phenos"
-for pheno in $binary_phenos; do
-    echo "Estimating neff for $pheno"
+echo "Estimating neff for binary phenotypes: \$BINARY_PHENOS"
+for pheno in \$BINARY_PHENOS; do
+    echo "Estimating neff for \$pheno"
     Rscript extdata/extractNglmm.R \
-        --phenoFile $PHENO_FILE \
-        --phenoCol $pheno \
-        --covarColList $COVAR_LIST \
+        --phenoFile \$PHENO_FILE \
+        --phenoCol \$pheno \
+        --covarColList \$COVAR_LIST \
         --traitType 'binary' \
-        --sparseGRMFile $SPARSE_GRM_FILE \
-        --sparseGRMSampleIDFile $SPARSE_GRM_ID_FILE \
-        --useSparseGRMtoFitNULL TRUE 2>&1 | grep 'Nglmm' | awk -v pheno_var="$pheno" '{print pheno_var "," $2}' >> neff.csv
+        --sparseGRMFile \$SPARSE_GRM_FILE \
+        --sparseGRMSampleIDFile \$SPARSE_GRM_ID_FILE \
+        --useSparseGRMtoFitNULL TRUE 2>&1 | grep 'Nglmm' | awk -v pheno_var="\$pheno" '{print pheno_var "," \$2}' >> neff.csv
 done
 
 # Process continuous phenotypes
-echo "Estimating neff for continuous phenotypes: $cont_phenos"
+echo "Estimating neff for continuous phenotypes: \$CONT_PHENOS"
 
-for pheno in $cont_phenos; do
-    echo "Estimating neff for $pheno"
+for pheno in \$CONT_PHENOS; do
+    echo "Estimating neff for \$pheno"
     Rscript extdata/extractNglmm.R \
-        --phenoFile $PHENO_FILE \
-        --phenoCol $pheno \
-        --covarColList $COVAR_LIST \
+        --phenoFile \$PHENO_FILE \
+        --phenoCol \$pheno \
+        --covarColList \$COVAR_LIST \
         --traitType 'quantitative' \
-        --sparseGRMFile $SPARSE_GRM_FILE \
-        --sparseGRMSampleIDFile $SPARSE_GRM_ID_FILE \
-        --useSparseGRMtoFitNULL TRUE 2>&1 | grep 'Nglmm' | awk -v pheno_var="$pheno" '{print pheno_var "," $2}' >> neff.csv
+        --sparseGRMFile \$SPARSE_GRM_FILE \
+        --sparseGRMSampleIDFile \$SPARSE_GRM_ID_FILE \
+        --useSparseGRMtoFitNULL TRUE 2>&1 | grep 'Nglmm' | awk -v pheno_var="\$pheno" '{print pheno_var "," \$2}' >> neff.csv
 done
 
 echo "Finished estimating neff"
