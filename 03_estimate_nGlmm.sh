@@ -62,42 +62,38 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 
 docker run -i -e HOME=${WD} -v ${WD}/:$HOME/ -v /mnt/project/:/mnt/project/ wzhou88/saige:1.3.4 /bin/bash << 'EOF'
-for anc in AFR AMR EAS EUR SAS; do 
 
-        sed -i '/setgeno/d' R/SAIGE_extractNeff.R
+sed -i '/setgeno/d' R/SAIGE_extractNeff.R
 
-        # Install the package
-        R CMD INSTALL .
+# Install the package
+R CMD INSTALL .
 
-        # Define phenotype variables (binary and continuous)
+# Define phenotype variables (binary and continuous)
 
-        echo "pheno,nglmm" >> Nglmm_$anc
+echo "pheno,nglmm" >> neff.csv
 
-        # Process binary phenotypes
-        for pheno in $binary_phenos; do
-            Rscript extdata/extractNglmm.R \
-                --phenoFile $PHENO_FILE \
-                --phenoCol $pheno \
-                --covarColList $COVAR_LIST \
-                --traitType 'binary' \
-                --sparseGRMFile $SPARSE_GRM_FILE \
-                --sparseGRMSampleIDFile $SPARSE_GRM_ID_FILE \
-                --useSparseGRMtoFitNULL TRUE 2>&1 | grep 'Nglmm' | awk -v pheno_var="$pheno" '{print pheno_var "," $2}' >> Nglmm_$anc
-        done
-
-        # Process continuous phenotypes
-        for pheno in $cont_phenos; do
-            Rscript extdata/extractNglmm.R \
-                --phenoFile $PHENO_FILE \
-                --phenoCol $pheno \
-                --covarColList $COVAR_LIST \
-                --traitType 'quantitative' \
-                --sparseGRMFile $SPARSE_GRM_FILE \
-                --sparseGRMSampleIDFile $SPARSE_GRM_ID_FILE \
-                --useSparseGRMtoFitNULL TRUE 2>&1 | grep 'Nglmm' | awk -v pheno_var="$pheno" '{print pheno_var "," $2}' >> Nglmm_$anc
-        done
-
-        # Output the results
-        mv Nglmm_$anc.csv $HOME/
+# Process binary phenotypes
+for pheno in $binary_phenos; do
+    Rscript extdata/extractNglmm.R \
+        --phenoFile $PHENO_FILE \
+        --phenoCol $pheno \
+        --covarColList $COVAR_LIST \
+        --traitType 'binary' \
+        --sparseGRMFile $SPARSE_GRM_FILE \
+        --sparseGRMSampleIDFile $SPARSE_GRM_ID_FILE \
+        --useSparseGRMtoFitNULL TRUE 2>&1 | grep 'Nglmm' | awk -v pheno_var="$pheno" '{print pheno_var "," $2}' >> neff.csv
 done
+
+# Process continuous phenotypes
+for pheno in $cont_phenos; do
+    Rscript extdata/extractNglmm.R \
+        --phenoFile $PHENO_FILE \
+        --phenoCol $pheno \
+        --covarColList $COVAR_LIST \
+        --traitType 'quantitative' \
+        --sparseGRMFile $SPARSE_GRM_FILE \
+        --sparseGRMSampleIDFile $SPARSE_GRM_ID_FILE \
+        --useSparseGRMtoFitNULL TRUE 2>&1 | grep 'Nglmm' | awk -v pheno_var="$pheno" '{print pheno_var "," $2}' >> neff.csv
+done
+
 EOF
