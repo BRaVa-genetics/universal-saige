@@ -103,7 +103,7 @@ for pheno in \$CONT_PHENOS; do
         --phenoFile \$PHENO_FILE \
         --phenoCol \$pheno \
         --covarColList \$COVAR_LIST \
-        --traitType 'binary' \
+        --traitType 'quantitative' \
         --sparseGRMFile \$SPARSE_GRM_FILE \
         --sparseGRMSampleIDFile \$SPARSE_GRM_ID_FILE \
         --useSparseGRMtoFitNULL TRUE 2>&1 | tee rscript_output.log
