@@ -84,8 +84,8 @@ R CMD INSTALL .
 # Define phenotype variables (binary and continuous)
 echo "pheno,nglmm" >> neff.csv
 
-echo "Estimating neff for binary phenotypes: \$BINARY_PHENOS"
-for pheno in \$BINARY_PHENOS; do
+echo "Estimating neff for cont phenotypes: \$BINARY_PHENOS"
+for pheno in \$CONT_PHENOS; do
     echo "Estimating neff for \$pheno"
     echo "PHENO_FILE: \$PHENO_FILE"
     echo "COVAR_LIST: \$COVAR_LIST"
@@ -116,21 +116,6 @@ for pheno in \$BINARY_PHENOS; do
         # Process the output only if Rscript was successful
         grep 'Nglmm' rscript_output.log | awk -v pheno_var="\$pheno" '{print pheno_var "," \$2}' >> neff.csv
     fi
-done
-
-# Process continuous phenotypes
-echo "Estimating neff for continuous phenotypes: \$CONT_PHENOS"
-
-for pheno in \$CONT_PHENOS; do
-    echo "Estimating neff for \$pheno"
-    Rscript extdata/extractNglmm.R \
-        --phenoFile \$PHENO_FILE \
-        --phenoCol \$pheno \
-        --covarColList \$COVAR_LIST \
-        --traitType 'quantitative' \
-        --sparseGRMFile \$SPARSE_GRM_FILE \
-        --sparseGRMSampleIDFile \$SPARSE_GRM_ID_FILE \
-        --useSparseGRMtoFitNULL TRUE 2>&1 | grep 'Nglmm' | awk -v pheno_var="\$pheno" '{print pheno_var "," \$2}' >> neff.csv
 done
 
 echo "Finished estimating neff"
