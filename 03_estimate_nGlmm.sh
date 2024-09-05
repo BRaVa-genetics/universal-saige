@@ -17,7 +17,7 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-    ---phenoFile)
+    --phenoFile)
       PHENO_FILE="$2" # past argument
       shift # past value
       ;;
