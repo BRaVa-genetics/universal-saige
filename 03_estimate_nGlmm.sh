@@ -73,6 +73,8 @@ docker run -i \
   -v /mnt/project/:/mnt/project/ \
   wzhou88/saige:1.3.4 /bin/bash << EOF
 
+set -x  # Enable debugging output
+
 sed -i '/setgeno/d' R/SAIGE_extractNeff.R
 
 # Install the package
@@ -84,6 +86,18 @@ echo "pheno,nglmm" >> neff.csv
 echo "Estimating neff for binary phenotypes: \$BINARY_PHENOS"
 for pheno in \$BINARY_PHENOS; do
     echo "Estimating neff for \$pheno"
+    echo "PHENO_FILE: \$PHENO_FILE"
+    echo "COVAR_LIST: \$COVAR_LIST"
+    echo "SPARSE_GRM_FILE: \$SPARSE_GRM_FILE"
+    echo "SPARSE_GRM_ID_FILE: \$SPARSE_GRM_ID_FILE"
+    
+    # Check if Rscript is available
+    which Rscript || echo "Rscript not found in PATH"
+    
+    # Check if the R script file exists
+    ls -l extdata/extractNglmm.R || echo "extractNglmm.R not found"
+    
+    # Run the Rscript command with error checking
     Rscript extdata/extractNglmm.R \
         --phenoFile \$PHENO_FILE \
         --phenoCol \$pheno \
@@ -91,7 +105,16 @@ for pheno in \$BINARY_PHENOS; do
         --traitType 'binary' \
         --sparseGRMFile \$SPARSE_GRM_FILE \
         --sparseGRMSampleIDFile \$SPARSE_GRM_ID_FILE \
-        --useSparseGRMtoFitNULL TRUE 2>&1 | grep 'Nglmm' | awk -v pheno_var="\$pheno" '{print pheno_var "," \$2}' >> neff.csv
+        --useSparseGRMtoFitNULL TRUE 2>&1 | tee rscript_output.log
+    
+    # Check if the Rscript command was successful
+    if [ \$? -ne 0 ]; then
+        echo "Rscript command failed. Check rscript_output.log for details."
+        cat rscript_output.log
+    else
+        # Process the output only if Rscript was successful
+        grep 'Nglmm' rscript_output.log | awk -v pheno_var="\$pheno" '{print pheno_var "," \$2}' >> neff.csv
+    fi
 done
 
 # Process continuous phenotypes
