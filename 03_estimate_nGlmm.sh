@@ -82,7 +82,7 @@ sed -i '/setgeno/d' R/SAIGE_extractNeff.R
 R CMD INSTALL .
 
 # Define phenotype variables (binary and continuous)
-echo "pheno,nglmm" >> neff.csv
+echo "pheno,nglmm" > \$HOME/neff.csv
 
 echo "Estimating neff for cont phenotypes: \$BINARY_PHENOS"
 for pheno in \$CONT_PHENOS; do
@@ -114,10 +114,21 @@ for pheno in \$CONT_PHENOS; do
         cat rscript_output.log
     else
         # Process the output only if Rscript was successful
-        grep 'Nglmm' rscript_output.log | awk -v pheno_var="\$pheno" '{print pheno_var "," \$2}' >> neff.csv
+        grep 'Nglmm' rscript_output.log | awk -v pheno_var="\$pheno" '{print pheno_var "," \$2}' >> \$HOME/neff.csv
     fi
 done
 
 echo "Finished estimating neff"
+echo "Contents of neff.csv:"
+cat \$HOME/neff.csv
 
 EOF
+
+# Check if neff.csv exists in the current directory
+if [ -f neff.csv ]; then
+    echo "neff.csv found in the current directory"
+else
+    echo "neff.csv not found in the current directory"
+    echo "Current directory contents:"
+    ls -la
+fi
