@@ -9,6 +9,7 @@ generate_grm=false
 generate_plink_for_vr=false
 
 WD=$(pwd)
+HOME=$WD
 
 subset_variants(){
     echo "Subsetting genetic data for GRM / VR"
@@ -128,7 +129,9 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     -s|--isSingularity)
+      SINGULARITY="$2"
       shift # past argument
+      shift # past value
       ;;
     -p|--geneticDataDirectory)
       GENETIC_DATA_DIR="$2"

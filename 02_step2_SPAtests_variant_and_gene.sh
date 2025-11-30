@@ -15,6 +15,9 @@ SPARSEGRM=""
 SPARSEGRMID=""
 GROUPFILE=""
 
+WD=$(pwd)
+HOME=$WD
+
 while [[ $# -gt 0 ]]; do
   case $1 in
     # --ancestry)
@@ -62,6 +65,7 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     -s|--isSingularity)
+      SINGULARITY="$2"
       shift # past argument
       shift # past value
       ;;

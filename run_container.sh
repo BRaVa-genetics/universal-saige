@@ -1,8 +1,8 @@
 run_container () {
   if [[ ${SINGULARITY} = true ]]; then
     singularity exec \
-      --env HOME=${WD} \
-      --bind ${WD}/:$HOME/ \
+      --home ${WD} --pwd ${WD} \
+      --bind ${WD}:${WD} \
       "resources/saige.sif" $cmd
   else
     # Load the Docker image from the tar.gz file

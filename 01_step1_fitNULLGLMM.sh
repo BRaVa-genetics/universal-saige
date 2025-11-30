@@ -16,16 +16,20 @@ PHENOFILE=""
 PHENOCOL=""
 COVARCOLLIST=""
 CATEGCOVARCOLLIST=""
+
 WD=$(pwd)
+HOME=$WD
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     -o|--outputPrefix)
       OUT="$2"
+      echo "out: $OUT"
       shift # past argument
       shift # past value
       ;;
     -s|--isSingularity)
+      SINGULARITY="$2"
       shift # past argument
       shift # past value
       ;;
@@ -35,36 +39,43 @@ while [[ $# -gt 0 ]]; do
         echo "Trait type is not in {quantitative,binary}"
         exit 1
       fi
+      echo "trait type: ${TRAITTYPE}"
       shift # past argument
       shift # past value
       ;;
     -p|--genotypePlink)
       GENOTYPE_PLINK="$2"
+      echo "genotype plink: ${GENOTYPE_PLINK}"
       shift # past argument
       shift # past value
       ;;
     --sparseGRM)
       SPARSEGRM="$2"
+      echo "sparse GRM: ${SPARSEGRM}"
       shift # past argument
       shift # past value
       ;;
     --sparseGRMID)
       SPARSEGRMID="$2"
+      echo "sparse GRM ID: ${SPARSEGRMID}"
       shift # past argument
       shift # past value
       ;;
     --phenoFile)
       PHENOFILE="$2"
+      echo "phenotype file: ${PHENOFILE}"
       shift # past argument
       shift # past value
       ;;
     --phenoCol)
       PHENOCOL="$2"
+      echo "phenotype column: ${PHENOCOL}"
       shift # past argument
       shift # past value
       ;;
     -c|--covarColList)
       COVARCOLLIST="$2"
+      echo "covariate column list: ${COVARCOLLIST}"
       shift # past argument
       shift # past value
       ;;
@@ -74,12 +85,13 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     --sampleIDs)
-      SAMPLEIDS="$2" 
+      SAMPLEIDS="$2"
       shift
       shift
-      ;; 
+      ;;
     -i|--sampleIDCol)
       SAMPLEIDCOL="$2"
+      echo "sample ID column: ${SAMPLEIDCOL}"
       shift # past argument
       shift # past value
       ;;
@@ -185,7 +197,7 @@ echo "SAMPLEIDCOL       = ${SAMPLEIDCOL}"
 
 
 if is_valid_r_var "$PHENOCOL"; then
-    echo "The variable name '$PHENOCOL' is not valid for an R variable."
+    echo "The variable name '$PHENOCOL' is valid for an R variable."
 fi
 
 if [[ "$PHENOCOL" =~ .*"-".* || "$PHENOCOL" =~ .*",".* || "$PHENOCOL" =~ .*"=".* ]]; then
