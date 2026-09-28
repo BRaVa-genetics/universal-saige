@@ -126,7 +126,8 @@ while [[ $# -gt 0 ]]; do
     -c,--covarColList: comma separated column names (e.g. age,pc1,pc2) of continuous covariates to include as fixed effects in the file specified in --phenoFile.
     --categCovarColList: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
     --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
-    --sex ('M' or 'F')
+    --sex ('M' or 'F'): for a sex-specific trait. Every sample with a non-missing phenotype must share one value of the
+      'sex' column (and equal --sex, when that column is coded M/F). Do not also pass sex as a covariate.
     --dryRun: print the SAIGE command instead of running it.
   fit gates (the slim build): a binary trait fitted on fewer than 100 cases, a categorical covariate level with fewer
     than 10 cases or controls, a separated covariate model or a fit that did not converge is REFUSED, with the gate
@@ -146,19 +147,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
-
-if [[ ${SEX} == "M" || ${SEX} == "F" ]]; then
-  # Getting column numbers
-  sex_col_num=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w 'sex' | cut -d: -f1)
-  pheno_col_num=$(head -n 1 $pheno_file | tr ' ' '\n' | grep -n -w $PHENOCOL | cut -d: -f1)
-
-  # Checking for wrong entries
-  awk -v sex_col=$sex_col_num -v pheno_col=$pheno_col_num -v sex=$sex 'NR>1 && $pheno_col != "NA" && $sex_col != sex' $pheno_file | while read line
-  do
-      echo "Error: Unexpected sex in line: $line"
-      exit 1
-  done
-fi
 
 # Checks
 if [[ ${TRAITTYPE} == "" ]]; then
@@ -182,6 +170,37 @@ fi
 if [[ ${PHENOCOL} == "" ]]; then
   echo "phenoCol not set"
   exit 1
+fi
+
+# A sex-specific trait: every sample with a phenotype must carry the same value
+# in the 'sex' column. The coding of that column varies by cohort, so only an
+# M/F coding can also be compared with --sex itself.
+if [[ ${SEX:-} != "" ]]; then
+  if [[ ${SEX} != "M" && ${SEX} != "F" ]]; then
+    echo "--sex must be M or F"
+    exit 1
+  fi
+  fs=' '   # awk's whitespace splitting, unless the file is tab-delimited (empty fields keep their place)
+  [[ $(head -n 1 "${PHENOFILE}") == *$'\t'* ]] && fs='\t'
+  header=$(head -n 1 "${PHENOFILE}" | awk -F"${fs}" '{for (i = 1; i <= NF; i++) print $i}')
+  sex_col_num=$(grep -n -x 'sex' <<< "${header}" | cut -d: -f1)
+  pheno_col_num=$(grep -n -x -F "${PHENOCOL}" <<< "${header}" | cut -d: -f1)
+  if [[ ${sex_col_num} == "" || ${pheno_col_num} == "" ]]; then
+    echo "--sex ${SEX}: ${PHENOFILE} needs a 'sex' column and a '${PHENOCOL}' column"
+    exit 1
+  fi
+  sex_values=$(awk -F"${fs}" -v s="${sex_col_num}" -v p="${pheno_col_num}" \
+    'NR > 1 && $p != "NA" && $p != "" {print $s}' "${PHENOFILE}" | sort | uniq -c)
+  if (( $(grep -c . <<< "${sex_values}") > 1 )); then
+    echo "--sex ${SEX}: samples with a non-missing ${PHENOCOL} have more than one value of 'sex' (count, value):"
+    echo "${sex_values}"
+    exit 1
+  fi
+  observed_sex=$(awk '{print $2}' <<< "${sex_values}")
+  if [[ ( ${observed_sex} == "M" || ${observed_sex} == "F" ) && ${observed_sex} != "${SEX}" ]]; then
+    echo "--sex ${SEX}: samples with a non-missing ${PHENOCOL} are all sex ${observed_sex}"
+    exit 1
+  fi
 fi
 
 if [[ $OUT = "out" ]]; then

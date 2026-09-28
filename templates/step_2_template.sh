@@ -38,7 +38,7 @@ out_step2=["out"]
 IS_SINGULARITY={"false","true"}
 
 # The GRM from step 0 and its sample IDs:
-# ${out_step0}.relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx and
+# ${out_step0}_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx and
 # the same with .sampleIDs.txt appended.
 GRM=["path/to/GRM/file"]
 GRM_samples=["path/to/GRM/sampleID/file"]

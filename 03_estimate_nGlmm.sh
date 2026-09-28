@@ -1,9 +1,23 @@
+#!/bin/bash
+# Effective sample size (Nglmm) of each phenotype's null GLMM on the sparse
+# GRM, one row per phenotype in a csv. extractNglmm.R is on the slim image's
+# PATH; it prints a line "Nglmm <value>" and writes no files.
+
+source ./run_container.sh
+
+POSITIONAL_ARGS=()
+
 binary_phenos=""
 cont_phenos=""
 PHENO_FILE=""
 COVAR_LIST=""
 SPARSE_GRM_FILE=""
 SPARSE_GRM_ID_FILE=""
+OUT_FILE="neff.csv"
+SINGULARITY=false
+
+WD=$(pwd)
+HOME=$WD
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -18,7 +32,8 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     --phenoFile)
-      PHENO_FILE="$2" # past argument
+      PHENO_FILE="$2"
+      shift # past argument
       shift # past value
       ;;
     --covarList)
@@ -36,6 +51,20 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    -o|--outputFile)
+      OUT_FILE="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -s|--isSingularity)
+      SINGULARITY="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --dryRun)
+      DRYRUN=true
+      shift # past argument
+      ;;
     -h|--help)
       echo "usage: 03_estimate_nGlmm.sh
   required:
@@ -44,8 +73,15 @@ while [[ $# -gt 0 ]]; do
     --phenoFile: filename of the phenotype file. This must be relative to, and contained within, the current working directory.
     --sparseGRM: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the current working directory.
     --sparseGRMID: filename of the sparseGRM ID file. This must be relative to, and contained within, the current working directory.
+  optional:
+    --covarList: comma separated column names of covariates in --phenoFile.
+    -o,--outputFile (default: neff.csv): the csv written, one 'pheno,nglmm' row per phenotype. Each phenotype's log is
+      <outputFile without .csv>.<pheno>.log.
+    -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
+    --dryRun: print the commands instead of running them.
+  A phenotype whose fit fails (or is refused by the fit gates) gets no row, and the script exits non-zero.
       "
-      shift # past argument
+      exit 0
       ;;
     -*|--*)
       echo "Unknown option $1"
@@ -60,105 +96,52 @@ done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
-WD=$( pwd )
+if [[ ${PHENO_FILE} == "" || ${SPARSE_GRM_FILE} == "" || ${SPARSE_GRM_ID_FILE} == "" ]]; then
+  echo "--phenoFile, --sparseGRM and --sparseGRMID are required"
+  exit 1
+fi
+if [[ ${binary_phenos} == "" && ${cont_phenos} == "" ]]; then
+  echo "no phenotypes: pass --binaryPhenos and/or --contPhenos"
+  exit 1
+fi
 
-# The slim SAIGE image (download_resources.sh --saige-image): extractNglmm.R is
-# on its PATH, so nothing is patched or reinstalled inside the container.
-docker load -i resources/saige.tar > /dev/null
-IMAGE_REF=$(cat resources/saige.image 2>/dev/null || true)
-IMAGE_ID=""
-[[ -n ${IMAGE_REF} ]] && IMAGE_ID=$(docker images --filter=reference="${IMAGE_REF}" --format "{{.ID}}" | head -n 1)
-[[ -n ${IMAGE_ID} ]] || IMAGE_ID=$(docker images --format "{{.Repository}}:{{.Tag}} {{.ID}}" | awk '$1 ~ /saige-slim:/ {print $2; exit}')
-[[ -n ${IMAGE_ID} ]] || { echo "no saige-slim image loaded; run download_resources.sh --saige-image" >&2; exit 1; }
-PROJECT_MOUNT=(); [[ -d /mnt/project ]] && PROJECT_MOUNT=(-v /mnt/project/:/mnt/project/)   # UKB RAP layout, when present
+check_container_env $SINGULARITY
 
-docker run -i --rm \
-  -e HOME=${WD} \
-  -e BINARY_PHENOS="$binary_phenos" \
-  -e CONT_PHENOS="$cont_phenos" \
-  -e PHENO_FILE="$PHENO_FILE" \
-  -e COVAR_LIST="$COVAR_LIST" \
-  -e SPARSE_GRM_FILE="$SPARSE_GRM_FILE" \
-  -e SPARSE_GRM_ID_FILE="$SPARSE_GRM_ID_FILE" \
-  -v ${WD}/:$HOME/ \
-  "${PROJECT_MOUNT[@]}" \
-  "${IMAGE_ID}" /bin/bash << EOF
+COVAR_ARGS=""
+[[ ${COVAR_LIST} != "" ]] && COVAR_ARGS="--covarColList ${COVAR_LIST}"
 
-set -x  # Enable debugging output
+echo "pheno,nglmm" > "${OUT_FILE}"
+failed=()
+estimate () {   # $1 = phenotype, $2 = trait type
+  local log="${OUT_FILE%.csv}.$1.log" rc nglmm
+  cmd="extractNglmm.R \
+    --phenoFile ${HOME}/${PHENO_FILE} \
+    --phenoCol $1 \
+    ${COVAR_ARGS} \
+    --traitType $2 \
+    --sparseGRMFile ${HOME}/${SPARSE_GRM_FILE} \
+    --sparseGRMSampleIDFile ${HOME}/${SPARSE_GRM_ID_FILE} \
+    --useSparseGRMtoFitNULL TRUE"
+  echo "Estimating Nglmm for $1 ($2); log: ${log}"
+  run_container > "${log}" 2>&1; rc=$?
+  [[ ${DRYRUN:-false} = true ]] && { cat "${log}"; return; }
+  nglmm=$(awk '$1 == "Nglmm" {v = $2} END {print v}' "${log}")
+  if (( rc != 0 )) || [[ ${nglmm} == "" ]]; then
+    echo "  FAILED (exit ${rc}); the end of ${log}:" >&2
+    tail -n 5 "${log}" >&2
+    failed+=("$1")
+  else
+    echo "$1,${nglmm}" >> "${OUT_FILE}"
+    echo "  Nglmm = ${nglmm}"
+  fi
+}
 
-# Define phenotype variables (binary and continuous)
-echo "pheno,nglmm" > \$HOME/neff.csv
+for pheno in ${cont_phenos}; do estimate "${pheno}" quantitative; done
+for pheno in ${binary_phenos}; do estimate "${pheno}" binary; done
 
-echo "Estimating neff for cont phenotypes: \$CONT_PHENOS"
-for pheno in \$CONT_PHENOS; do
-    echo "Estimating neff for \$pheno"
-    echo "PHENO_FILE: \$PHENO_FILE"
-    echo "COVAR_LIST: \$COVAR_LIST"
-    echo "SPARSE_GRM_FILE: \$SPARSE_GRM_FILE"
-    echo "SPARSE_GRM_ID_FILE: \$SPARSE_GRM_ID_FILE"
-    
-    # Check if Rscript is available
-    which Rscript || echo "Rscript not found in PATH"
-    
-    # Check that the script is on the image's PATH
-    which extractNglmm.R || echo "extractNglmm.R not found"
-    
-    # Run the Rscript command with error checking
-    extractNglmm.R \
-        --phenoFile \$PHENO_FILE \
-        --phenoCol \$pheno \
-        --covarColList \$COVAR_LIST \
-        --traitType 'quantitative' \
-        --sparseGRMFile \$SPARSE_GRM_FILE \
-        --sparseGRMSampleIDFile \$SPARSE_GRM_ID_FILE \
-        --useSparseGRMtoFitNULL TRUE 2>&1 | tee rscript_output.log
-    
-    # Check if the Rscript command was successful
-    if [ \$? -ne 0 ]; then
-        echo "Rscript command failed. Check rscript_output.log for details."
-        cat rscript_output.log
-    else
-        # Process the output only if Rscript was successful
-        grep 'Nglmm' rscript_output.log | awk -v pheno_var="\$pheno" '{print pheno_var "," \$2}' >> \$HOME/neff.csv
-    fi
-done
-
-echo "Estimating neff for binary phenotypes: \$BINARY_PHENOS"
-for pheno in \$BINARY_PHENOS; do
-    echo "Estimating neff for \$pheno"
-    echo "PHENO_FILE: \$PHENO_FILE"
-    echo "COVAR_LIST: \$COVAR_LIST"
-    echo "SPARSE_GRM_FILE: \$SPARSE_GRM_FILE"
-    echo "SPARSE_GRM_ID_FILE: \$SPARSE_GRM_ID_FILE"
-    
-    # Check if Rscript is available
-    which Rscript || echo "Rscript not found in PATH"
-
-    # Check that the script is on the image's PATH
-    which extractNglmm.R || echo "extractNglmm.R not found"
-
-    # Run the Rscript command with error checking
-    extractNglmm.R \
-        --phenoFile \$PHENO_FILE \
-        --phenoCol \$pheno \
-        --covarColList \$COVAR_LIST \
-        --traitType 'binary' \
-        --sparseGRMFile \$SPARSE_GRM_FILE \
-        --sparseGRMSampleIDFile \$SPARSE_GRM_ID_FILE \
-        --useSparseGRMtoFitNULL TRUE 2>&1 | tee rscript_output.log
-    
-    # Check if the Rscript command was successful
-    if [ \$? -ne 0 ]; then
-        echo "Rscript command failed. Check rscript_output.log for details."
-        cat rscript_output.log
-    else  
-        # Process the output only if Rscript was successful
-        grep 'Nglmm' rscript_output.log | awk -v pheno_var="\$pheno" '{print pheno_var "," \$2}' >> \$HOME/neff.csv
-    fi
-done
-
-echo "Finished estimating neff"
-echo "Contents of neff.csv:"
-cat \$HOME/neff.csv
-
-EOF
+echo "Contents of ${OUT_FILE}:"
+cat "${OUT_FILE}"
+if (( ${#failed[@]} > 0 )); then
+  echo "No Nglmm for: ${failed[*]}" >&2
+  exit 1
+fi

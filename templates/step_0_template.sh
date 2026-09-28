@@ -8,8 +8,9 @@
 # of the autosomes for just one biobank/cohort and not multiple!
 genetic_data_directory=["in/"]
 
-# Note, VCF files must be gzipped with `.vcf.gz` file extensions.
-GENETIC_DATA_FORMAT={"plink","vcf"}
+# PLINK 1 (.bed/.bim/.fam) or PLINK 2 (.pgen/.pvar/.psam). A VCF is refused:
+# convert it once with resources/plink2 --vcf FILE.vcf.gz --make-pgen --out PREFIX
+GENETIC_DATA_FORMAT={"plink","pgen"}
 
 GENETIC_DATA_TYPE={"WES","WGS","genotype"}
 

@@ -59,7 +59,7 @@ bash download_resources.sh --saige-image --plink2 --plink --singularity
 ## Step 0 
 To start we must generate the sparse genetic relatedness matrix (GRM) and processed plink files for usage in variance ratio estimation during step 1. While this step may take several hours to run, it only has to be executed once per biobank/cohort.
 
-Step 0 supports (genotype data, plink format), (exome data, VCF format) and (exome data, plink format) as inputs although we recommend the usage of (genotype, plink format) in order to reduce runtime and maximise the number of independent sites. (Step 0 is the one place a VCF is still read, through plink 1.9; steps 1 and 2 take PLINK 2 or PLINK 1 only.)
+Step 0 takes genotype or exome data in PLINK 1 (`--geneticDataFormat plink`) or PLINK 2 (`--geneticDataFormat pgen`) format, as steps 1 and 2 do; convert a VCF once with plink2 first. We recommend genotype array data here, to reduce runtime and maximise the number of independent sites.
 
 For this step we recommend using a larger machine - most functions in this step are parallelised across CPU cores and will benefit from high RAM. 
 
@@ -297,7 +297,7 @@ variant_results = pd.read_csv(variant_results, sep="\t")
 qqplot(variant_results, "HDL_cholesterol", "variant")
 ```
 
-Note that due to fast testing enables results with $P > 0.05$ may be skewed and affect the $\lambda_{GC}$ value. 
+The drivers run with fastTest off (the All of Us choice), so every _P_-value is computed in full, including those above 0.05, and $\lambda_{GC}$ can be read off the whole distribution.
 
 <img src="https://user-images.githubusercontent.com/43707014/236252715-93df0a07-9799-4e50-85af-c679631a4bc3.png" width="500">
 

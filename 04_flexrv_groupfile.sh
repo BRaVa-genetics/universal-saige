@@ -53,4 +53,5 @@ else
   [[ -n ${ISO} ]] && args+=(--isoforms "${ISO}")
   [[ -n ${ANNO} ]] && args+=(--anno-table "${ANNO}" --prefer-anno-transcript)
 fi
-python3 "${HERE}/flexrv_score_from_alphamissense.py" "${args[@]}" "${EXTRA[@]}"
+# ${EXTRA[@]+...}: an empty array is "unbound" under set -u in bash < 4.4 (macOS ships 3.2)
+python3 "${HERE}/flexrv_score_from_alphamissense.py" "${args[@]}" ${EXTRA[@]+"${EXTRA[@]}"}

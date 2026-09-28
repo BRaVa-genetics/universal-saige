@@ -78,21 +78,22 @@ bash download_resources.sh --alphamissense                  # the AlphaMissense 
 
 ## Usage
 ### Step 0 (once per cohort/biobank)
-Take genotyping array data in `plink` format, or `{WES, WGS}` files in `{vcf, plink}` format, and generate variance ratios and a sparse GRM.
+Take genotyping array data, or `{WES, WGS}` data, in PLINK 1 (`.bed/.bim/.fam`) or PLINK 2 (`.pgen/.pvar/.psam`) format, and generate variance ratios and a sparse GRM.
 
 ```
 usage: 00_step0_VR_and_GRM.sh
 ```
 required:
-- `--geneticDataDirectory`: directory containing the genetic data (genotyping array data in `plink` format, or `{WES, WGS}` files in `{vcf, plink}` format).
-- `--geneticDataFormat`: format of the genetic data `{vcf, plink}`. VCF files must be gzipped with `.vcf.gz` file extensions.
-- `--sampleIDs`: `.fam` file of the sample IDs that are present in the `{WES, WGS}` data. **Note, if this is not _all_ of the samples in the `{WES, WGS}` dataset, the `{WES, WGS}` data must be filtered to these samples before running step 1**
+- `--geneticDataDirectory`: directory containing the genetic data (genotyping array data, or `{WES, WGS}` files).
+- `--geneticDataFormat`: format of the genetic data `{plink, pgen}`: PLINK 1 or PLINK 2. A VCF is refused; convert it once with `plink2 --vcf FILE.vcf.gz --make-pgen --out PREFIX`.
+- `--geneticDataType`: type of the genetic data `{WES, WGS, genotype}`.
+- `-o`,`--outputPrefix`: output prefix from this program (SAIGE step 0) to be used as SAIGE step 1 input.
 
 optional:
-- `-o`,`--outputPrefix`: output prefix from this program (SAIGE step 0) to be used as SAIGE step 1 input.
 - `-s`,`--isSingularity` (default: `false`): is singularity available? If not, it is assumed that docker is available.
 - `--generate_GRM` (default: false): generate GRM for the genetic data.
 - `--generate_plink_for_vr` (default: false): generate plink file for vr.
+- `--sampleIDs`: single column of sample IDs (matched on IID) to define the GRM and the variance-ratio markers' samples; all samples when omitted. **Note, if this is not _all_ of the samples in the `{WES, WGS}` dataset, the `{WES, WGS}` data must be filtered to these samples before running step 1**
 
 > [!IMPORTANT]
 > All files contained within `--geneticDataDirectory` of the type flagged by `--geneticDataFormat` will be globbed, so please ensure that this contains all of the autosomes for _just one biobank/cohort_ and not multiple!
@@ -164,3 +165,12 @@ required:
 - `--phenoFile`: filename of the phenotype file. This must be relative to, and contained within, the current working directory.
 - `--sparseGRM`: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the current working directory.
 - `--sparseGRMID`: filename of the sparseGRM ID file. This must be relative to, and contained within, the current working directory.
+
+optional:
+- `--covarList`: comma separated covariate column names in `--phenoFile`.
+- `-o`,`--outputFile` (default `neff.csv`): one `pheno,nglmm` row per phenotype; each phenotype's log is `<outputFile without .csv>.<pheno>.log`.
+- `-s`,`--isSingularity` (default: false), `--dryRun`.
+
+Nglmm is `1' K^-1 1` on the sparse GRM `K` over the phenotype's analysed samples (times `4 Pn (1 - Pn)` for a binary
+trait, `Pn` the case fraction): a function of the relatedness and the case fraction, not of the phenotype's heritability.
+A phenotype whose fit fails gets no row, and the script exits non-zero.

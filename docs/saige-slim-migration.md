@@ -72,3 +72,36 @@ the 0.05 sparse GRM; `group_new_snpid_flexrv.txt` with its `score:REVEL` line):
 
 To repeat: `docker save <image> -o resources/saige.tar; echo <image> > resources/saige.image`,
 copy the fixture files into a working directory, run the commands above from it.
+
+## Second pass (2026-09-28): an end-to-end test, and what it found
+
+`tests/run_e2e.sh` runs every driver on a simulated cohort where the right
+answer is known: a pedigree for the GRM to recover, planted gene, FlexRV and
+common-variant effects, null and permuted traits, a trait below the case
+gate, and sample-ID overlaps whose intersection is the expected N. It is
+scored by `tests/check_results.py` (see `CLAUDE.md`). What it and the review
+around it changed:
+
+- **Step 0 takes PLINK 1 or PLINK 2 only** (`--geneticDataFormat {plink,pgen}`),
+  like steps 1 and 2. A VCF is refused with the plink2 conversion. `.pgen`
+  is converted to `.bed` in the scratch directory, because the merge, pruning
+  and counts are plink 1.9.
+- **Step 0 `--sampleIDs` matches on IID.** `--keep "ID ID"` silently dropped
+  every sample whose FID differed from its IID, which covers any PLINK 2 input
+  (plink2 writes FID 0).
+- **Step 0 MAC bins:** the minor allele count was computed as C2 - C1 from
+  `.frq.counts`, whose C2 is the other allele count, not the total. Near-50%
+  variants were binned as MAC 10-20 (1% of that bin in the test).
+- Step 0: `shuf` (absent on macOS) replaced by a seeded sampler; scratch in a
+  per-run `mktemp -d` instead of shared `/tmp` names; `--outputPrefix` required.
+- Step 1 `--sex` read unset variables (so it read stdin) and could not stop the
+  run from inside `| while`. It now requires one value of `sex` among samples
+  with a phenotype, and that value to equal `--sex` when the column is M/F.
+- Step 3 mounted the working directory at the host `$HOME` and took `$?` from
+  `tee`, so it only ran from `$HOME` and hid failures. It now uses
+  `run_container` (Singularity, fit-gate pass-through), takes `--outputFile`,
+  and exits non-zero for a phenotype without an Nglmm. It no longer mounts
+  `/mnt/project` (the UKB RAP layout); whether RAP runs need it back is open. Nglmm
+  reconciles exactly with 1'K^-1 1 on the GRM.
+- `04_flexrv_groupfile.sh` failed under macOS bash 3.2 (an empty array under `set -u`).
+- Templates: `--t` -> `--traitType`; the GRM file is `<out>_relatednessCutoff_...`.
