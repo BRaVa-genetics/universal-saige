@@ -14,7 +14,7 @@ There is no build or linter. Setup and checks:
 bash download_resources.sh --saige-image --plink --plink2 [--singularity]   # image -> resources/saige.{tar,sif}, resources/saige.image
 bash download_resources.sh --alphamissense                                   # FlexRV weights source (~600 MB)
 
-bash tests/run_e2e.sh            # the end-to-end test: every driver on a simulated cohort, then PASS/FAIL per check (Docker, ~20 min)
+bash tests/run_e2e.sh            # the end-to-end test: every driver on a simulated cohort, then PASS/FAIL per check (Docker, 20-40 min)
 bash tests/run_e2e.sh --check    # re-score the last run without re-running it
 bash tests/run_e2e.sh --resume   # re-run only what did not succeed (e.g. after Docker died mid-run)
 python3 flexrv_score_from_alphamissense.py --selftest   # controls for the FlexRV score builder alone; no downloads
@@ -26,7 +26,7 @@ bash 01_step1_fitNULLGLMM.sh ... --dryRun               # print the SAIGE comman
 ## Architecture
 
 **Every driver must be run from the repo root.** Each one does `source ./run_container.sh`, sets `WD=$(pwd)` and `HOME=$WD`, parses flags into globals, builds a SAIGE command string in `$cmd`, and calls `run_container`. That function mounts `$WD` at the same path inside Docker or Singularity and runs `$cmd` unquoted. So:
-- every file argument must be a relative path inside the working directory. Drivers prefix it with `${HOME}/`, and symlinks pointing outside the directory break;
+- every file argument must be a relative path inside the working directory. Drivers prefix it with `${HOME}/`, and symlinks pointing outside the directory break. The one exception is step 3, which also takes absolute paths under directories that `run_container` binds read-only: `/mnt/project` (UKB RAP) whenever it exists, and anything in `SAIGE_EXTRA_MOUNTS`;
 - `$cmd` is word-split, so paths and column names cannot contain spaces;
 - the image is found through `resources/saige.image` (Docker: `docker load` of `resources/saige.tar` on each call) or `resources/saige.sif`.
 

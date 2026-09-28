@@ -9,8 +9,8 @@
 #
 # Needs Docker and resources/ from
 #   bash download_resources.sh --saige-image --plink --plink2
-# Writes tests/work/ (in/, out/, logs/, status.tsv). Takes about 20 minutes (a group test ~75 s). If it is
-# much slower, Docker itself may be struggling: restarting Docker Desktop fixed a 10x slowdown once.
+# Writes tests/work/ (in/, out/, logs/, status.tsv). Takes 20-40 minutes (a group test 1-6 minutes). If it is
+# much slower, check Docker Desktop's backend CPU: restarting Docker fixed a 10x slowdown once.
 # Each run's log is tests/work/logs/<name>.log; status.tsv has its exit code.
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -149,6 +149,18 @@ wait
 echo "== step 3 (Nglmm)"
 run s3_nglmm ok bash 03_estimate_nGlmm.sh --contPhenos Q_pos --binaryPhenos "B_pos B_rare" --phenoFile "${IN}/pheno.tsv" \
   --covarList "${COV}" --sparseGRM "${GRM}" --sparseGRMID "${GRMID}" --outputFile "${OUT}/neff.csv"
+# inputs outside the working directory, by absolute path through SAIGE_EXTRA_MOUNTS
+# (the mechanism that binds /mnt/project on the UKB RAP): the same Nglmm with the
+# mount, "does not exist" without it
+EXT=$(mktemp -d "${TMPDIR:-/tmp}/universal_saige_e2e.XXXXXX"); trap 'rm -rf "${EXT}"' EXIT
+cp "${IN}/pheno.tsv" "${GRM}" "${GRMID}" "${EXT}/"
+S3X=(bash 03_estimate_nGlmm.sh --phenoFile "${EXT}/pheno.tsv" --covarList "${COV}"
+     --sparseGRM "${EXT}/${GRM##*/}" --sparseGRMID "${EXT}/${GRMID##*/}")
+run s3_nglmm_extmount   ok   env SAIGE_EXTRA_MOUNTS="${EXT}" "${S3X[@]}" --contPhenos Q_pos --binaryPhenos "B_pos B_rare" \
+  --outputFile "${OUT}/neff_extmount.csv"
+run s3_nglmm_nomount    fail env SAIGE_EXTRA_MOUNTS= "${S3X[@]}" --contPhenos Q_pos --outputFile "${OUT}/neff_nomount.csv"
+run s3_refuse_bad_mount fail env SAIGE_EXTRA_MOUNTS=/nonexistent_universal_saige "${S3X[@]}" --contPhenos Q_pos \
+  --outputFile "${OUT}/neff_badmount.csv" --dryRun
 
 echo "== checks"
 python3 tests/check_results.py "${W}"

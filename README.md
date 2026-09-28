@@ -162,9 +162,13 @@ usage: 03_estimate_nGlmm.sh
 required:
 - `--binaryPhenos`: space separated list of binary phenotypes.
 - `--contPhenos`: space separated list of continuous phenotypes.
-- `--phenoFile`: filename of the phenotype file. This must be relative to, and contained within, the current working directory.
-- `--sparseGRM`: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the current working directory.
-- `--sparseGRMID`: filename of the sparseGRM ID file. This must be relative to, and contained within, the current working directory.
+- `--phenoFile`: filename of the phenotype file.
+- `--sparseGRM`: filename of the sparseGRM .mtx file.
+- `--sparseGRMID`: filename of the sparseGRM ID file.
+
+Each is relative to the current working directory, or an absolute path under it, under `/mnt/project` (the UKB RAP
+project mount, bound read-only whenever it exists), or under a directory listed, colon-separated, in the
+`SAIGE_EXTRA_MOUNTS` environment variable. On the RAP, `--phenoFile /mnt/project/...` works as it is.
 
 optional:
 - `--covarList`: comma separated covariate column names in `--phenoFile`.

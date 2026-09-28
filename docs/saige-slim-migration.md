@@ -100,8 +100,10 @@ around it changed:
 - Step 3 mounted the working directory at the host `$HOME` and took `$?` from
   `tee`, so it only ran from `$HOME` and hid failures. It now uses
   `run_container` (Singularity, fit-gate pass-through), takes `--outputFile`,
-  and exits non-zero for a phenotype without an Nglmm. It no longer mounts
-  `/mnt/project` (the UKB RAP layout); whether RAP runs need it back is open. Nglmm
+  and exits non-zero for a phenotype without an Nglmm. Inputs outside the working
+  directory go through read-only binds in `run_container`: `/mnt/project` (the
+  UKB RAP project mount) whenever it exists, plus `SAIGE_EXTRA_MOUNTS`; step 3
+  takes absolute paths under them, as it did on the RAP. Nglmm
   reconciles exactly with 1'K^-1 1 on the GRM.
 - `04_flexrv_groupfile.sh` failed under macOS bash 3.2 (an empty array under `set -u`).
 - Templates: `--t` -> `--traitType`; the GRM file is `<out>_relatednessCutoff_...`.

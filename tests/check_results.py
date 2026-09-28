@@ -117,7 +117,8 @@ section()
 for name, (expect, rc, secs) in status.items():
     ok = (int(rc) == 0) == (expect == "ok")
     check("exit: " + name, ok, "exit %s (%ss)" % (rc, secs), "exit 0" if expect == "ok" else "non-zero")
-for name in ("s2_B_pos_variant", "s2_B_pos_group", "s3_nglmm", "s2_Q_null_group", "s2_Q_perm_group"):
+for name in ("s2_B_pos_variant", "s2_B_pos_group", "s3_nglmm", "s2_Q_null_group", "s2_Q_perm_group",
+             "s3_nglmm_extmount"):
     if name not in status:
         check("exit: " + name, False, "never ran", "exit 0")
 
@@ -136,6 +137,8 @@ for name, text in [
     ("s1_sex_numeric_ok", "DRY RUN"),
     ("s0_refuse_vcf", "geneticDataFormat must be in {plink,pgen}"),
     ("s0_refuse_no_out", "--outputPrefix is required"),
+    ("s3_nglmm_nomount", "does not exist"),
+    ("s3_refuse_bad_mount", "is not a directory"),
 ]:
     check("message: " + name, text in log(name), "found" if text in log(name) else "absent", repr(text))
 
@@ -471,6 +474,10 @@ for trait in ("Q_pos", "B_pos", "B_rare"):
         d = float("nan")
     check("step3 %s: Nglmm = 1'K^-1 1 recomputed from the GRM" % trait, abs(v - d) <= 1e-4 * abs(d),
           "%.4f vs %.4f (N %d)" % (v, d, N[trait]), "equal to 1e-4")
+
+section("s3_nglmm", "s3_nglmm_extmount")
+check("step3: absolute paths through SAIGE_EXTRA_MOUNTS give the same csv (bytes)",
+      same_bytes(out("neff.csv"), out("neff_extmount.csv")), "", "identical")
 
 # ------------------------------------------------------------ report
 width = max(len(r[1]) for r in RESULTS)
