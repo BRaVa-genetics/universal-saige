@@ -6,9 +6,10 @@
 #   bash tests/run_e2e.sh --check     # re-score the last run only
 #   bash tests/run_e2e.sh --fresh     # re-simulate as well
 #   bash tests/run_e2e.sh --resume    # re-run only the runs that did not succeed (and every expected refusal)
+#   SINGULARITY=true bash tests/run_e2e.sh   # the same, with every step on Singularity (resources/saige.sif)
 #
-# Needs Docker and resources/ from
-#   bash download_resources.sh --saige-image --plink --plink2
+# Needs Docker (or Singularity) and resources/ from
+#   bash download_resources.sh --saige-image --plink --plink2 [--singularity]
 # Writes tests/work/ (in/, out/, logs/, status.tsv). Takes 20-40 minutes (a group test 1-6 minutes). If it is
 # much slower, check Docker Desktop's backend CPU: restarting Docker fixed a 10x slowdown once.
 # Each run's log is tests/work/logs/<name>.log; status.tsv has its exit code.
@@ -16,7 +17,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 W=tests/work; IN=${W}/in; OUT=${W}/out; LOG=${W}/logs; STATUS=${W}/status.tsv
-FRESH=false; CHECK_ONLY=false; RESUME=false; MAXJOBS=${MAXJOBS:-1}
+FRESH=false; CHECK_ONLY=false; RESUME=false; MAXJOBS=${MAXJOBS:-1}; SING=${SINGULARITY:-false}
 for a in "$@"; do
   case "$a" in
     --fresh) FRESH=true ;;
@@ -28,9 +29,16 @@ done
 if [[ ${CHECK_ONLY} = true ]]; then
   exec python3 tests/check_results.py "${W}"
 fi
-for f in resources/plink resources/plink2 resources/saige.tar resources/saige.image; do
-  [[ -s ${f} ]] || { echo "${f} missing: bash download_resources.sh --saige-image --plink --plink2" >&2; exit 1; }
+if [[ ${SING} = true ]]; then
+  IMAGE_FILES="resources/saige.sif"; GET="--singularity"
+  command -v singularity > /dev/null || { echo "SINGULARITY=true but singularity is not on PATH" >&2; exit 1; }
+else
+  IMAGE_FILES="resources/saige.tar resources/saige.image"; GET=""
+fi
+for f in resources/plink resources/plink2 ${IMAGE_FILES}; do
+  [[ -s ${f} ]] || { echo "${f} missing: bash download_resources.sh --saige-image --plink --plink2 ${GET}" >&2; exit 1; }
 done
+echo "container runtime: $([[ ${SING} = true ]] && echo Singularity || echo Docker)"
 
 run () {   # run NAME ok|fail COMMAND...: stdin closed, output to the log, exit code recorded
   local name=$1 expect=$2; shift 2
@@ -72,9 +80,9 @@ GRMID=${GRM}.sampleIDs.txt
 VR=${OUT}/step0.plink_for_var_ratio
 COV="age,age2,sex,PC1,PC2,PC3,PC4"
 MASKS="pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous"
-S1=(bash 01_step1_fitNULLGLMM.sh --phenoFile "${IN}/pheno.tsv" --sparseGRM "${GRM}" --sparseGRMID "${GRMID}"
+S1=(bash 01_step1_fitNULLGLMM.sh --isSingularity "${SING}" --phenoFile "${IN}/pheno.tsv" --sparseGRM "${GRM}" --sparseGRMID "${GRMID}"
     --sampleIDs "${IN}/sample_ids.txt" --sampleIDCol IID)
-S2=(bash 02_step2_SPAtests_variant_and_gene.sh --chr 7 --sparseGRM "${GRM}" --sparseGRMID "${GRMID}")
+S2=(bash 02_step2_SPAtests_variant_and_gene.sh --isSingularity "${SING}" --chr 7 --sparseGRM "${GRM}" --sparseGRMID "${GRMID}")
 
 echo "== refusals and dry runs (no container)"
 run s2_refuse_vcf          fail "${S2[@]}" --testType variant --vcf "${IN}/exome/chr7.vcf.gz" --modelFile m --varianceRatio v
@@ -88,15 +96,15 @@ run s1_sex_mf_ok           ok   "${S1[@]}" --traitType quantitative --phenoFile 
 run s1_sex_mf_wrong        fail "${S1[@]}" --traitType quantitative --phenoFile "${IN}/pheno_mf.tsv" --phenoCol Q_f --sex M --genotypePlink "${VR}" --dryRun
 run s1_sex_mixed           fail "${S1[@]}" --traitType quantitative --phenoCol Q_null --sex F --genotypePlink "${VR}" --dryRun
 run s1_sex_numeric_ok      ok   "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --genotypePlink "${VR}" --dryRun
-run s0_refuse_vcf          fail bash 00_step0_VR_and_GRM.sh --geneticDataDirectory "${IN}/array" --geneticDataFormat vcf \
+run s0_refuse_vcf          fail bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat vcf \
   --geneticDataType genotype --outputPrefix "${OUT}/never" --generate_GRM
-run s0_refuse_no_out       fail bash 00_step0_VR_and_GRM.sh --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
+run s0_refuse_no_out       fail bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
   --geneticDataType genotype --generate_GRM
 
 echo "== step 0"
-run s0_plink ok bash 00_step0_VR_and_GRM.sh --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
+run s0_plink ok bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
   --geneticDataType genotype --outputPrefix "${OUT}/step0" --sampleIDs "${IN}/sample_ids.txt" --generate_GRM --generate_plink_for_vr
-run s0_pgen ok bash 00_step0_VR_and_GRM.sh --geneticDataDirectory "${IN}/array_pgen" --geneticDataFormat pgen \
+run s0_pgen ok bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array_pgen" --geneticDataFormat pgen \
   --geneticDataType genotype --outputPrefix "${OUT}/step0_pgen" --sampleIDs "${IN}/sample_ids.txt" --generate_GRM
 resources/plink --bfile "${VR}" --freq counts --out "${OUT}/vr_freq" > /dev/null
 resources/plink2 --bfile "${VR}" --make-pgen --out "${VR}" > /dev/null
@@ -148,14 +156,14 @@ throttle; run s2_B_rare_gated      fail "${S2[@]}" $(m B_rare) --testType varian
 wait
 
 echo "== step 3 (Nglmm)"
-run s3_nglmm ok bash 03_estimate_nGlmm.sh --contPhenos Q_pos --binaryPhenos "B_pos B_rare" --phenoFile "${IN}/pheno.tsv" \
+run s3_nglmm ok bash 03_estimate_nGlmm.sh --isSingularity "${SING}" --contPhenos Q_pos --binaryPhenos "B_pos B_rare" --phenoFile "${IN}/pheno.tsv" \
   --covarList "${COV}" --sparseGRM "${GRM}" --sparseGRMID "${GRMID}" --outputFile "${OUT}/neff.csv"
 # inputs outside the working directory, by absolute path through SAIGE_EXTRA_MOUNTS
 # (the mechanism that binds /mnt/project on the UKB RAP): the same Nglmm with the
 # mount, "does not exist" without it
 EXT=$(mktemp -d "${TMPDIR:-/tmp}/universal_saige_e2e.XXXXXX"); trap 'rm -rf "${EXT}"' EXIT
 cp "${IN}/pheno.tsv" "${GRM}" "${GRMID}" "${EXT}/"
-S3X=(bash 03_estimate_nGlmm.sh --phenoFile "${EXT}/pheno.tsv" --covarList "${COV}"
+S3X=(bash 03_estimate_nGlmm.sh --isSingularity "${SING}" --phenoFile "${EXT}/pheno.tsv" --covarList "${COV}"
      --sparseGRM "${EXT}/${GRM##*/}" --sparseGRMID "${EXT}/${GRMID##*/}")
 run s3_nglmm_extmount   ok   env SAIGE_EXTRA_MOUNTS="${EXT}" "${S3X[@]}" --contPhenos Q_pos --binaryPhenos "B_pos B_rare" \
   --outputFile "${OUT}/neff_extmount.csv"
