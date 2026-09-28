@@ -65,7 +65,7 @@ generate_GRM(){
 
     cmd="createSparseGRM.R \
         --plinkFile="${HOME}/${OUT}.plink_for_grm" \
-        --nThreads=$(nproc) \
+        --nThreads=$(ncpu) \
         --outputPrefix="${HOME}/${OUT}" \
         --numRandomMarkerforSparseKin=$numRandomMarkerforSparseKin \
         --relatednessCutoff=0.05"

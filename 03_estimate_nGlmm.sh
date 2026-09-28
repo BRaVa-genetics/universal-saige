@@ -62,7 +62,17 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 WD=$( pwd )
 
-docker run -i \
+# The slim SAIGE image (download_resources.sh --saige-image): extractNglmm.R is
+# on its PATH, so nothing is patched or reinstalled inside the container.
+docker load -i resources/saige.tar > /dev/null
+IMAGE_REF=$(cat resources/saige.image 2>/dev/null || true)
+IMAGE_ID=""
+[[ -n ${IMAGE_REF} ]] && IMAGE_ID=$(docker images --filter=reference="${IMAGE_REF}" --format "{{.ID}}" | head -n 1)
+[[ -n ${IMAGE_ID} ]] || IMAGE_ID=$(docker images --format "{{.Repository}}:{{.Tag}} {{.ID}}" | awk '$1 ~ /saige-slim:/ {print $2; exit}')
+[[ -n ${IMAGE_ID} ]] || { echo "no saige-slim image loaded; run download_resources.sh --saige-image" >&2; exit 1; }
+PROJECT_MOUNT=(); [[ -d /mnt/project ]] && PROJECT_MOUNT=(-v /mnt/project/:/mnt/project/)   # UKB RAP layout, when present
+
+docker run -i --rm \
   -e HOME=${WD} \
   -e BINARY_PHENOS="$binary_phenos" \
   -e CONT_PHENOS="$cont_phenos" \
@@ -71,15 +81,10 @@ docker run -i \
   -e SPARSE_GRM_FILE="$SPARSE_GRM_FILE" \
   -e SPARSE_GRM_ID_FILE="$SPARSE_GRM_ID_FILE" \
   -v ${WD}/:$HOME/ \
-  -v /mnt/project/:/mnt/project/ \
-  wzhou88/saige:1.3.4 /bin/bash << EOF
+  "${PROJECT_MOUNT[@]}" \
+  "${IMAGE_ID}" /bin/bash << EOF
 
 set -x  # Enable debugging output
-
-sed -i '/setgeno/d' R/SAIGE_extractNeff.R
-
-# Install the package
-R CMD INSTALL .
 
 # Define phenotype variables (binary and continuous)
 echo "pheno,nglmm" > \$HOME/neff.csv
@@ -95,11 +100,11 @@ for pheno in \$CONT_PHENOS; do
     # Check if Rscript is available
     which Rscript || echo "Rscript not found in PATH"
     
-    # Check if the R script file exists
-    ls -l extdata/extractNglmm.R || echo "extractNglmm.R not found"
+    # Check that the script is on the image's PATH
+    which extractNglmm.R || echo "extractNglmm.R not found"
     
     # Run the Rscript command with error checking
-    Rscript extdata/extractNglmm.R \
+    extractNglmm.R \
         --phenoFile \$PHENO_FILE \
         --phenoCol \$pheno \
         --covarColList \$COVAR_LIST \
@@ -129,11 +134,11 @@ for pheno in \$BINARY_PHENOS; do
     # Check if Rscript is available
     which Rscript || echo "Rscript not found in PATH"
 
-    # Check if the R script file exists
-    ls -l extdata/extractNglmm.R || echo "extractNglmm.R not found"
+    # Check that the script is on the image's PATH
+    which extractNglmm.R || echo "extractNglmm.R not found"
 
     # Run the Rscript command with error checking
-    Rscript extdata/extractNglmm.R \
+    extractNglmm.R \
         --phenoFile \$PHENO_FILE \
         --phenoCol \$pheno \
         --covarColList \$COVAR_LIST \

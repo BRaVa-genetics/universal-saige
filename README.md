@@ -32,35 +32,49 @@
 
 _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 
-- Containerised SAIGE (Docker / Singularity) ✅
-- Supporting VCF and PLINK exome data formats ✅
+- Containerised SAIGE (Docker / Singularity): the slim build `astheeggeggs/saige-slim`, pulled from Docker Hub ✅
+- PLINK 2 (`.pgen/.pvar/.psam`, **recommended**) and PLINK 1 (`.bed/.bim/.fam`) exome data ✅
+- SAIGE-GENE+ group tests and **FlexRV** (Schwartzentruber et al. 2025), with an AlphaMissense weight builder ✅
 - Parallelised across ancestry, phenotypes and chromosomes ✅
-- Sanity checks ✅
+- Sanity checks, and the image's own fit gates ✅
+
+> [!IMPORTANT]
+> **Use PLINK 2 format.** Convert your exome data once with `plink2 --vcf exome.chr20.vcf.gz --make-pgen --out exome.chr20`
+> (`download_resources.sh --plink2` fetches plink2). The SAIGE image reads PLINK 2 and PLINK 1 genotypes and **nothing else**:
+> there is no VCF reader, and step 2 refuses a VCF rather than convert it on every chromosome of every phenotype.
+
+> [!NOTE]
+> The image's **fit gates are on**. A binary trait fitted on fewer than 100 cases, a categorical covariate level with fewer than
+> 10 cases or controls, a separated covariate model, or a fit that did not converge is refused, in step 1 and again when
+> step 2 loads the model, with the gate named in the log. That refusal is the right answer for such a trait (the tail of the
+> tests is not calibrated there). `SAIGE_FIT_GATES=0` in your environment turns the refusals into warnings; not recommended.
+
+The choices baked into the drivers (Firth off, fastTest off, `--tol 0.02` for both trait types, `--minMAC 4` for
+single-variant tests, the build's missingness defaults) are the ones the All of Us production runs used; the record is
+`docs/state/aou-saige-parameters.md` in the `saige-slim` repository.
 
 ## System Requirements
 - Internet connection (only needed once for download_resources.sh)
 - Docker OR Singularity
 - Linux OR Mac
 ### Getting started
-To run universal-saige we need to download plink and the SAIGE image. These steps are separated out into download_resources.sh:
-#### Setup (if using Docker)
 ```
-bash download_resources.sh --saige-image --plink
+bash download_resources.sh --saige-image --plink2           # Docker: the SAIGE image and plink2
+bash download_resources.sh --saige-image --plink2 --singularity
+bash download_resources.sh --plink                          # plink 1.9, used by step 0 only
+bash download_resources.sh --alphamissense                  # the AlphaMissense release, for FlexRV weights (~600 MB)
 ```
-#### Setup (if using Singularity)
-```
-bash download_resources.sh --saige-image --plink --singularity
-```
-You should now have all the relevant software installed to run all three steps.
+`SAIGE_IMAGE` and `SAIGE_VERSION` in `download_resources.sh` pin the image; record the tag with your results.
 
 ## Input data (required)
-- WES data in PLINK (`.bim/.bed/.fam`) or VCF format (.gz compressed)
+- WES data in PLINK 2 (`.pgen/.pvar/.psam`, recommended) or PLINK 1 (`.bim/.bed/.fam`) format, one file set per chromosome
 - Sample IDs, (ancestry specific)
-- SAIGE annotation file ([details found here](https://docs.google.com/document/d/1emWqbX8ohi-9rYIW_pKSAFiMHZZUV6zyXwg7qWJNdlc/edit#heading=h.puz6ua3vxnca](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1)))
+- SAIGE annotation file ([details found here](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1))
 - BRaVa phenotype file (tsv) with 'IID' (sample ID) column and covariates
 
 ## Input data (optional)
 - Genotyping array data for every sample included in the WES data above. Recommended.
+- For FlexRV: the AlphaMissense release (`download_resources.sh --alphamissense`), or another per-variant score in [0, 1]
 
 ## Usage
 ### Step 0 (once per cohort/biobank)
@@ -109,20 +123,35 @@ optional:
 usage: 02_step2_SPAtests_variant_and_gene.sh
 ```
 required:
-- `--chr`: chromosome to test.
-- `--testType`: type of test `{variant,group}`.
-- `-p`,`--plink`: plink filename prefix of `.bim/.bed/.fam` for WES (or WGS restricted to exons). These must be relative to the current working directory.
-- `--vcf` vcf exome file. If a set of plink files for the WES (or WGS restricted to exons) is not available then this vcf file will be used. This must be present in the current working directory.
-- `--modelFile`: filename of the model file output from SAIGE step 1. This must be relative to the current working directory.
-- `--varianceRatio`: filename of the varianceRatio file output from SAIGE step 1. This must be relative to the current working directory.
-- `--sparseGRM`: filename of the sparseGRM `.mtx` file output from SAIGE step 0. This must be relative to the current working directory.
-- `--sparseGRMID`: filename of the sparseGRM ID file output from SAIGE step 0. This must be relative to the current working directory.
+- `--chr`: chromosome to test, spelled as in the `.pvar`/`.bim` (`chr20` or `20`).
+- `--testType`: type of test `{variant,group}` (implied by `--flexRVscore`).
+- `--pgen`: PLINK 2 filename prefix of `.pgen/.pvar/.psam` for WES (or WGS restricted to exons), **recommended**; or `-p`,`--plink`: the PLINK 1 prefix. Relative to the current working directory. A `--vcf` is refused: convert once with plink2.
+- `--modelFile`, `--varianceRatio`: the step-1 outputs. Relative to the current working directory.
+- `--sparseGRM`, `--sparseGRMID`: the step-0 GRM and its sample IDs. Relative to the current working directory.
 
 optional:
-- `-o`,`--outputPrefix`: output prefix from this program (SAIGE step 2).
-- `-s`,`--isSingularity` (default: false): is singularity available? If not, it is assumed that docker is available.
-- `-g`,`--groupFile`: required if group test is selected. Filename of the annotation file used for group tests. This must be in relation to the working directory.
-- `--annotations`: required if group test is selected. The collection of annotations in the group file to be tested. Please use `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`
+- `-o`,`--outputPrefix`: output prefix (step 2). Group tests also write `<prefix>.txt.singleAssoc.txt`, `.markerList.txt` and, when there is something to report, the sidecars `.pooledTests.txt`, `.skatoMethod.txt`, `.skatFailures.txt`, `.spaFallbacks.txt`.
+- `-s`,`--isSingularity` (default: false).
+- `-g`,`--groupFile`: required for a group test. The annotation file.
+- `--annotations`: required for a group test. `':'` joins labels into one mask, `','` separates masks. For SAIGE-GENE+ use `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`.
+- `--relatednessCutoff` (default 0.05): must equal the cutoff step 1 fitted under; nothing in SAIGE checks it.
+- `--condition`, `--subSampleFile`, `--dryRun` (prints the SAIGE command).
+
+FlexRV (one run per weight set):
+- `--flexRVscore NAME`: run FlexRV on the group file's `score:NAME` line (built by step 4 below). One annotation mask (default `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`), one max MAF (`--flexRVmaxMAF`, default 0.001), burden statistic. The results file carries one row per transform set and the pooled `p_FlexRV` row (`Group == Cauchy`).
+- `--flexRVlofAnno` (default `pLoF`): the label(s) the `lof` transform keys on, the same labels the score line was built with.
+
+### Step 4: FlexRV weights (once per chromosome per weight set)
+
+```
+usage: 04_flexrv_groupfile.sh --group <BRaVa group file> --chr <c> --name AM --out <group file>.flexrv_AM.txt
+```
+adds a `score:AM` line to every gene of the BRaVa group file from the AlphaMissense release (LoF variants 1.0 by
+annotation, missense variants their AlphaMissense pathogenicity, a missense variant with no score its gene's mean).
+A second weight set goes through the same door: `--annoTable <BRaVa long-form table> --scoreColumn <column> --name <NAME>`
+for a score carried as a column of the annotation table, or `--am <table>` for a score in AlphaMissense's per-variant
+layout. One score line per file, so one file and one step-2 run per weight set. The tool behind it is
+`flexrv_score_from_alphamissense.py` (`--help`, and `--selftest` for its controls).
 
 ### Step 3
 

@@ -35,31 +35,31 @@ If at any point you run into issues or have any questions please create an issue
 ### Data
 
 - Genotype data, plink (optional), ideally used in place of exome data for step 0
-- Exome data, VCF or plink. 
+- Exome data in PLINK 2 (`.pgen/.pvar/.psam`, recommended) or PLINK 1 (`.bed/.bim/.fam`) format; a VCF is converted once with plink2 (`plink2 --vcf exome.chr11.vcf.gz --make-pgen --out exome.chr11`). 
 - Sample IDs, (ancestry specific)
 - Annotation file ([details found here](https://docs.google.com/document/d/1emWqbX8ohi-9rYIW_pKSAFiMHZZUV6zyXwg7qWJNdlc/edit#heading=h.puz6ua3vxnca](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1)))
 - BRaVa phenotype file (.tsv) with 'IID' (sample ID) column and covariates
 
 ### Environment
 
-The only env requirement for this walkthrough is access to a linux machine with either Docker or Singularity available. With Docker or Singularity we can run Wei Zhou's [SAIGE Docker container](https://hub.docker.com/r/wzhou88/saige), giving guarantees that analyses across cohorts are equivalent and easily reproducible. 
+The only env requirement for this walkthrough is access to a linux machine with either Docker or Singularity available. With Docker or Singularity we run the slim SAIGE build (`astheeggeggs/saige-slim` on Docker Hub, pinned by tag in `download_resources.sh`), which gives the same guarantee that analyses across cohorts are equivalent and reproducible. 
 
 ## Setup
 To run universal-saige we need to download plink and the SAIGE image. These steps are separated out into `download_resources.sh`:
 
 ### Setup (if using Docker)
 ```
-bash download_resources.sh --saige-image --plink
+bash download_resources.sh --saige-image --plink2 --plink
 ```
 ### Setup (if using Singularity)
 ```
-bash download_resources.sh --saige-image --plink --singularity
+bash download_resources.sh --saige-image --plink2 --plink --singularity
 ```
 
 ## Step 0 
 To start we must generate the sparse genetic relatedness matrix (GRM) and processed plink files for usage in variance ratio estimation during step 1. While this step may take several hours to run, it only has to be executed once per biobank/cohort.
 
-Step 0 supports (genotype data, plink format), (exome data, VCF format) and (exome data, plink format) as inputs although we reccomend the usage of (genotype, plink format) in order to reduce runtime and maximise the number of independent sites.
+Step 0 supports (genotype data, plink format), (exome data, VCF format) and (exome data, plink format) as inputs although we recommend the usage of (genotype, plink format) in order to reduce runtime and maximise the number of independent sites. (Step 0 is the one place a VCF is still read, through plink 1.9; steps 1 and 2 take PLINK 2 or PLINK 1 only.)
 
 For this step we recommend using a larger machine - most functions in this step are parallelised across CPU cores and will benefit from high RAM. 
 
@@ -195,6 +195,22 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
+FlexRV on the same chromosome, once the AlphaMissense weights have been added to the group file
+(`bash download_resources.sh --alphamissense`, then `bash 04_flexrv_groupfile.sh --group in/ukb_brava_annotations.txt --chr 11 --name AM --out in/ukb_brava_annotations.flexrv_AM.txt`):
+```
+bash 02_step2_SPAtests_variant_and_gene.sh \
+    --chr chr11 \
+    --plink in/ukb_wes_450k.qced.chr11 \
+    --modelFile out/HDL_cholesterol.rda \
+    --varianceRatio out/HDL_cholesterol.varianceRatio.txt \
+    --groupFile in/ukb_brava_annotations.flexrv_AM.txt \
+    --flexRVscore AM \
+    --outputPrefix out/chr11_HDL_cholesterol.flexrv_AM \
+    --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
+    --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
+```
+The pooled FlexRV p per gene is the `Group == Cauchy` row's `Pvalue_Burden`; the other rows are the transform sets.
+
 > [!WARNING]
 > There's one more 'gotcha' here - you'll need to ensure that the chromosome name flagged by `--chr` _exactly_ matches the chromosome name in the .bim file. For example, if the chromosome is labelled as '11' in the first column of the .bim, `--chr chr11` will not work (but `--chr 11` will).
 
