@@ -130,7 +130,8 @@ with open(sys.argv[1]) as fh, open(sys.argv[2], "w") as out:
 EOF
 
 echo "== step 2 (${MAXJOBS} at a time)"
-# independent runs, but each one's BLAS threads use several cores: MAXJOBS > 1 oversubscribes a laptop
+# independent single-threaded runs (the image sets OMP, OpenBLAS and RcppParallel threads to 1), so
+# MAXJOBS can go up to the core count; it is 1 because Docker Desktop on macOS bogged down under parallel runs
 throttle () { while (( $(jobs -rp | wc -l) >= MAXJOBS )); do sleep 2; done; }
 m () { echo --modelFile "${OUT}/$1.rda" --varianceRatio "${OUT}/$1.varianceRatio.txt"; }
 throttle; run s2_Q_pos_variant     ok   "${S2[@]}" $(m Q_pos)  --testType variant --pgen "${IN}/exome/chr7" --outputPrefix "${OUT}/Q_pos.variant" &

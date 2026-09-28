@@ -23,6 +23,10 @@ bash 01_step1_fitNULLGLMM.sh ... --dryRun               # print the SAIGE comman
 
 `tests/simulate_cohort.py` simulates a cohort where the right answer is known: a family pedigree the GRM should recover, planted gene, FlexRV and common-variant effects, null and permuted traits, a binary trait below the 100-case gate, and untidy sample-ID overlaps whose intersection is the expected N. `tests/check_results.py` compares every step's output with `tests/work/in/truth.json`, and its docstring states each expected effect size. When you change a driver, add a check there. Output goes to `tests/work/` (gitignored), and each run's log is `tests/work/logs/<name>.log`. The Singularity path is not covered.
 
+Performance notes, both measured:
+- Step 2 is single-threaded, because the image sets `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS` and `RCPP_PARALLEL_NUM_THREADS` to 1. Don't pass the host's values through: HPC schedulers often set `OMP_NUM_THREADS` and would override that.
+- On Docker Desktop for macOS, bind-mount I/O leaves `com.docker.backend` burning CPU after the containers exit. A long test run can slow down about 10× this way. Restarting Docker fixes it.
+
 ## Architecture
 
 **Every driver must be run from the repo root.** Each one does `source ./run_container.sh`, sets `WD=$(pwd)` and `HOME=$WD`, parses flags into globals, builds a SAIGE command string in `$cmd`, and calls `run_container`. That function mounts `$WD` at the same path inside Docker or Singularity and runs `$cmd` unquoted. So:

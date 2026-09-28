@@ -52,9 +52,12 @@ run_container () {
       --bind "${WD}:${WD}" ${binds[@]+"${binds[@]}"} \
       "resources/saige.sif" ${cmd}
   else
-    docker load -i "resources/saige.tar" > /dev/null
     local ref image_id=""
     ref=$(cat resources/saige.image 2>/dev/null || true)
+    # load the tar only when the image is not there already (~5 s per call otherwise)
+    if [[ -z ${ref} ]] || ! docker image inspect "${ref}" > /dev/null 2>&1; then
+      docker load -i "resources/saige.tar" > /dev/null
+    fi
     [[ -n ${ref} ]] && image_id=$(docker images --filter=reference="${ref}" --format "{{.ID}}" | head -n 1)
     [[ -n ${image_id} ]] || image_id=$(docker images --format "{{.Repository}}:{{.Tag}} {{.ID}}" | awk '$1 ~ /saige-slim:/ {print $2; exit}')
     [[ -n ${image_id} ]] || { echo "no saige-slim image loaded; run download_resources.sh --saige-image" >&2; return 1; }
