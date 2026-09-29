@@ -1,54 +1,80 @@
 #!/bin/bash
+# Fetch the tools universal-saige needs. Nothing here is required more than once.
+#
+#   bash download_resources.sh --saige-image --plink2            # Docker
+#   bash download_resources.sh --saige-image --plink2 --singularity
+#   bash download_resources.sh --plink                            # plink 1.9, step 0 only
+#   bash download_resources.sh --alphamissense [--isoforms]       # FlexRV weights (AlphaMissense release)
+#
+# THE IMAGE is the slim SAIGE build (https://github.com/astheeggeggs/saige-slim),
+# pulled from Docker Hub, which is free to pull from anywhere. It reads PLINK 1
+# (.bed/.bim/.fam) and PLINK 2 (.pgen/.pvar/.psam) genotypes and NOTHING ELSE:
+# there is no VCF reader. Convert once with plink2 (see the README) -- PLINK 2
+# format is the recommended input for every step.
+set -euo pipefail
 
-SAIGE_IMAGE=false
-PLINK1_9=false
-SINGULARITY=false
-machine=$(uname)
-saige_version="1.3.6"
+SAIGE_IMAGE="${SAIGE_IMAGE:-astheeggeggs/saige-slim}"        # Docker Hub namespace/repository
+SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-3e92d89d}"          # the tag; pin it, and record it with your results
+PLINK2_DATE="20260919"                                        # plink2 alpha 6 build, all platforms
+AM_RECORD="https://zenodo.org/records/8208688/files"          # AlphaMissense release (Cheng et al. 2023)
 
-
+GET_IMAGE=false; GET_PLINK=false; GET_PLINK2=false; GET_AM=false; GET_ISO=false; SINGULARITY=false
 while [[ $# -gt 0 ]]; do
-    key="$1"
-    case $key in
-        --saige-image)
-        SAIGE_IMAGE=true
-        shift
-        ;;
-        --singularity)
-        SINGULARITY=true
-        shift
-        ;;
-        --plink)
-        PLINK1_9=true
-        shift
-        ;;
-        *)
-        shift
-        ;;
-    esac
+  case "$1" in
+    --saige-image)  GET_IMAGE=true; shift ;;
+    --singularity)  SINGULARITY=true; shift ;;
+    --plink)        GET_PLINK=true; shift ;;
+    --plink2)       GET_PLINK2=true; shift ;;
+    --alphamissense) GET_AM=true; shift ;;
+    --isoforms)     GET_ISO=true; shift ;;
+    -h|--help)      sed -n '2,15p' "$0"; exit 0 ;;
+    *) echo "unknown option: $1" >&2; exit 1 ;;
+  esac
 done
+mkdir -p resources/
+machine=$(uname); arch=$(uname -m)
 
-if [[ $SAIGE_IMAGE = true ]]; then
-    mkdir -p resources/
-    if [[ ${SINGULARITY} = true && ! $( test -f "resources/saige-${saige_version}.sif" ) ]]; then
-        singularity pull "resources/saige.sif" "docker://wzhou88/saige:${saige_version}"
-    elif [[ ${SINGULARITY} = false ]]; then
-        docker pull "wzhou88/saige:${saige_version}"
-        docker save -o "resources/saige.tar" "wzhou88/saige:${saige_version}"
-    fi
+if [[ ${GET_IMAGE} = true ]]; then
+  ref="${SAIGE_IMAGE}:${SAIGE_VERSION}"
+  if [[ ${SINGULARITY} = true ]]; then
+    [[ -s resources/saige.sif ]] || singularity pull "resources/saige.sif" "docker://${ref}"
+  else
+    docker pull "${ref}"
+    docker save -o "resources/saige.tar" "${ref}"
+  fi
+  echo "${ref}" > resources/saige.image
+  echo "SAIGE image: ${ref}"
 fi
 
-if [[ $PLINK1_9 = true ]]; then
-    mkdir -p resources/
-    if [[ $machine == "Darwin" ]]; then
-        echo "Downloading OSX version of plink"
-        wget -nc https://s3.amazonaws.com/plink1-assets/plink_mac_20230116.zip --no-check-certificate -P resources/
-        unzip -o resources/plink_mac_20230116.zip -d resources/
-    elif [[ $machine == "Linux" ]]; then
-        echo "Downloading linux version of plink"
-        wget -nc https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20230116.zip --no-check-certificate -P resources/
-        unzip -o resources/plink_linux_x86_64_20230116.zip -d resources/
-    else
-        echo "Operating system not compatible with the code"
-    fi
+if [[ ${GET_PLINK2} = true ]]; then
+  # plink2 is what converts a VCF, subsets samples/variants and writes .pgen;
+  # the linux x86_64 build runs on any x86 CPU (the avx2 one is faster, if yours has it)
+  case "${machine}-${arch}" in
+    Linux-x86_64)  f="plink2_linux_x86_64_${PLINK2_DATE}.zip" ;;
+    Darwin-arm64)  f="plink2_mac_arm64_${PLINK2_DATE}.zip" ;;
+    Darwin-*)      f="plink2_mac_${PLINK2_DATE}.zip" ;;
+    *) echo "no plink2 build known for ${machine}-${arch}; see https://www.cog-genomics.org/plink/2.0/" >&2; exit 1 ;;
+  esac
+  wget -nc "https://s3.amazonaws.com/plink2-assets/alpha6/${f}" -P resources/
+  unzip -o "resources/${f}" plink2 -d resources/ >/dev/null
+  chmod a+x resources/plink2 && echo "plink2: $(resources/plink2 --version 2>/dev/null | head -1)"
+fi
+
+if [[ ${GET_PLINK} = true ]]; then
+  # plink 1.9: used by step 0 to merge, LD-prune and count (its flags are 1.9 syntax)
+  case "${machine}" in
+    Darwin) f="plink_mac_20230116.zip" ;;
+    Linux)  f="plink_linux_x86_64_20230116.zip" ;;
+    *) echo "operating system not supported" >&2; exit 1 ;;
+  esac
+  wget -nc "https://s3.amazonaws.com/plink1-assets/${f}" --no-check-certificate -P resources/
+  unzip -o "resources/${f}" -d resources/ >/dev/null && echo "plink 1.9 in resources/"
+fi
+
+if [[ ${GET_AM} = true ]]; then
+  # canonical transcripts (~600 MB); --isoforms adds the non-canonical complement (~1.2 GB),
+  # which the release marks as less evaluated -- only 04_flexrv_groupfile.sh --isoforms uses it
+  wget -nc "${AM_RECORD}/AlphaMissense_hg38.tsv.gz" -P resources/
+  [[ ${GET_ISO} = true ]] && wget -nc "${AM_RECORD}/AlphaMissense_isoforms_hg38.tsv.gz" -P resources/
+  echo "AlphaMissense in resources/"
 fi
