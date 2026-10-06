@@ -153,8 +153,9 @@ for name, text in [
     ("s3_nglmm_nomount", "does not exist"),
     ("s3_refuse_bad_mount", "is not a directory"),
     ("grm_dense_005", "THE SPARSE GRM IS DENSE: 399.0 relatives per sample"),
-    ("grm_dense_0125", "200 related pairs, 1.0 relatives per sample"),
-    ("s0_plink", "0.05: 1900 samples, 2267 related pairs"),
+    ("grm_relcut_mismatch", "built at --relatednessCutoff 0.05 and this step uses 0.125"),
+    ("s0_plink", "1900 samples, 2267 related pairs, 2.4 relatives per sample (built at --relatednessCutoff 0.05)"),
+    ("s0_relcut_0125", "1900 samples, 2258 related pairs, 2.4 relatives per sample (built at --relatednessCutoff 0.125)"),
     ("s1_Q_pos", "relatives per sample"),
 ]:
     if os.path.exists(out(name + ".skipped")):
@@ -165,9 +166,12 @@ for name, text in [
     check("message: " + name, text in log(name), "found" if text in log(name) else "absent", repr(text))
 
 # the dense-GRM banner: only where the GRM is dense at the cutoff in use
-for name in ("grm_dense_0125", "s0_plink", "s0_relcut_0125", "s1_Q_pos"):
+for name in ("grm_relcut_mismatch", "s0_plink", "s0_relcut_0125", "s1_Q_pos"):
     check("no dense-GRM warning: " + name, "THE SPARSE GRM IS DENSE" not in log(name),
           "absent" if "THE SPARSE GRM IS DENSE" not in log(name) else "PRESENT", "absent", runs=[name])
+for name in ("s0_plink", "s0_relcut_0125", "s1_Q_pos"):
+    check("no cutoff-mismatch warning: " + name, "this step uses" not in log(name),
+          "absent" if "this step uses" not in log(name) else "PRESENT", "absent", runs=[name])
 
 # step 0 ends on the GRM's density, where it cannot be missed
 for name in ("s0_plink", "s0_pgen", "s0_relcut_0125"):
