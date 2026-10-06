@@ -39,7 +39,17 @@ if [[ ${GET_IMAGE} = true ]]; then
   if [[ ${SINGULARITY} = true ]]; then
     # apptainer is singularity's renamed successor; either pulls the same .sif
     sing=$(command -v singularity || command -v apptainer) || { echo "neither singularity nor apptainer found on PATH" >&2; exit 1; }
-    [[ -s resources/saige.sif ]] || "${sing}" pull "resources/saige.sif" "docker://${ref}"
+    if [[ ! -s resources/saige.sif ]]; then
+      # The pull downloads and unpacks the image's layers. By default that is in
+      # /tmp plus a cache in $HOME, both often small on clusters; here it is a
+      # scratch directory next to the .sif (or APPTAINER_TMPDIR/SINGULARITY_TMPDIR
+      # if set), removed afterwards, with no cache. Running the .sif needs neither.
+      pull_tmp=$(mktemp -d "${PWD}/resources/.pull_tmp.XXXXXX")
+      trap 'rm -rf "${pull_tmp}"' EXIT
+      tmp="${APPTAINER_TMPDIR:-${SINGULARITY_TMPDIR:-${pull_tmp}}}"
+      APPTAINER_TMPDIR="${tmp}" SINGULARITY_TMPDIR="${tmp}" \
+        "${sing}" pull --disable-cache "resources/saige.sif" "docker://${ref}"
+    fi
   else
     docker pull "${ref}"
     docker save -o "resources/saige.tar" "${ref}"
