@@ -32,7 +32,7 @@
 
 _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 
-- Containerised SAIGE (Docker / Singularity): the slim build `astheeggeggs/saige-slim`, pulled from Docker Hub ✅
+- Containerised SAIGE (Docker / Singularity / Apptainer): the slim build `astheeggeggs/saige-slim`, pulled from Docker Hub ✅
 - PLINK 2 (`.pgen/.pvar/.psam`, **recommended**) and PLINK 1 (`.bed/.bim/.fam`) exome data ✅
 - SAIGE-GENE+ group tests and **FlexRV** (Schwartzentruber et al. 2025), with an AlphaMissense weight builder ✅
 - Parallelised across ancestry, phenotypes and chromosomes ✅
@@ -55,12 +55,12 @@ single-variant tests, the build's missingness defaults) are the ones the All of 
 
 ## System Requirements
 - Internet connection (only needed once for download_resources.sh)
-- Docker OR Singularity
+- Docker OR Singularity OR Apptainer (Singularity's successor; `--isSingularity true` uses whichever of `singularity` and `apptainer` is on PATH)
 - Linux OR Mac
 ### Getting started
 ```
 bash download_resources.sh --saige-image --plink2           # Docker: the SAIGE image and plink2
-bash download_resources.sh --saige-image --plink2 --singularity
+bash download_resources.sh --saige-image --plink2 --singularity   # Singularity or Apptainer: resources/saige.sif
 bash download_resources.sh --plink                          # plink 1.9, used by step 0 only
 bash download_resources.sh --alphamissense                  # the AlphaMissense release, for FlexRV weights (~600 MB)
 ```
@@ -90,7 +90,7 @@ required:
 - `-o`,`--outputPrefix`: output prefix from this program (SAIGE step 0) to be used as SAIGE step 1 input.
 
 optional:
-- `-s`,`--isSingularity` (default: `false`): is singularity available? If not, it is assumed that docker is available.
+- `-s`,`--isSingularity` (default: `false`): is singularity (or apptainer) available? If not, it is assumed that docker is available.
 - `--generate_GRM` (default: false): generate GRM for the genetic data.
 - `--generate_plink_for_vr` (default: false): generate plink file for vr.
 - `--sampleIDs`: single column of sample IDs (matched on IID) to define the GRM and the variance-ratio markers' samples; all samples when omitted. **Note, if this is not _all_ of the samples in the `{WES, WGS}` dataset, the `{WES, WGS}` data must be filtered to these samples before running step 1**
@@ -113,7 +113,7 @@ required:
 
 optional:
 - `-o`,`--outputPrefix`:  output prefix from this program (SAIGE step 1) to be used as SAIGE step 2 input.
-- `-s`,`--isSingularity`: (default: false): is singularity available? If not, it is assumed that docker is available.
+- `-s`,`--isSingularity`: (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
 - `-c`,`--covarColList`: comma separated column names (e.g. `age,pc1,pc2`) of continuous covariates to include as fixed effects in the file specified in `--phenoFile`. Recall, proposed pilot fixed effect covariates are `age,age2,sex,age*sex,age2*sex,PCs`.
 - `--categCovarColList`: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
 - `--sampleIDCol` (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.

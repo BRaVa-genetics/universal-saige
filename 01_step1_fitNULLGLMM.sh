@@ -122,7 +122,7 @@ while [[ $# -gt 0 ]]; do
     --phenoCol: the column names of the phenotype to be analysed in the file specified in --phenoFile.
   optional:
     -o,--outputPrefix: output prefix of the SAIGE step 1 output. This must be relative to, and contained within, the current working directory.
-    -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
+    -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
     -c,--covarColList: comma separated column names (e.g. age,pc1,pc2) of continuous covariates to include as fixed effects in the file specified in --phenoFile.
     --categCovarColList: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
     --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.

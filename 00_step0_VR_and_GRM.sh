@@ -172,7 +172,7 @@ while [[ $# -gt 0 ]]; do
                 --geneticDataType: type of the genetic data {WES,WGS,genotype}.
                 -o,--outputPrefix: output prefix of the SAIGE step 0 output. This must be relative to, and contained within, the current working directory.
             optional:
-                -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
+                -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
                 --generate_GRM (default: false): generate GRM for the genetic data.
                 --generate_plink_for_vr (default: false): generate plink file for vr.
                 --sampleIDs: path to a file containing sampleIDs (as a single column) to be used to define the GRM.

@@ -79,7 +79,7 @@ while [[ $# -gt 0 ]]; do
     --covarList: comma separated column names of covariates in --phenoFile.
     -o,--outputFile (default: neff.csv): the csv written, one 'pheno,nglmm' row per phenotype. Each phenotype's log is
       <outputFile without .csv>.<pheno>.log.
-    -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
+    -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
     --dryRun: print the commands instead of running them.
   A phenotype whose fit fails (or is refused by the fit gates) gets no row, and the script exits non-zero.
       "

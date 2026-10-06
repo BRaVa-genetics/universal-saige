@@ -9,7 +9,7 @@
   * [Environment](#environment)
 * [Setup](#setup)
   * [Setup (if using Docker)](#setup-if-using-docker)
-  * [Setup (if using Singularity)](#setup-if-using-singularity)
+  * [Setup (if using Singularity or Apptainer)](#setup-if-using-singularity-or-apptainer)
 * [Step 0](#step-0)
 * [Step 1](#step-1)
 * [Step 2](#step-2)
@@ -42,7 +42,7 @@ If at any point you run into issues or have any questions please create an issue
 
 ### Environment
 
-The only env requirement for this walkthrough is access to a linux machine with either Docker or Singularity available. With Docker or Singularity we run the slim SAIGE build (`astheeggeggs/saige-slim` on Docker Hub, pinned by tag in `download_resources.sh`), which gives the same guarantee that analyses across cohorts are equivalent and reproducible. 
+The only env requirement for this walkthrough is access to a linux machine with Docker, Singularity or Apptainer available (Apptainer is Singularity's successor; `--isSingularity true` uses whichever of `singularity` and `apptainer` is on PATH). With any of them we run the slim SAIGE build (`astheeggeggs/saige-slim` on Docker Hub, pinned by tag in `download_resources.sh`), which gives the same guarantee that analyses across cohorts are equivalent and reproducible. 
 
 ## Setup
 To run universal-saige we need to download plink and the SAIGE image. These steps are separated out into `download_resources.sh`:
@@ -51,10 +51,11 @@ To run universal-saige we need to download plink and the SAIGE image. These step
 ```
 bash download_resources.sh --saige-image --plink2 --plink
 ```
-### Setup (if using Singularity)
+### Setup (if using Singularity or Apptainer)
 ```
 bash download_resources.sh --saige-image --plink2 --plink --singularity
 ```
+The image is pulled without a cache and unpacked next to `resources/saige.sif`, not in `/tmp` or `$HOME`, which are often small on clusters. Set `APPTAINER_TMPDIR` to unpack it somewhere else.
 
 ## Step 0 
 To start we must generate the sparse genetic relatedness matrix (GRM) and processed plink files for usage in variance ratio estimation during step 1. While this step may take several hours to run, it only has to be executed once per biobank/cohort.
