@@ -18,9 +18,12 @@
 ncpu () {   # portable core count (nproc is Linux-only)
   nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1
 }
+singularity_bin () {   # singularity, or apptainer (its renamed successor; many clusters now ship only apptainer)
+  command -v singularity 2>/dev/null || command -v apptainer 2>/dev/null
+}
 check_container_env () {   # $1 = true for singularity; stops early when the runtime or the image is missing
   if [[ ${1:-false} = true ]]; then
-    command -v singularity >/dev/null || { echo "singularity not found on PATH" >&2; exit 1; }
+    singularity_bin >/dev/null || { echo "neither singularity nor apptainer found on PATH" >&2; exit 1; }
     [[ -s resources/saige.sif ]] || { echo "resources/saige.sif missing: bash download_resources.sh --saige-image --singularity" >&2; exit 1; }
   else
     command -v docker >/dev/null || { echo "docker not found on PATH" >&2; exit 1; }
@@ -47,7 +50,7 @@ run_container () {
   local gates=()
   [[ -n ${SAIGE_FIT_GATES:-} ]] && gates=(SAIGE_FIT_GATES="${SAIGE_FIT_GATES}")
   if [[ ${SINGULARITY} = true ]]; then
-    env "${gates[@]}" singularity exec \
+    env ${gates[@]+"${gates[@]}"} "$(singularity_bin)" exec \
       --home "${WD}" --pwd "${WD}" \
       --bind "${WD}:${WD}" ${binds[@]+"${binds[@]}"} \
       "resources/saige.sif" ${cmd}

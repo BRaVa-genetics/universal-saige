@@ -37,7 +37,9 @@ machine=$(uname); arch=$(uname -m)
 if [[ ${GET_IMAGE} = true ]]; then
   ref="${SAIGE_IMAGE}:${SAIGE_VERSION}"
   if [[ ${SINGULARITY} = true ]]; then
-    [[ -s resources/saige.sif ]] || singularity pull "resources/saige.sif" "docker://${ref}"
+    # apptainer is singularity's renamed successor; either pulls the same .sif
+    sing=$(command -v singularity || command -v apptainer) || { echo "neither singularity nor apptainer found on PATH" >&2; exit 1; }
+    [[ -s resources/saige.sif ]] || "${sing}" pull "resources/saige.sif" "docker://${ref}"
   else
     docker pull "${ref}"
     docker save -o "resources/saige.tar" "${ref}"

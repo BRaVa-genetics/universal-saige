@@ -31,7 +31,8 @@ if [[ ${CHECK_ONLY} = true ]]; then
 fi
 if [[ ${SING} = true ]]; then
   IMAGE_FILES="resources/saige.sif"; GET="--singularity"
-  command -v singularity > /dev/null || { echo "SINGULARITY=true but singularity is not on PATH" >&2; exit 1; }
+  command -v singularity > /dev/null || command -v apptainer > /dev/null \
+    || { echo "SINGULARITY=true but neither singularity nor apptainer is on PATH" >&2; exit 1; }
 else
   IMAGE_FILES="resources/saige.tar resources/saige.image"; GET=""
 fi
