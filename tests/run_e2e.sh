@@ -168,7 +168,17 @@ S3X=(bash 03_estimate_nGlmm.sh --isSingularity "${SING}" --phenoFile "${EXT}/phe
      --sparseGRM "${EXT}/${GRM##*/}" --sparseGRMID "${EXT}/${GRMID##*/}")
 run s3_nglmm_extmount   ok   env SAIGE_EXTRA_MOUNTS="${EXT}" "${S3X[@]}" --contPhenos Q_pos --binaryPhenos "B_pos B_rare" \
   --outputFile "${OUT}/neff_extmount.csv"
-run s3_nglmm_nomount    fail env SAIGE_EXTRA_MOUNTS= "${S3X[@]}" --contPhenos Q_pos --outputFile "${OUT}/neff_nomount.csv"
+# Docker sees only what is mounted, but apptainer/singularity also binds /tmp and
+# the site's bind paths (apptainer.conf), where ${EXT} may well be: then the file
+# is reachable without the mount and the negative control cannot fail. Ask the
+# container itself, through run_container, and skip the control when it can see ${EXT}.
+if ( source ./run_container.sh; WD=$(pwd); SINGULARITY=${SING}; SAIGE_EXTRA_MOUNTS=; DRYRUN=false
+     cmd="test -d ${EXT}"; run_container ) < /dev/null > /dev/null 2>&1; then
+  echo "${EXT}" > "${OUT}/s3_nglmm_nomount.skipped"
+  printf "%-28s skipped: the container sees %s without a mount\n" s3_nglmm_nomount "${EXT}"
+else
+  run s3_nglmm_nomount  fail env SAIGE_EXTRA_MOUNTS= "${S3X[@]}" --contPhenos Q_pos --outputFile "${OUT}/neff_nomount.csv"
+fi
 run s3_refuse_bad_mount fail env SAIGE_EXTRA_MOUNTS=/nonexistent_universal_saige "${S3X[@]}" --contPhenos Q_pos \
   --outputFile "${OUT}/neff_badmount.csv" --dryRun
 

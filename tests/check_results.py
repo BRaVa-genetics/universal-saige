@@ -49,6 +49,14 @@ def section(*runs):
     SECTION[:] = runs
 
 
+SKIPPED = []
+
+
+def skip(name, why):
+    """A check that cannot be informative on this machine: reported, not counted."""
+    SKIPPED.append((name, why))
+
+
 def check(name, ok, observed, expected, runs=None):
     """If a run the check reads did not end as expected, its output may be
     partial (a killed run leaves half a file), so the check fails whatever it says."""
@@ -140,6 +148,11 @@ for name, text in [
     ("s3_nglmm_nomount", "does not exist"),
     ("s3_refuse_bad_mount", "is not a directory"),
 ]:
+    if os.path.exists(out(name + ".skipped")):
+        skip("message: " + name, "the container sees %s without a mount (apptainer binds /tmp and the "
+             "site's bind paths), so the run cannot fail; the SAIGE_EXTRA_MOUNTS check below then shows only "
+             "that binding a visible directory is harmless" % open(out(name + ".skipped")).read().strip())
+        continue
     check("message: " + name, text in log(name), "found" if text in log(name) else "absent", repr(text))
 
 # ------------------------------------------------------------ step 0
@@ -483,6 +496,8 @@ check("step3: absolute paths through SAIGE_EXTRA_MOUNTS give the same csv (bytes
 width = max(len(r[1]) for r in RESULTS)
 for ok, name, obs, exp in RESULTS:
     print("%s  %-*s  %s%s" % ("PASS" if ok else "FAIL", width, name, obs, ("   [expected %s]" % exp) if exp else ""))
+for name, why in SKIPPED:
+    print("SKIP  %-*s  %s" % (width, name, why))
 n_fail = sum(1 for r in RESULTS if not r[0])
-print("\n%d checks, %d failed" % (len(RESULTS), n_fail))
+print("\n%d checks, %d failed%s" % (len(RESULTS), n_fail, ", %d skipped" % len(SKIPPED) if SKIPPED else ""))
 sys.exit(1 if n_fail else 0)
