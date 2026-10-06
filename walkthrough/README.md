@@ -168,6 +168,8 @@ This command took 10 minutes with 4 cores. Checking the `out/` directory we can 
 
 Step 2 requires variant annotations which can be generated [here](https://github.com/BRaVa-genetics/variant-annotation). A summary of the thresholds and software versioning used for variant annotation within BRaVa can be found [here](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1), but you don't need to worry about the annoying version alignment if you follow our [steps](https://github.com/BRaVa-genetics/variant-annotation).
 
+The labels in the `anno` lines are what `--annotations` refers to. Step 2 checks that every label you ask for appears in the group file, and refuses the run (listing the labels the file does have) if one does not. A group file written with other labels needs `--annotations` changed to match.
+
 The top of the file looks like this:
 
 `head in/ukb_brava_annotations.txt`

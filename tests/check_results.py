@@ -138,6 +138,8 @@ for name, text in [
     ("s2_refuse_flex_mafs", "FlexRV tests ONE max MAF"),
     ("s2_refuse_flex_variant", "contradicts"),
     ("s2_dryrun", "DRY RUN"),
+    ("s2_refuse_anno_labels", "on no variant in the group file: damaging_missense other_missense"),
+    ("s2_refuse_lof_label", "on no variant in the group file: LoF"),
     ("s1_refuse_both_geno", "Pass ONE of --genotypePlink and --genotypePgen"),
     ("s1_sex_mf_ok", "DRY RUN"),
     ("s1_sex_mf_wrong", "are all sex F"),

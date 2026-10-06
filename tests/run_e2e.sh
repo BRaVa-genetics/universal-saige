@@ -91,7 +91,12 @@ run s2_refuse_both_geno    fail "${S2[@]}" --testType variant --pgen "${IN}/exom
 run s2_refuse_flex_masks   fail "${S2[@]}" --flexRVscore AM --annotations pLoF,synonymous --pgen "${IN}/exome/chr7" --groupFile g --modelFile m --varianceRatio v
 run s2_refuse_flex_mafs    fail "${S2[@]}" --flexRVscore AM --flexRVmaxMAF 0.001,0.01 --pgen "${IN}/exome/chr7" --groupFile g --modelFile m --varianceRatio v
 run s2_refuse_flex_variant fail "${S2[@]}" --flexRVscore AM --testType variant --pgen "${IN}/exome/chr7" --groupFile g --modelFile m --varianceRatio v
-run s2_dryrun              ok   "${S2[@]}" --testType group --pgen "${IN}/exome/chr7" --groupFile g --annotations pLoF --modelFile m --varianceRatio v --dryRun
+run s2_dryrun              ok   "${S2[@]}" --testType group --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" --annotations pLoF --modelFile m --varianceRatio v --dryRun
+# masks in AoU's labels against the BRaVa-labelled group file: refused before SAIGE runs
+run s2_refuse_anno_labels fail "${S2[@]}" --testType group --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" --modelFile m --varianceRatio v \
+  --annotations pLoF,damaging_missense,pLoF:damaging_missense:other_missense --dryRun
+run s2_refuse_lof_label   fail "${S2[@]}" --flexRVscore AM --flexRVlofAnno LoF --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" \
+  --modelFile m --varianceRatio v --dryRun
 run s1_refuse_both_geno    fail "${S1[@]}" --traitType quantitative --phenoCol Q_pos --genotypePlink "${VR}" --genotypePgen "${VR}" --dryRun
 run s1_sex_mf_ok           ok   "${S1[@]}" --traitType quantitative --phenoFile "${IN}/pheno_mf.tsv" --phenoCol Q_f --sex F --genotypePlink "${VR}" --dryRun
 run s1_sex_mf_wrong        fail "${S1[@]}" --traitType quantitative --phenoFile "${IN}/pheno_mf.tsv" --phenoCol Q_f --sex M --genotypePlink "${VR}" --dryRun

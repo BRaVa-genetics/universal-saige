@@ -135,6 +135,9 @@ optional:
 - `-s`,`--isSingularity` (default: false).
 - `-g`,`--groupFile`: required for a group test. The annotation file.
 - `--annotations`: required for a group test. `':'` joins labels into one mask, `','` separates masks. For SAIGE-GENE+ use `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`.
+  Every label must be on an `anno` line of the group file (for FlexRV, the `--flexRVlofAnno` labels too); otherwise the run
+  is refused before SAIGE starts, naming the missing labels and the ones the file has. SAIGE itself would quietly test a
+  smaller or empty mask under the name asked for.
 - `--relatednessCutoff` (default 0.05): must equal the cutoff step 1 fitted under; nothing in SAIGE checks it.
 - `--condition`, `--subSampleFile`, `--dryRun` (prints the SAIGE command).
 

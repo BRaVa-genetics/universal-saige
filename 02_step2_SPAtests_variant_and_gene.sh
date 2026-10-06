@@ -159,6 +159,7 @@ while [[ $# -gt 0 ]]; do
     -g,--groupFile: required if group test is selected. Filename of the annotation file used for group tests. This must be relative to, and contained within, the current working directory.
     --annotations: required if group test is selected. Comma separated list of annotation masks to test (':' joins labels INTO one mask, ',' separates masks). Please use
       'pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous'
+      Every label (and every --flexRVlofAnno label) must be on an 'anno' line of the group file, or the run is refused.
     --relatednessCutoff (default: 0.05): MUST equal the cutoff step 1 fitted under; nothing in SAIGE checks it.
     --condition: comma separated list of SNPs to condition on. This must be in order of the SNP occurrence in the dosage file.
     --subSampleFile: single-column file of sample IDs to restrict the test to.
@@ -253,6 +254,47 @@ fi
 if [[ $ANNOTATIONS == "" ]] && [[ ${TESTTYPE} == "group" ]]; then
   echo "attempting to run group tests without selected annotations"
   exit 1
+fi
+
+# Every label the masks name (and, for FlexRV, every --flexRVlofAnno label) must
+# be on an `anno` line of the group file. SAIGE checks nothing of the kind for
+# the masks, and only warns for the lof labels (saige-slim LEDGER #170), so a
+# typo, or BRaVa labels against a group file written with other ones (AoU's say
+# damaging_missense where BRaVa's say damaging_missense_or_protein_altering),
+# would test a smaller mask, or an empty one, under the name asked for.
+if [[ ${TESTTYPE} == "group" ]]; then
+  if [[ ! -s ${GROUPFILE} ]]; then
+    echo "ERROR: group file '${GROUPFILE}' not found or empty"
+    exit 1
+  fi
+  case ${GROUPFILE} in *.gz|*.bgz) read_group="gzip -cd" ;; *) read_group="cat" ;; esac
+  asked="${ANNOTATIONS}"
+  [[ ${FLEXRV_SCORE} != "" ]] && asked="${asked},${FLEXRV_LOFANNO}"
+  # line 1: the labels asked for that the file lacks; line 2: the labels it has
+  labels=$(${read_group} "${GROUPFILE}" | awk -v asked="${asked}" '
+    $2 == "anno" { for (i = 3; i <= NF; i++) if (!($i in seen)) { seen[$i]; order[++n] = $i } }
+    END {
+      m = split(asked, a, /[,:;]/)
+      for (i = 1; i <= m; i++) if (a[i] != "" && !(a[i] in seen) && !(a[i] in told)) { told[a[i]]; miss = miss " " a[i] }
+      for (i = 1; i <= n; i++) have = have " " order[i]
+      print miss; print have
+    }')
+  missing=$(echo "${labels}" | sed -n 1p)
+  if [[ -n ${missing# } ]]; then
+    echo "ERROR: annotation label(s) asked for but on no variant in the group file:${missing}"
+    echo "  group file:         ${GROUPFILE}"
+    echo "  labels it has:     $(echo "${labels}" | sed -n 2p)"
+    echo "  --annotations:      ${ANNOTATIONS}"
+    [[ ${FLEXRV_SCORE} != "" ]] && echo "  --flexRVlofAnno:    ${FLEXRV_LOFANNO}"
+    if [[ ${FLEXRV_SCORE} != "" ]]; then
+      echo "Pass --annotations (ONE mask, labels joined with ':') and --flexRVlofAnno with labels the file has to the FlexRV"
+      echo "call (in templates/step_2_template.sh: section 3, which uses the defaults), or pass the group file they were written for."
+    else
+      echo "Change --annotations in your step-2 call to labels the file has (in templates/step_2_template.sh: the 'annots'"
+      echo "line), or pass the group file those labels were written for."
+    fi
+    exit 1
+  fi
 fi
 
 if [[ ${CHR:-} == "" ]]; then

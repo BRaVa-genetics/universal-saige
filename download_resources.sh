@@ -14,7 +14,10 @@
 set -euo pipefail
 
 SAIGE_IMAGE="${SAIGE_IMAGE:-astheeggeggs/saige-slim}"        # Docker Hub namespace/repository
-SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-3e92d89d}"          # the tag; pin it, and record it with your results
+SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-152ffd8c}"          # the tag; pin it, and record it with your results
+# 152ffd8c (2026-10-03) is the latest saige-slim: it has the LEDGER #172 fix the
+# AoU FlexRV reruns used (a weighted cell one variant carries takes the exact
+# test) and #176 (a cell the variance ratio stretches takes the exact convolution).
 # plink builds: the newest STABLE ones on cog-genomics.org (not the development
 # builds listed beside them), checked 2026-10-06. Pinned, like the image, so
 # every site runs the same binaries; bump these deliberately.
