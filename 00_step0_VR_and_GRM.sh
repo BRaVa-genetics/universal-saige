@@ -74,7 +74,6 @@ generate_GRM(){
     variant_count=$(wc -l < "${HOME}/${OUT}.plink_for_grm.bim")
     if [[ $variant_count -ge $numRandomMarkerforSparseKin ]]; then
       run_container
-      grm_density_check "${HOME}/${OUT}_relatednessCutoff_${RELCUTOFF}_5000_randomMarkersUsed.sparseGRM.mtx" "${RELCUTOFF}"
     else
       echo "Error: ${variant_count} variants found in ${OUT}.plink_for_grm, which is less than the required ${numRandomMarkerforSparseKin} variants."
       exit 1
@@ -275,4 +274,13 @@ fi
 if [[ ${generate_plink_for_vr} = true ]]; then
   echo "generating plink for vr"
   generate_plink_for_vr
+fi
+
+# The GRM's density is the LAST thing step 0 prints, out of the trace, because
+# this is where the cutoff is chosen: a dense GRM is fixed by rerunning step 0
+# with a higher --relatednessCutoff, before any step-1 fit is paid for.
+set +x
+if [[ ${generate_grm} = true ]]; then
+  echo
+  grm_density_check "${HOME}/${OUT}_relatednessCutoff_${RELCUTOFF}_5000_randomMarkersUsed.sparseGRM.mtx" "${RELCUTOFF}"
 fi

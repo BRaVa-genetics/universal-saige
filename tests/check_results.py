@@ -169,6 +169,12 @@ for name in ("grm_dense_0125", "s0_plink", "s0_relcut_0125", "s1_Q_pos"):
     check("no dense-GRM warning: " + name, "THE SPARSE GRM IS DENSE" not in log(name),
           "absent" if "THE SPARSE GRM IS DENSE" not in log(name) else "PRESENT", "absent", runs=[name])
 
+# step 0 ends on the GRM's density, where it cannot be missed
+for name in ("s0_plink", "s0_pgen", "s0_relcut_0125"):
+    last = ([l for l in log(name).splitlines() if l.strip()] or [""])[-1]
+    check("step0 log ends on the GRM density: " + name, "relatives per sample" in last, last[-60:], "the density line",
+          runs=[name])
+
 # ------------------------------------------------------------ step 0
 kept_n = T["n_kept"]
 section("s0_plink")
