@@ -153,8 +153,8 @@ while [[ $# -gt 0 ]]; do
     --chr: chromosome to test (spelled as in the .pvar/.bim, e.g. chr20 or 20).
   optional:
     -o,--outputPrefix: output prefix of the SAIGE step 2 output. The results are <prefix>.txt; group tests also write
-      <prefix>.txt.singleAssoc.txt, .markerList.txt, and the sidecars .pooledTests.txt, .skatoMethod.txt, .skatFailures.txt,
-      .spaFallbacks.txt (each only when there is something to report).
+      <prefix>.txt.singleAssoc.txt, .markerList.txt, .skatoMethod.txt (the p-value method of every SKAT-O cell), and the
+      sidecars .pooledTests.txt, .skatFailures.txt, .spaFallbacks.txt (each only when there is something to report).
     -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
     -g,--groupFile: required if group test is selected. Filename of the annotation file used for group tests. This must be relative to, and contained within, the current working directory.
     --annotations: required if group test is selected. Comma separated list of annotation masks to test (':' joins labels INTO one mask, ',' separates masks). Please use

@@ -131,7 +131,7 @@ required:
 - `--sparseGRM`, `--sparseGRMID`: the step-0 GRM and its sample IDs. Relative to the current working directory.
 
 optional:
-- `-o`,`--outputPrefix`: output prefix (step 2). Group tests also write `<prefix>.txt.singleAssoc.txt`, `.markerList.txt` and, when there is something to report, the sidecars `.pooledTests.txt`, `.skatoMethod.txt`, `.skatFailures.txt`, `.spaFallbacks.txt`.
+- `-o`,`--outputPrefix`: output prefix (step 2). Group tests also write `<prefix>.txt.singleAssoc.txt`, `.markerList.txt`, `.skatoMethod.txt` (which p-value method each SKAT-O cell used) and, when there is something to report, the sidecars `.pooledTests.txt`, `.skatFailures.txt`, `.spaFallbacks.txt`.
 - `-s`,`--isSingularity` (default: false).
 - `-g`,`--groupFile`: required for a group test. The annotation file.
 - `--annotations`: required for a group test. `':'` joins labels into one mask, `','` separates masks. For SAIGE-GENE+ use `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`.
