@@ -147,6 +147,9 @@ for name, text in [
     ("s1_sex_numeric_ok", "DRY RUN"),
     ("s0_refuse_vcf", "geneticDataFormat must be in {plink,pgen}"),
     ("s0_refuse_no_out", "--outputPrefix is required"),
+    ("s0_refuse_bad_relcut", "--relatednessCutoff must be a number between 0 and 1"),
+    ("s1_refuse_bad_relcut", "--relatednessCutoff must be a number between 0 and 1"),
+    ("s1_relcut_dryrun", "--relatednessCutoff 0.125"),
     ("s3_nglmm_nomount", "does not exist"),
     ("s3_refuse_bad_mount", "is not a directory"),
 ]:
@@ -173,13 +176,14 @@ else:
     check("step0: VR markers MAC 10-20 / MAC >= 20", False, "no frq file", (2000, 2000))
 
 
-def grm_check(prefix, label, run):
+def grm_check(prefix, label, run, cutoff="0.05"):
+    """The GRM step 0 wrote at --relatednessCutoff `cutoff`; returns the number of unrelated pairs it kept."""
     section(run)
-    ids_path = out(prefix + "_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt")
-    mtx_path = out(prefix + "_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx")
+    ids_path = out(prefix + "_relatednessCutoff_%s_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt" % cutoff)
+    mtx_path = out(prefix + "_relatednessCutoff_%s_5000_randomMarkersUsed.sparseGRM.mtx" % cutoff)
     if not (os.path.exists(ids_path) and os.path.exists(mtx_path)):
         check(label + ": GRM files exist", False, "missing", "present")
-        return
+        return None
     ids = [l.strip() for l in open(ids_path) if l.strip()]
     check(label + ": GRM samples = include list x genotyped", len(ids) == kept_n and len(set(ids)) == kept_n,
           len(ids), kept_n)
@@ -210,10 +214,20 @@ def grm_check(prefix, label, run):
     spurious = [v for (i, j), v in entries.items() if i != j and (i, j) not in ped]
     check(label + ": no unrelated pair above 0.12", not spurious or max(spurious) < 0.12,
           "%d unrelated pairs kept, max %.3f" % (len(spurious), max(spurious) if spurious else 0), "< 0.12")
+    low = [v for (i, j), v in entries.items() if i != j and v < float(cutoff)]
+    check(label + ": no pair below the cutoff %s" % cutoff, not low,
+          "%d below, min %.3f" % (len(low), min(low)) if low else "none", "none")
+    return len(spurious)
 
 
-grm_check("step0", "step0 plink", "s0_plink")
+n_spur_005 = grm_check("step0", "step0 plink", "s0_plink")
 grm_check("step0_pgen", "step0 pgen (IID-only .psam)", "s0_pgen")
+# --relatednessCutoff 0.125 (All of Us amr): the pedigree survives (checked above, at
+# 0.35-0.65), and the unrelated pairs the 0.05 GRM keeps (max ~0.06) are dropped
+n_spur_0125 = grm_check("step0_rc0125", "step0 at --relatednessCutoff 0.125", "s0_relcut_0125", "0.125")
+section("s0_plink", "s0_relcut_0125")
+check("step0: 0.125 drops the unrelated pairs 0.05 keeps", bool(n_spur_005) and n_spur_0125 == 0,
+      "%s at 0.05, %s at 0.125" % (n_spur_005, n_spur_0125), "> 0 at 0.05, 0 at 0.125")
 
 # ------------------------------------------------------------ step 1
 for trait in ("Q_pos", "Q_pos_pgen", "Q_null", "Q_perm", "B_pos", "B_rare", "Q_female"):

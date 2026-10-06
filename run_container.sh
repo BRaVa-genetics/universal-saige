@@ -20,6 +20,14 @@ ncpu () {   # portable core count (nproc is Linux-only)
 singularity_bin () {   # singularity, or apptainer (its renamed successor; many clusters now ship only apptainer)
   command -v singularity 2>/dev/null || command -v apptainer 2>/dev/null
 }
+check_relcutoff () {   # $1 = a --relatednessCutoff value; stops unless it is a number in (0, 1)
+  # The same cutoff must reach steps 0, 1 and 2: step 0 keeps GRM entries at or
+  # above it, and steps 1 and 2 thin the GRM they load to it again. Nothing in
+  # SAIGE checks that they agree (All of Us: 0.05, but 0.125 for amr, whose
+  # admixed GRM had ~46M entries at 0.05 and a fit that never finished).
+  awk -v x="$1" 'BEGIN { exit !(x ~ /^(0?\.[0-9]+|0)$/ && x + 0 > 0) }' \
+    || { echo "--relatednessCutoff must be a number between 0 and 1 (got '$1')" >&2; exit 1; }
+}
 check_container_env () {   # $1 = true for singularity; stops early when the runtime or the image is missing
   if [[ ${1:-false} = true ]]; then
     singularity_bin >/dev/null || { echo "neither singularity nor apptainer found on PATH" >&2; exit 1; }

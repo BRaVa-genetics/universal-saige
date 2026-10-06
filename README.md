@@ -93,6 +93,8 @@ optional:
 - `-s`,`--isSingularity` (default: `false`): is singularity (or apptainer) available? If not, it is assumed that docker is available.
 - `--generate_GRM` (default: false): generate GRM for the genetic data.
 - `--generate_plink_for_vr` (default: false): generate plink file for vr.
+- `--relatednessCutoff` (default 0.05): GRM entries below it are dropped; the GRM is written to
+  `<outputPrefix>_relatednessCutoff_<value>_5000_randomMarkersUsed.sparseGRM.mtx`. The same value must be passed to steps 0, 1 and 2; nothing in SAIGE checks that they agree. All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05.
 - `--sampleIDs`: single column of sample IDs (matched on IID) to define the GRM and the variance-ratio markers' samples; all samples when omitted. **Note, if this is not _all_ of the samples in the `{WES, WGS}` dataset, the `{WES, WGS}` data must be filtered to these samples before running step 1**
 
 > [!IMPORTANT]
@@ -117,6 +119,7 @@ optional:
 - `-c`,`--covarColList`: comma separated column names (e.g. `age,pc1,pc2`) of continuous covariates to include as fixed effects in the file specified in `--phenoFile`. Recall, proposed pilot fixed effect covariates are `age,age2,sex,age*sex,age2*sex,PCs`.
 - `--categCovarColList`: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
 - `--sampleIDCol` (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
+- `--relatednessCutoff` (default 0.05): the GRM is thinned to entries at or above it. It must equal step 0's and step 2's.
 
 ### Step 2 (once per chromosome per phenotype)
 
@@ -138,7 +141,7 @@ optional:
   Every label must be on an `anno` line of the group file (for FlexRV, the `--flexRVlofAnno` labels too); otherwise the run
   is refused before SAIGE starts, naming the missing labels and the ones the file has. SAIGE itself would quietly test a
   smaller or empty mask under the name asked for.
-- `--relatednessCutoff` (default 0.05): must equal the cutoff step 1 fitted under; nothing in SAIGE checks it.
+- `--relatednessCutoff` (default 0.05): must equal the cutoff steps 0 and 1 used; nothing in SAIGE checks it.
 - `--condition`, `--subSampleFile`, `--dryRun` (prints the SAIGE command).
 
 FlexRV (one run per weight set):

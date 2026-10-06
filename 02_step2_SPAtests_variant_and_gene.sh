@@ -187,6 +187,7 @@ done
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 # Checks
+check_relcutoff "${RELCUTOFF}"
 if [[ ${VCF} != "" ]]; then
   echo "ERROR: --vcf is not accepted. The SAIGE image reads PLINK 2 (.pgen/.pvar/.psam) or PLINK 1 (.bed/.bim/.fam) only,"
   echo "and a conversion on every run would be paid once per chromosome per phenotype. Convert ONCE, then pass --pgen:"

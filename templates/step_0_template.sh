@@ -25,6 +25,11 @@ out_step0=["out"]
 # in the files will be used
 sample_id_path=["path/to/sampleIDs"]
 
+# Relatedness cutoff: GRM entries below it are dropped. Use the SAME value in
+# steps 1 and 2. 0.05 is the default; All of Us used 0.125 for its admixed amr
+# cohort, whose GRM was too dense to fit at 0.05.
+relatedness_cutoff=0.05
+
 # The inclusion of the following two flags ensures that the variance ratio file
 # and GRM files are created.
 # --generate_plink_for_vr (used in step 1 and flagged by --genotypePlink).
@@ -37,5 +42,6 @@ bash 00_step0_VR_and_GRM.sh \
     --isSingularity ${IS_SINGULARITY} \
     --outputPrefix ${out_step0} \
     --sampleIDs ${sample_id_path} \
+    --relatednessCutoff ${relatedness_cutoff} \
     --generate_plink_for_vr \
     --generate_GRM

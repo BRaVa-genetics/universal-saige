@@ -7,6 +7,7 @@ POSITIONAL_ARGS=()
 
 SINGULARITY=false
 SAMPLEIDCOL="IID"
+RELCUTOFF="0.05"
 OUT="out"
 TRAITTYPE=""
 PLINK=""
@@ -105,6 +106,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --relatednessCutoff)
+      RELCUTOFF="$2"
+      shift # past argument
+      shift # past value
+      ;;
     --sex)
       SEX="$2"
       shift # past argument
@@ -126,6 +132,8 @@ while [[ $# -gt 0 ]]; do
     -c,--covarColList: comma separated column names (e.g. age,pc1,pc2) of continuous covariates to include as fixed effects in the file specified in --phenoFile.
     --categCovarColList: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
     --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
+    --relatednessCutoff (default: 0.05): the GRM is thinned to entries at or above it. MUST equal step 0's and step 2's
+      (All of Us: 0.05, and 0.125 for amr); nothing in SAIGE checks it.
     --sex ('M' or 'F'): for a sex-specific trait. Every sample with a non-missing phenotype must share one value of the
       'sex' column (and equal --sex, when that column is coded M/F). Do not also pass sex as a covariate.
     --dryRun: print the SAIGE command instead of running it.
@@ -149,6 +157,7 @@ done
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 # Checks
+check_relcutoff "${RELCUTOFF}"
 if [[ ${TRAITTYPE} == "" ]]; then
   echo "traitType not set"
   exit 1
@@ -286,7 +295,7 @@ fi
 
 cmd="""step1_fitNULLGLMM.R \
       ${GENO_ARGS} \
-      --relatednessCutoff 0.05 \
+      --relatednessCutoff ${RELCUTOFF} \
       --sparseGRMFile ${HOME}/${SPARSEGRM} \
       --sparseGRMSampleIDFile ${HOME}/${SPARSEGRMID} \
       --useSparseGRMtoFitNULL=TRUE \

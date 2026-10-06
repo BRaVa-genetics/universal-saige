@@ -7,6 +7,7 @@ POSITIONAL_ARGS=()
 SINGULARITY=false
 generate_grm=false
 generate_plink_for_vr=false
+RELCUTOFF="0.05"
 
 WD=$(pwd)
 HOME=$WD
@@ -68,7 +69,7 @@ generate_GRM(){
         --nThreads=$(ncpu) \
         --outputPrefix="${HOME}/${OUT}" \
         --numRandomMarkerforSparseKin=$numRandomMarkerforSparseKin \
-        --relatednessCutoff=0.05"
+        --relatednessCutoff=${RELCUTOFF}"
 
     variant_count=$(wc -l < "${HOME}/${OUT}.plink_for_grm.bim")
     if [[ $variant_count -ge $numRandomMarkerforSparseKin ]]; then
@@ -158,6 +159,11 @@ while [[ $# -gt 0 ]]; do
       generate_plink_for_vr=true
       shift # past argument
       ;;
+    --relatednessCutoff)
+      RELCUTOFF="$2"
+      shift # past argument
+      shift # past value
+      ;;
     --sampleIDs)
       SAMPLEIDS="$2" 
       shift
@@ -175,6 +181,9 @@ while [[ $# -gt 0 ]]; do
                 -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
                 --generate_GRM (default: false): generate GRM for the genetic data.
                 --generate_plink_for_vr (default: false): generate plink file for vr.
+                --relatednessCutoff (default: 0.05): GRM entries below it are dropped. Pass the SAME value to steps 1 and 2
+                  (All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05). The output
+                  is <outputPrefix>_relatednessCutoff_<value>_5000_randomMarkersUsed.sparseGRM.mtx.
                 --sampleIDs: path to a file containing sampleIDs (as a single column) to be used to define the GRM.
                 Note that if nothing is passed, then all of the samples in the plink/pgen files will be used.
                 Samples are matched on IID.
@@ -233,7 +242,10 @@ if [[ ${OUT:-} == "" ]]; then
   exit 1
 fi
 
+check_relcutoff "${RELCUTOFF}"
+
 echo "OUT               = ${OUT}"
+echo "RELCUTOFF         = ${RELCUTOFF}"
 echo "SINGULARITY       = ${SINGULARITY}"
 echo "GENETIC DATA      = ${GENETIC_DATA_DIR}/*.{${GENETIC_DATA_FORMAT}}"
 echo "SAMPLEIDS         = ${SAMPLEIDS}"

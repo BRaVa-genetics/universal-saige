@@ -106,12 +106,18 @@ run s0_refuse_vcf          fail bash 00_step0_VR_and_GRM.sh --isSingularity "${S
   --geneticDataType genotype --outputPrefix "${OUT}/never" --generate_GRM
 run s0_refuse_no_out       fail bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
   --geneticDataType genotype --generate_GRM
+run s0_refuse_bad_relcut   fail bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
+  --geneticDataType genotype --outputPrefix "${OUT}/never" --generate_GRM --relatednessCutoff 5
+run s1_refuse_bad_relcut   fail "${S1[@]}" --traitType quantitative --phenoCol Q_pos --genotypePlink "${VR}" --relatednessCutoff 0 --dryRun
+run s1_relcut_dryrun       ok   "${S1[@]}" --traitType quantitative --phenoCol Q_pos --genotypePlink "${VR}" --relatednessCutoff 0.125 --dryRun
 
 echo "== step 0"
 run s0_plink ok bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
   --geneticDataType genotype --outputPrefix "${OUT}/step0" --sampleIDs "${IN}/sample_ids.txt" --generate_GRM --generate_plink_for_vr
 run s0_pgen ok bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array_pgen" --geneticDataFormat pgen \
   --geneticDataType genotype --outputPrefix "${OUT}/step0_pgen" --sampleIDs "${IN}/sample_ids.txt" --generate_GRM
+run s0_relcut_0125 ok bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
+  --geneticDataType genotype --outputPrefix "${OUT}/step0_rc0125" --sampleIDs "${IN}/sample_ids.txt" --generate_GRM --relatednessCutoff 0.125
 resources/plink --bfile "${VR}" --freq counts --out "${OUT}/vr_freq" > /dev/null
 resources/plink2 --bfile "${VR}" --make-pgen --out "${VR}" > /dev/null
 
