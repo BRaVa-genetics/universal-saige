@@ -27,7 +27,8 @@ sample_id_path=["path/to/sampleIDs"]
 
 # Relatedness cutoff: GRM entries below it are dropped. Use the SAME value in
 # steps 1 and 2. 0.05 is the default; All of Us used 0.125 for its admixed amr
-# cohort, whose GRM was too dense to fit at 0.05.
+# cohort, whose GRM was too dense to fit at 0.05. Steps 0 and 1 print the
+# GRM's relatives per sample and warn loudly when it is dense: raise it then.
 relatedness_cutoff=0.05
 
 # The inclusion of the following two flags ensures that the variance ratio file

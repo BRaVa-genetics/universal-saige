@@ -119,6 +119,13 @@ run s0_pgen ok bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDa
 run s0_relcut_0125 ok bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
   --geneticDataType genotype --outputPrefix "${OUT}/step0_rc0125" --sampleIDs "${IN}/sample_ids.txt" --generate_GRM --relatednessCutoff 0.125
 resources/plink --bfile "${VR}" --freq counts --out "${OUT}/vr_freq" > /dev/null
+# the dense-GRM warning: a planted GRM where every pair is at 0.06 (399 "relatives"
+# per sample) plus 200 real pairs at 0.3; dense at 0.05, ~1 relative per sample at 0.125
+awk 'BEGIN { n = 400; print "%%MatrixMarket matrix coordinate real symmetric"; print n, n, n + n * (n - 1) / 2
+             for (i = 1; i <= n; i++) print i, i, 1
+             for (i = 1; i <= n; i++) for (j = i + 1; j <= n; j++) print j, i, (j == i + 1 && i % 2) ? 0.3 : 0.06 }' > "${OUT}/dense.mtx"
+run grm_dense_005  ok bash -c 'source ./run_container.sh; grm_density_check "$1" 0.05'  _ "${OUT}/dense.mtx"
+run grm_dense_0125 ok bash -c 'source ./run_container.sh; grm_density_check "$1" 0.125' _ "${OUT}/dense.mtx"
 resources/plink2 --bfile "${VR}" --make-pgen --out "${VR}" > /dev/null
 
 echo "== step 1"

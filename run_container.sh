@@ -28,6 +28,41 @@ check_relcutoff () {   # $1 = a --relatednessCutoff value; stops unless it is a 
   awk -v x="$1" 'BEGIN { exit !(x ~ /^(0?\.[0-9]+|0)$/ && x + 0 > 0) }' \
     || { echo "--relatednessCutoff must be a number between 0 and 1 (got '$1')" >&2; exit 1; }
 }
+grm_density_check () {   # $1 = sparse GRM .mtx, $2 = the cutoff it is used at; warns LOUDLY when it is dense
+  # Mean relatives per sample (2 x off-diagonal pairs at or above the cutoff / N),
+  # counted as SAIGE will use the matrix (it drops entries below the cutoff). A
+  # GRM from 5,000 random markers is noisy, and in an admixed cohort ancestry
+  # also reads as relatedness, so a low cutoff can flood it. All of Us amr
+  # (N 52,192): ~885 relatives per sample at 0.05 (46.2M entries), a step-1 fit
+  # that never finished and tau collapsed to 0 in ~95% of models; at 0.125, ~5.7
+  # and a fit in 58 s (saige-slim handoff 2026-09-25). Real families give a few
+  # (the e2e pedigree ~2.4). The warning threshold, 100, is a judgement between.
+  local mtx=$1 cutoff=$2 stats n pairs rel
+  [[ -r ${mtx} ]] || return 0
+  stats=$(awk -v c="${cutoff}" '
+    NR == 1 { sym = ($0 ~ /symmetric/) }
+    /^%/ { next }
+    !dims { n = $1; dims = 1; next }
+    $1 != $2 && $3 >= c { pairs++ }
+    END { if (!sym) pairs /= 2; printf "%d %d %.1f\n", n, pairs, n ? 2 * pairs / n : 0 }' "${mtx}")
+  read -r n pairs rel <<< "${stats}"
+  echo "sparse GRM at --relatednessCutoff ${cutoff}: ${n} samples, ${pairs} related pairs, ${rel} relatives per sample"
+  if awk -v r="${rel}" 'BEGIN { exit !(r > 100) }'; then
+    {
+      echo "################################################################################"
+      echo "WARNING: THE SPARSE GRM IS DENSE: ${rel} relatives per sample on average"
+      echo "  (${pairs} pairs among ${n} samples at --relatednessCutoff ${cutoff})."
+      echo "  At this density the step-1 fit can run for hours or never finish, and the"
+      echo "  random effect can collapse to 0. Most of these 'relatives' are noise or"
+      echo "  shared ancestry, not family. RAISE --relatednessCutoff -- All of Us used"
+      echo "  0.125 for its admixed amr cohort: ~885 relatives per sample at 0.05, ~5.7"
+      echo "  at 0.125, and a fit that never finished took 58 s -- and pass the SAME"
+      echo "  value to steps 0, 1 and 2."
+      echo "################################################################################"
+    } >&2
+  fi
+  return 0
+}
 check_container_env () {   # $1 = true for singularity; stops early when the runtime or the image is missing
   if [[ ${1:-false} = true ]]; then
     singularity_bin >/dev/null || { echo "neither singularity nor apptainer found on PATH" >&2; exit 1; }

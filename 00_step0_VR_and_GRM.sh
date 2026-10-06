@@ -74,6 +74,7 @@ generate_GRM(){
     variant_count=$(wc -l < "${HOME}/${OUT}.plink_for_grm.bim")
     if [[ $variant_count -ge $numRandomMarkerforSparseKin ]]; then
       run_container
+      grm_density_check "${HOME}/${OUT}_relatednessCutoff_${RELCUTOFF}_5000_randomMarkersUsed.sparseGRM.mtx" "${RELCUTOFF}"
     else
       echo "Error: ${variant_count} variants found in ${OUT}.plink_for_grm, which is less than the required ${numRandomMarkerforSparseKin} variants."
       exit 1

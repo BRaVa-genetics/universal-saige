@@ -152,6 +152,10 @@ for name, text in [
     ("s1_relcut_dryrun", "--relatednessCutoff 0.125"),
     ("s3_nglmm_nomount", "does not exist"),
     ("s3_refuse_bad_mount", "is not a directory"),
+    ("grm_dense_005", "THE SPARSE GRM IS DENSE: 399.0 relatives per sample"),
+    ("grm_dense_0125", "200 related pairs, 1.0 relatives per sample"),
+    ("s0_plink", "0.05: 1900 samples, 2267 related pairs"),
+    ("s1_Q_pos", "relatives per sample"),
 ]:
     if os.path.exists(out(name + ".skipped")):
         skip("message: " + name, "the container sees %s without a mount (apptainer binds /tmp and the "
@@ -159,6 +163,11 @@ for name, text in [
              "that binding a visible directory is harmless" % open(out(name + ".skipped")).read().strip())
         continue
     check("message: " + name, text in log(name), "found" if text in log(name) else "absent", repr(text))
+
+# the dense-GRM banner: only where the GRM is dense at the cutoff in use
+for name in ("grm_dense_0125", "s0_plink", "s0_relcut_0125", "s1_Q_pos"):
+    check("no dense-GRM warning: " + name, "THE SPARSE GRM IS DENSE" not in log(name),
+          "absent" if "THE SPARSE GRM IS DENSE" not in log(name) else "PRESENT", "absent", runs=[name])
 
 # ------------------------------------------------------------ step 0
 kept_n = T["n_kept"]

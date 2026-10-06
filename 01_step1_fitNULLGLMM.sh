@@ -158,6 +158,7 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 # Checks
 check_relcutoff "${RELCUTOFF}"
+grm_density_check "${SPARSEGRM}" "${RELCUTOFF}"
 if [[ ${TRAITTYPE} == "" ]]; then
   echo "traitType not set"
   exit 1

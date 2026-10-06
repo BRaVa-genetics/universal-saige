@@ -95,6 +95,7 @@ optional:
 - `--generate_plink_for_vr` (default: false): generate plink file for vr.
 - `--relatednessCutoff` (default 0.05): GRM entries below it are dropped; the GRM is written to
   `<outputPrefix>_relatednessCutoff_<value>_5000_randomMarkersUsed.sparseGRM.mtx`. The same value must be passed to steps 0, 1 and 2; nothing in SAIGE checks that they agree. All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05.
+  Steps 0 and 1 print the GRM's mean number of relatives per sample at the cutoff, and warn loudly above 100, where a fit can run for hours or never finish (All of Us amr: ~885 at 0.05, ~5.7 at 0.125).
 - `--sampleIDs`: single column of sample IDs (matched on IID) to define the GRM and the variance-ratio markers' samples; all samples when omitted. **Note, if this is not _all_ of the samples in the `{WES, WGS}` dataset, the `{WES, WGS}` data must be filtered to these samples before running step 1**
 
 > [!IMPORTANT]
