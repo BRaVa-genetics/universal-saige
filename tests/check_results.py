@@ -224,6 +224,12 @@ for trait in ("Q_pos", "Q_pos_pgen", "Q_null", "Q_perm", "B_pos", "B_rare", "Q_f
     sparse = has and "sparse" in open(vr).read()
     check("step1 %s: model + variance ratio with 'sparse' rows" % trait, has and sparse,
           "ok" if has and sparse else ("no sparse rows" if has else "missing/empty"), "present")
+    # quantitative traits are IRNT'd on import (a BRaVa requirement), binary ones never;
+    # SAIGE prints this line (its spelling) only when it applies the transform
+    irnt = "Perform the inverse nomalization" in log("s1_B_rare_ungated" if trait == "B_rare" else "s1_" + trait)
+    quant = trait.startswith("Q_")
+    check("step1 %s: IRNT %s" % (trait, "applied" if quant else "not applied"), irnt == quant,
+          "applied" if irnt else "not applied", "applied" if quant else "not applied")
 section("s1_Q_pos", "s1_Q_pos_pgen")
 check("step1: VR from --genotypePlink == --genotypePgen (bytes)",
       same_bytes(out("Q_pos.varianceRatio.txt"), out("Q_pos_pgen.varianceRatio.txt")), "", "identical")

@@ -259,7 +259,6 @@ WD=$( pwd )
 # Get number of threads
 n_threads=$(( $(ncpu) - 1 )); (( n_threads < 1 )) && n_threads=1
 
-# Get inverse-normalize flag if trait_type=="quantitative"
 # --useSparseGRMforVarRatio=TRUE: step 2 is given the sparse GRM, and a model
 # whose variance-ratio file carries no `sparse` rows is REFUSED there (the
 # All of Us models carry them). Without it every step-2 run fails on load.
@@ -267,6 +266,10 @@ n_threads=$(( $(ncpu) - 1 )); (( n_threads < 1 )) && n_threads=1
 # production runs used it for both, and the earlier 1e-5 for quantitative
 # traits bought nothing measurable at a real cost in fit time.
 TOL="0.02"
+# Quantitative traits are ALWAYS inverse-rank normalised on import (a BRaVa
+# requirement): --invNormalize=TRUE makes SAIGE replace the phenotype by
+# qnorm((rank - 0.5) / n) on the final analysis set (after intersecting
+# genotypes, GRM and complete covariates), before the covariates are fitted.
 if [[ ${TRAITTYPE} == "quantitative" ]]; then
   echo "Quantitative trait passed to SAIGE, perform IRNT"
   INVNORMALISE=TRUE

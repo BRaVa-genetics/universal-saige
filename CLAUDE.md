@@ -48,7 +48,8 @@ Step numbering is not execution order: step 4 builds the FlexRV group file that 
 
 ## Invariants that are easy to break
 
-- **The parameters are the All of Us production choices.** Their authoritative record is `docs/state/aou-saige-parameters.md` in `saige-slim`. Don't change them without a reason recorded there: step 1 `--tol 0.02` for both trait types, IRNT for quantitative traits; step 2 Firth off, fastTest off, `--minMAC 4` for variant tests and `0.5` for group tests, max MAF `0.0001,0.001,0.01`, `--LOCO=FALSE`.
+- **The parameters are the All of Us production choices.** Their authoritative record is `docs/state/aou-saige-parameters.md` in `saige-slim`. Don't change them without a reason recorded there: step 1 `--tol 0.02` for both trait types; step 2 Firth off, fastTest off, `--minMAC 4` for variant tests and `0.5` for group tests, max MAF `0.0001,0.001,0.01`, `--LOCO=FALSE`.
+- **Quantitative traits are always IRNT'd on import** (`--invNormalize=TRUE` in step 1; SAIGE ranks the raw phenotype on the final analysis set, before covariates). This is a BRaVa requirement, not an AoU record: the AoU record lists `--invNormalize` as not recorded.
 - **Step 1 `--useSparseGRMforVarRatio=TRUE` is required.** Without it the variance-ratio file has no `sparse` rows, and step 2 refuses the model when it is given the GRM.
 - `--relatednessCutoff` (0.05) must be the same in steps 1 and 2. SAIGE does not check this.
 - **PLINK 1 or PLINK 2 input only, in every step.** The image has no VCF reader, and steps 0 and 2 refuse a VCF on purpose, with the one-line plink2 conversion in the message. Step 0 takes `--geneticDataFormat {plink,pgen}` and converts `.pgen` to `.bed` in its scratch directory, because its merge, pruning and counts are plink 1.9. Steps 1 and 2 take `--pgen` (recommended) or `--plink`/`--genotypePlink`, exactly one of the two.
