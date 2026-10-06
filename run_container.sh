@@ -28,7 +28,7 @@ check_relcutoff () {   # $1 = a --relatednessCutoff value; stops unless it is a 
   awk -v x="$1" 'BEGIN { exit !(x ~ /^(0?\.[0-9]+|0)$/ && x + 0 > 0) }' \
     || { echo "--relatednessCutoff must be a number between 0 and 1 (got '$1')" >&2; exit 1; }
 }
-grm_density_check () {   # $1 = sparse GRM .mtx, $2 = the cutoff this step uses; warns LOUDLY when it is dense
+grm_density_check () {   # $1 = sparse GRM .mtx, $2 = the cutoff this step uses; warns LOUDLY and returns 3 when it is dense
   # Mean relatives per sample, 2 x (stored entries - N) / N, read off the Matrix
   # Market size line ("N N entries"; a symmetric file stores each pair once,
   # with the N diagonal entries): instant at any size, and exact for the GRM as
@@ -38,7 +38,9 @@ grm_density_check () {   # $1 = sparse GRM .mtx, $2 = the cutoff this step uses;
   # relatives per sample at 0.05 (46.2M entries), a step-1 fit that never
   # finished and tau collapsed to 0 in ~95% of models; at 0.125, ~5.7 and a fit
   # in 58 s (saige-slim handoff 2026-09-25). Real families give a few (the e2e
-  # pedigree ~2.4). The warning threshold, 100, is a judgement between.
+  # pedigree ~2.4). The threshold, 100, is a judgement between. Step 0 only
+  # warns (the GRM exists by then); step 1 refuses, before paying for the fit,
+  # unless it is passed --forceDenseGRM.
   local mtx=$1 cutoff=$2 stats n pairs rel built
   [[ -r ${mtx} ]] || return 0
   stats=$(awk 'NR == 1 { sym = ($0 ~ /symmetric/) }
@@ -61,9 +63,11 @@ grm_density_check () {   # $1 = sparse GRM .mtx, $2 = the cutoff this step uses;
       echo "  shared ancestry, not family. RAISE --relatednessCutoff -- All of Us used"
       echo "  0.125 for its admixed amr cohort: ~885 relatives per sample at 0.05, ~5.7"
       echo "  at 0.125, and a fit that never finished took 58 s -- rerun step 0 with it,"
-      echo "  and pass the SAME value to steps 1 and 2."
+      echo "  and pass the SAME value to steps 1 and 2. Step 1 REFUSES a GRM this dense"
+      echo "  unless it is passed --forceDenseGRM (not recommended)."
       echo "################################################################################"
     } >&2
+    return 3
   fi
   return 0
 }

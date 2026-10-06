@@ -282,5 +282,5 @@ fi
 set +x
 if [[ ${generate_grm} = true ]]; then
   echo
-  grm_density_check "${HOME}/${OUT}_relatednessCutoff_${RELCUTOFF}_5000_randomMarkersUsed.sparseGRM.mtx" "${RELCUTOFF}"
+  grm_density_check "${HOME}/${OUT}_relatednessCutoff_${RELCUTOFF}_5000_randomMarkersUsed.sparseGRM.mtx" "${RELCUTOFF}" || true
 fi

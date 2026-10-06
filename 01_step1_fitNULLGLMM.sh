@@ -8,6 +8,7 @@ POSITIONAL_ARGS=()
 SINGULARITY=false
 SAMPLEIDCOL="IID"
 RELCUTOFF="0.05"
+FORCE_DENSE_GRM=false
 OUT="out"
 TRAITTYPE=""
 PLINK=""
@@ -111,6 +112,10 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --forceDenseGRM)
+      FORCE_DENSE_GRM=true
+      shift # past argument
+      ;;
     --sex)
       SEX="$2"
       shift # past argument
@@ -132,6 +137,8 @@ while [[ $# -gt 0 ]]; do
     -c,--covarColList: comma separated column names (e.g. age,pc1,pc2) of continuous covariates to include as fixed effects in the file specified in --phenoFile.
     --categCovarColList: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
     --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
+    --forceDenseGRM: fit even when the sparse GRM is dense (more than 100 relatives per sample), which is otherwise
+      refused; not recommended.
     --relatednessCutoff (default: 0.05): the GRM is thinned to entries at or above it. MUST equal step 0's and step 2's
       (All of Us: 0.05, and 0.125 for amr); nothing in SAIGE checks it.
     --sex ('M' or 'F'): for a sex-specific trait. Every sample with a non-missing phenotype must share one value of the
@@ -140,6 +147,9 @@ while [[ $# -gt 0 ]]; do
   fit gates (the slim build): a binary trait fitted on fewer than 100 cases, a categorical covariate level with fewer
     than 10 cases or controls, a separated covariate model or a fit that did not converge is REFUSED, with the gate
     named in the log. SAIGE_FIT_GATES=0 in the environment downgrades the refusal to a warning (not recommended).
+  dense GRM: a sparse GRM with more than 100 relatives per sample on average is REFUSED before the fit (All of Us amr
+    at 0.05: ~885, a fit that never finished). Raise --relatednessCutoff in steps 0, 1 and 2; --forceDenseGRM
+    fits anyway (not recommended).
       "
       shift # past argument
       ;;
@@ -158,7 +168,17 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 # Checks
 check_relcutoff "${RELCUTOFF}"
-grm_density_check "${SPARSEGRM}" "${RELCUTOFF}"
+# A dense GRM is refused before the fit is paid for (see grm_density_check)
+dense=0; grm_density_check "${SPARSEGRM}" "${RELCUTOFF}" || dense=$?
+if (( dense == 3 )); then
+  if [[ ${FORCE_DENSE_GRM} = true ]]; then
+    echo "--forceDenseGRM: fitting on the dense GRM anyway" >&2
+  else
+    echo "REFUSED: the sparse GRM is too dense to fit (above). Rerun step 0 with a higher --relatednessCutoff and" >&2
+    echo "pass the same value here and to step 2, or pass --forceDenseGRM to fit anyway (not recommended)." >&2
+    exit 1
+  fi
+fi
 if [[ ${TRAITTYPE} == "" ]]; then
   echo "traitType not set"
   exit 1

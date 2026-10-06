@@ -124,8 +124,11 @@ resources/plink --bfile "${VR}" --freq counts --out "${OUT}/vr_freq" > /dev/null
 awk 'BEGIN { n = 400; print "%%MatrixMarket matrix coordinate real symmetric"; print n, n, n + n * (n - 1) / 2
              for (i = 1; i <= n; i++) print i, i, 1
              for (i = 1; i <= n; i++) for (j = i + 1; j <= n; j++) print j, i, (j == i + 1 && i % 2) ? 0.3 : 0.06 }' > "${OUT}/dense.mtx"
-run grm_dense_005  ok bash -c 'source ./run_container.sh; grm_density_check "$1" 0.05'  _ "${OUT}/dense.mtx"
+run grm_dense_005  fail bash -c 'source ./run_container.sh; grm_density_check "$1" 0.05'  _ "${OUT}/dense.mtx"
 run grm_relcut_mismatch ok bash -c 'source ./run_container.sh; grm_density_check "$1" 0.125' _ "${GRM}"
+run s1_refuse_dense     fail "${S1[@]}" --traitType quantitative --phenoCol Q_pos --genotypePlink "${VR}" --sparseGRM "${OUT}/dense.mtx" --dryRun
+run s1_dense_override   ok   "${S1[@]}" --traitType quantitative --phenoCol Q_pos --genotypePlink "${VR}" \
+  --sparseGRM "${OUT}/dense.mtx" --forceDenseGRM --dryRun
 resources/plink2 --bfile "${VR}" --make-pgen --out "${VR}" > /dev/null
 
 echo "== step 1"

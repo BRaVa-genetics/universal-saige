@@ -48,6 +48,11 @@ _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 > 10 cases or controls, a separated covariate model, or a fit that did not converge is refused, in step 1 and again when
 > step 2 loads the model, with the gate named in the log. That refusal is the right answer for such a trait (the tail of the
 > tests is not calibrated there). `SAIGE_FIT_GATES=0` in your environment turns the refusals into warnings; not recommended.
+>
+> Step 1 also **refuses a dense sparse GRM**: more than 100 relatives per sample on average, where a fit can run for hours
+> or never finish (All of Us amr at `--relatednessCutoff 0.05`: ~885, and the fits never finished; at 0.125: ~5.7, a minute).
+> Step 0 warns about it as it finishes. Rerun step 0 with a higher `--relatednessCutoff` and pass the same value to steps 1
+> and 2; step 1's `--forceDenseGRM` fits anyway (not recommended).
 
 The choices baked into the drivers (Firth off, fastTest off, `--tol 0.02` for both trait types, `--minMAC 4` for
 single-variant tests, the build's missingness defaults) are the ones the All of Us production runs used; the record is
@@ -95,7 +100,7 @@ optional:
 - `--generate_plink_for_vr` (default: false): generate plink file for vr.
 - `--relatednessCutoff` (default 0.05): GRM entries below it are dropped; the GRM is written to
   `<outputPrefix>_relatednessCutoff_<value>_5000_randomMarkersUsed.sparseGRM.mtx`. The same value must be passed to steps 0, 1 and 2; nothing in SAIGE checks that they agree. All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05.
-  Steps 0 and 1 print the GRM's mean number of relatives per sample (from the file header, so instantly), warn loudly above 100, and warn when the GRM was built at a different cutoff from the step's; above 100 a fit can run for hours or never finish (All of Us amr: ~885 at 0.05, ~5.7 at 0.125).
+  Steps 0 and 1 print the GRM's mean number of relatives per sample (from the file header, so instantly), warn loudly above 100 (step 1 then refuses the GRM, see the note on refusals above), and warn when the GRM was built at a different cutoff from the step's; above 100 a fit can run for hours or never finish (All of Us amr: ~885 at 0.05, ~5.7 at 0.125).
 - `--sampleIDs`: single column of sample IDs (matched on IID) to define the GRM and the variance-ratio markers' samples; all samples when omitted. **Note, if this is not _all_ of the samples in the `{WES, WGS}` dataset, the `{WES, WGS}` data must be filtered to these samples before running step 1**
 
 > [!IMPORTANT]
@@ -121,6 +126,7 @@ optional:
 - `--categCovarColList`: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
 - `--sampleIDCol` (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
 - `--relatednessCutoff` (default 0.05): the GRM is thinned to entries at or above it. It must equal step 0's and step 2's.
+- `--forceDenseGRM`: fit even when the sparse GRM has more than 100 relatives per sample on average, which is otherwise refused (see the note on refusals above); not recommended.
 
 ### Step 2 (once per chromosome per phenotype)
 

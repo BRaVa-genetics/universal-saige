@@ -79,3 +79,7 @@ bash 01_step1_fitNULLGLMM.sh \
     --sparseGRMID ${GRM_samples} \
     --relatednessCutoff ${relatedness_cutoff}
 
+# A sparse GRM with more than 100 relatives per sample on average is refused
+# (the fit can run for hours or never finish): rerun step 0 with a higher
+# relatedness_cutoff. Only if that is not an option, add --forceDenseGRM.
+

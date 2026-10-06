@@ -154,6 +154,8 @@ for name, text in [
     ("s3_refuse_bad_mount", "is not a directory"),
     ("grm_dense_005", "THE SPARSE GRM IS DENSE: 399.0 relatives per sample"),
     ("grm_relcut_mismatch", "built at --relatednessCutoff 0.05 and this step uses 0.125"),
+    ("s1_refuse_dense", "REFUSED: the sparse GRM is too dense to fit"),
+    ("s1_dense_override", "--forceDenseGRM: fitting on the dense GRM anyway"),
     ("s0_plink", "1900 samples, 2267 related pairs, 2.4 relatives per sample (built at --relatednessCutoff 0.05)"),
     ("s0_relcut_0125", "1900 samples, 2258 related pairs, 2.4 relatives per sample (built at --relatednessCutoff 0.125)"),
     ("s1_Q_pos", "relatives per sample"),
