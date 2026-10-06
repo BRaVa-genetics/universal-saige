@@ -30,7 +30,7 @@ Performance notes, both measured:
 ## Architecture
 
 **Every driver must be run from the repo root.** Each one does `source ./run_container.sh`, sets `WD=$(pwd)` and `HOME=$WD`, parses flags into globals, builds a SAIGE command string in `$cmd`, and calls `run_container`. That function mounts `$WD` at the same path inside Docker or Singularity and runs `$cmd` unquoted. So:
-- every file argument must be a relative path inside the working directory. Drivers prefix it with `${HOME}/`, and symlinks pointing outside the directory break. The one exception is step 3, which also takes absolute paths under directories that `run_container` binds read-only: `/mnt/project` (UKB RAP) whenever it exists, and anything in `SAIGE_EXTRA_MOUNTS`;
+- every file argument must be a relative path inside the working directory. Drivers prefix it with `${HOME}/`, and symlinks pointing outside the directory break. The one exception is step 3, which also takes absolute paths under the directories in `SAIGE_EXTRA_MOUNTS`, which `run_container` binds read-only;
 - `$cmd` is word-split, so paths and column names cannot contain spaces;
 - the image is found through `resources/saige.image` (Docker: `resources/saige.tar` is loaded only when that image is not already present) or `resources/saige.sif`.
 

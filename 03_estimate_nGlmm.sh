@@ -73,8 +73,8 @@ while [[ $# -gt 0 ]]; do
     --phenoFile: filename of the phenotype file.
     --sparseGRM: filename of the sparseGRM .mtx file.
     --sparseGRMID: filename of the sparseGRM ID file.
-    Each is relative to the current working directory, or an absolute path under it, under /mnt/project (the UKB RAP
-    project mount, bound read-only when it exists) or under a directory in SAIGE_EXTRA_MOUNTS (colon-separated).
+    Each is relative to the current working directory, or an absolute path under it or under a directory listed,
+    colon-separated, in SAIGE_EXTRA_MOUNTS (bound read-only).
   optional:
     --covarList: comma separated column names of covariates in --phenoFile.
     -o,--outputFile (default: neff.csv): the csv written, one 'pheno,nglmm' row per phenotype. Each phenotype's log is
@@ -110,8 +110,8 @@ fi
 check_container_env $SINGULARITY
 
 # relative paths are inside the working directory; an absolute path is used as
-# given, and must be under the working directory, /mnt/project or a
-# SAIGE_EXTRA_MOUNTS directory (see run_container.sh)
+# given, and must be under the working directory or a SAIGE_EXTRA_MOUNTS
+# directory (see run_container.sh)
 container_path () { [[ $1 == /* ]] && echo "$1" || echo "${HOME}/$1"; }
 
 COVAR_ARGS=""

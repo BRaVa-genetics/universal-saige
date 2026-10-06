@@ -159,9 +159,8 @@ wait
 echo "== step 3 (Nglmm)"
 run s3_nglmm ok bash 03_estimate_nGlmm.sh --isSingularity "${SING}" --contPhenos Q_pos --binaryPhenos "B_pos B_rare" --phenoFile "${IN}/pheno.tsv" \
   --covarList "${COV}" --sparseGRM "${GRM}" --sparseGRMID "${GRMID}" --outputFile "${OUT}/neff.csv"
-# inputs outside the working directory, by absolute path through SAIGE_EXTRA_MOUNTS
-# (the mechanism that binds /mnt/project on the UKB RAP): the same Nglmm with the
-# mount, "does not exist" without it
+# inputs outside the working directory, by absolute path through SAIGE_EXTRA_MOUNTS:
+# the same Nglmm with the mount, "does not exist" without it
 EXT=$(mktemp -d "${TMPDIR:-/tmp}/universal_saige_e2e.XXXXXX"); trap 'rm -rf "${EXT}"' EXIT
 cp "${IN}/pheno.tsv" "${GRM}" "${GRMID}" "${EXT}/"
 S3X=(bash 03_estimate_nGlmm.sh --isSingularity "${SING}" --phenoFile "${EXT}/pheno.tsv" --covarList "${COV}"

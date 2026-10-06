@@ -101,9 +101,8 @@ around it changed:
   `tee`, so it only ran from `$HOME` and hid failures. It now uses
   `run_container` (Singularity, fit-gate pass-through), takes `--outputFile`,
   and exits non-zero for a phenotype without an Nglmm. Inputs outside the working
-  directory go through read-only binds in `run_container`: `/mnt/project` (the
-  UKB RAP project mount) whenever it exists, plus `SAIGE_EXTRA_MOUNTS`; step 3
-  takes absolute paths under them, as it did on the RAP. Nglmm
+  directory go through read-only binds in `run_container`, listed in
+  `SAIGE_EXTRA_MOUNTS`; step 3 takes absolute paths under them. Nglmm
   reconciles exactly with 1'K^-1 1 on the GRM.
 - `04_flexrv_groupfile.sh` failed under macOS bash 3.2 (an empty array under `set -u`).
 - Templates: `--t` -> `--traitType`; the GRM file is `<out>_relatednessCutoff_...`.

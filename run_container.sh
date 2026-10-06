@@ -9,10 +9,9 @@
 # valid analysis. SAIGE_FIT_GATES=0 in your environment turns them into
 # warnings -- not recommended, and the log then says so on every run.
 #
-# Directories outside it can be bound too, read-only and at the same path:
-# /mnt/project (the UKB RAP project mount) whenever it exists, plus any listed,
-# colon-separated, in SAIGE_EXTRA_MOUNTS. Only step 3 takes absolute paths into
-# them; steps 0-2 read every file relative to the working directory.
+# Directories outside it can be bound too, read-only and at the same path: list
+# them, colon-separated, in SAIGE_EXTRA_MOUNTS. Only step 3 takes absolute paths
+# into them; steps 0-2 read every file relative to the working directory.
 #
 # DRYRUN=true prints the command instead of running it.
 ncpu () {   # portable core count (nproc is Linux-only)
@@ -30,8 +29,7 @@ check_container_env () {   # $1 = true for singularity; stops early when the run
     [[ -s resources/saige.tar ]] || { echo "resources/saige.tar missing: bash download_resources.sh --saige-image" >&2; exit 1; }
   fi
 }
-extra_mounts () {   # one directory per line: /mnt/project if present, then SAIGE_EXTRA_MOUNTS
-  [[ -d /mnt/project ]] && echo /mnt/project
+extra_mounts () {   # one directory per line, from SAIGE_EXTRA_MOUNTS
   local d IFS=:
   for d in ${SAIGE_EXTRA_MOUNTS:-}; do [[ -n ${d} ]] && echo "${d}"; done
 }

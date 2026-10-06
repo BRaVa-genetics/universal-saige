@@ -166,9 +166,8 @@ required:
 - `--sparseGRM`: filename of the sparseGRM .mtx file.
 - `--sparseGRMID`: filename of the sparseGRM ID file.
 
-Each is relative to the current working directory, or an absolute path under it, under `/mnt/project` (the UKB RAP
-project mount, bound read-only whenever it exists), or under a directory listed, colon-separated, in the
-`SAIGE_EXTRA_MOUNTS` environment variable. On the RAP, `--phenoFile /mnt/project/...` works as it is.
+Each is relative to the current working directory, or an absolute path under it or under a directory listed,
+colon-separated, in the `SAIGE_EXTRA_MOUNTS` environment variable (bound read-only).
 
 optional:
 - `--covarList`: comma separated covariate column names in `--phenoFile`.
