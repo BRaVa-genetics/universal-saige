@@ -15,7 +15,11 @@ set -euo pipefail
 
 SAIGE_IMAGE="${SAIGE_IMAGE:-astheeggeggs/saige-slim}"        # Docker Hub namespace/repository
 SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-3e92d89d}"          # the tag; pin it, and record it with your results
-PLINK2_DATE="20260919"                                        # plink2 alpha 6 build, all platforms
+# plink builds: the newest STABLE ones on cog-genomics.org (not the development
+# builds listed beside them), checked 2026-10-06. Pinned, like the image, so
+# every site runs the same binaries; bump these deliberately.
+PLINK2_ALPHA="alpha7"; PLINK2_DATE="20261001"                 # plink2 v2.0.0-a.7.11, all platforms
+PLINK1_DATE="20260927"                                        # plink 1.9.0 stable (out of beta), all platforms
 AM_RECORD="https://zenodo.org/records/8208688/files"          # AlphaMissense release (Cheng et al. 2023)
 
 GET_IMAGE=false; GET_PLINK=false; GET_PLINK2=false; GET_AM=false; GET_ISO=false; SINGULARITY=false
@@ -67,7 +71,7 @@ if [[ ${GET_PLINK2} = true ]]; then
     Darwin-*)      f="plink2_mac_${PLINK2_DATE}.zip" ;;
     *) echo "no plink2 build known for ${machine}-${arch}; see https://www.cog-genomics.org/plink/2.0/" >&2; exit 1 ;;
   esac
-  wget -nc "https://s3.amazonaws.com/plink2-assets/alpha6/${f}" -P resources/
+  wget -nc "https://s3.amazonaws.com/plink2-assets/${PLINK2_ALPHA}/${f}" -P resources/
   unzip -o "resources/${f}" plink2 -d resources/ >/dev/null
   chmod a+x resources/plink2 && echo "plink2: $(resources/plink2 --version 2>/dev/null | head -1)"
 fi
@@ -75,12 +79,13 @@ fi
 if [[ ${GET_PLINK} = true ]]; then
   # plink 1.9: used by step 0 to merge, LD-prune and count (its flags are 1.9 syntax)
   case "${machine}" in
-    Darwin) f="plink_mac_20230116.zip" ;;
-    Linux)  f="plink_linux_x86_64_20230116.zip" ;;
+    Darwin) f="plink_mac_${PLINK1_DATE}.zip" ;;
+    Linux)  f="plink_linux_x86_64_${PLINK1_DATE}.zip" ;;
     *) echo "operating system not supported" >&2; exit 1 ;;
   esac
   wget -nc "https://s3.amazonaws.com/plink1-assets/${f}" --no-check-certificate -P resources/
-  unzip -o "resources/${f}" -d resources/ >/dev/null && echo "plink 1.9 in resources/"
+  unzip -o "resources/${f}" plink -d resources/ >/dev/null
+  chmod a+x resources/plink && echo "plink: $(resources/plink --version 2>/dev/null | head -1)"
 fi
 
 if [[ ${GET_AM} = true ]]; then
