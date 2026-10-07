@@ -28,7 +28,7 @@ If at any point you run into issues or have any questions please create an issue
 > [!WARNING]
 > A few things to be aware of:
 > - SAIGE can fail in a variety of ways due to low case count - we don't handle this within universal-SAIGE but step1/step2 failing across an entire phenotype x ancestry is a likely indicator for this
-> - When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results/crashes. Drop every sex term (All of Us used `age,age2,PC1,...,PC20` and no categorical covariate), pass `--sex F` or `--sex M` to step 1, and code the other sex's phenotype as missing (NA): step 1 refuses the trait otherwise.
+> - When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results/crashes. Drop every sex term (All of Us used `age,age2,PC1,...,PC20` and no categorical covariate), and pass `--sex F` or `--sex M` to step 1, which then fits only that sex and drops the rest (SAIGE's `--FemaleOnly`/`--MaleOnly`, as All of Us did). A numeric `sex` column is read as 0 = female, 1 = male, BRaVa's coding; add `--femaleCode 1 --maleCode 0` if yours is the other way round, and check the counts step 1 prints.
 
 ## Requirements
 

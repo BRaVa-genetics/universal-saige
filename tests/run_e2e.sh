@@ -105,8 +105,23 @@ run s2_refuse_chr_name    fail bash 02_step2_SPAtests_variant_and_gene.sh --isSi
 run s1_refuse_both_geno    fail "${S1[@]}" --traitType quantitative --phenoCol Q_pos --genotypePlink "${VR}" --genotypePgen "${VR}" --dryRun
 run s1_sex_mf_ok           ok   "${S1[@]}" --traitType quantitative --phenoFile "${IN}/pheno_mf.tsv" --phenoCol Q_f --sex F --genotypePlink "${VR}" --dryRun
 run s1_sex_mf_wrong        fail "${S1[@]}" --traitType quantitative --phenoFile "${IN}/pheno_mf.tsv" --phenoCol Q_f --sex M --genotypePlink "${VR}" --dryRun
-run s1_sex_mixed           fail "${S1[@]}" --traitType quantitative --phenoCol Q_null --sex F --genotypePlink "${VR}" --dryRun
+run s1_sex_mixed           ok   "${S1[@]}" --traitType quantitative --phenoCol Q_null --sex F --genotypePlink "${VR}" --dryRun
 run s1_sex_numeric_ok      ok   "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --genotypePlink "${VR}" --dryRun
+# derived phenotypes for the sex-coding checks: B_f, a female-only binary trait with males coded 0
+# (controls); Q_null with males set NA (the --sex F control); and sex in PLINK's 1 = male, 2 = female
+awk -F'\t' -v OFS='\t' 'NR == 1 { for (i = 1; i <= NF; i++) h[$i] = i; print $0, "B_f"; next }
+  { b = $h["B_pos"]; if ($h["sex"] == 1 && b != "NA") b = 0; print $0, b }' "${IN}/pheno.tsv" > "${OUT}/pheno_bf.tsv"
+awk -F'\t' -v OFS='\t' 'NR == 1 { for (i = 1; i <= NF; i++) h[$i] = i; print; next }
+  { if ($h["sex"] == 1) $h["Q_null"] = "NA"; print }' "${IN}/pheno.tsv" > "${OUT}/pheno_qnull_malesNA.tsv"
+awk -F'\t' -v OFS='\t' 'NR == 1 { for (i = 1; i <= NF; i++) h[$i] = i; print; next }
+  { $h["sex"] = ($h["sex"] == 0) ? 2 : 1; print }' "${IN}/pheno.tsv" > "${OUT}/pheno_plinksex.tsv"
+run s1_sex_code_absent     fail "${S1[@]}" --traitType quantitative --phenoFile "${OUT}/pheno_plinksex.tsv" --phenoCol Q_female --sex F --genotypePlink "${VR}" --dryRun
+run s1_sex_binary_ok       ok   "${S1[@]}" --traitType binary --phenoFile "${OUT}/pheno_bf.tsv" --phenoCol B_f --sex F --covarColList age,age2 --genotypePlink "${VR}" --dryRun
+run s1_sex_binary_flipped  fail "${S1[@]}" --traitType binary --phenoFile "${OUT}/pheno_bf.tsv" --phenoCol B_f --sex F --femaleCode 1 --maleCode 0 --covarColList age,age2 --genotypePlink "${VR}" --dryRun
+run s1_sex_binary_both     ok   "${S1[@]}" --traitType binary --phenoCol B_pos --sex F --covarColList age,age2 --genotypePlink "${VR}" --dryRun
+# the codes flipped (SAIGE's 1 = female against this file's 0): no female has a phenotype under that code
+run s1_sex_flipped_code    fail "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --femaleCode 1 --maleCode 0 --genotypePlink "${VR}" --dryRun
+run s1_refuse_sex_covar    fail "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList age,sex --genotypePlink "${VR}" --dryRun
 run s0_refuse_vcf          fail bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat vcf \
   --geneticDataType genotype --outputPrefix "${OUT}/never" --generate_GRM
 run s0_refuse_no_out       fail bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
@@ -145,6 +160,10 @@ run s1_B_pos         ok   "${S1[@]}" --traitType binary --phenoCol B_pos  --cova
 run s1_B_rare_gated  fail "${S1[@]}" --traitType binary --phenoCol B_rare --covarColList "${COV}" --categCovarColList sex --genotypePlink "${VR}" --outputPrefix "${OUT}/B_rare_gated"
 run s1_B_rare_ungated ok  env SAIGE_FIT_GATES=0 "${S1[@]}" --traitType binary --phenoCol B_rare --covarColList "${COV}" --categCovarColList sex --genotypePlink "${VR}" --outputPrefix "${OUT}/B_rare"
 run s1_Q_female      ok   "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList "age,age2,PC1,PC2,PC3,PC4" --genotypePlink "${VR}" --outputPrefix "${OUT}/Q_female"
+# Q_null, --sex F: SAIGE drops the males (--FemaleOnly), which must give exactly the model of Q_null with the
+# males set NA in the file and no --sex (the same samples and values)
+run s1_Q_null_female ok   "${S1[@]}" --traitType quantitative --phenoCol Q_null --sex F --covarColList "age,age2,PC1,PC2,PC3,PC4" --genotypePlink "${VR}" --outputPrefix "${OUT}/Q_null_female"
+run s1_Q_null_malesNA ok  "${S1[@]}" --traitType quantitative --phenoFile "${OUT}/pheno_qnull_malesNA.tsv" --phenoCol Q_null --covarColList "age,age2,PC1,PC2,PC3,PC4" --genotypePlink "${VR}" --outputPrefix "${OUT}/Q_null_malesNA"
 
 echo "== step 4 (FlexRV group file)"
 run s4_selftest ok python3 flexrv_score_from_alphamissense.py --selftest

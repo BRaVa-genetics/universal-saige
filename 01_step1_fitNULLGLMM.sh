@@ -9,6 +9,8 @@ SINGULARITY=false
 SAMPLEIDCOL="IID"
 RELCUTOFF="0.05"
 FORCE_DENSE_GRM=false
+FEMALE_CODE="0"
+MALE_CODE="1"
 OUT="out"
 TRAITTYPE=""
 PLINK=""
@@ -121,6 +123,16 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --femaleCode)
+      FEMALE_CODE="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --maleCode)
+      MALE_CODE="$2"
+      shift # past argument
+      shift # past value
+      ;;
     -h|--help)
       echo "usage: 01_step1_fitNULLGLMM.sh
   required:
@@ -141,8 +153,10 @@ while [[ $# -gt 0 ]]; do
       refused; not recommended.
     --relatednessCutoff (default: 0.05): the GRM is thinned to entries at or above it. MUST equal step 0's and step 2's
       (All of Us: 0.05, and 0.125 for amr); nothing in SAIGE checks it.
-    --sex ('M' or 'F'): for a sex-specific trait. Every sample with a non-missing phenotype must share one value of the
-      'sex' column (and equal --sex, when that column is coded M/F). Do not also pass sex as a covariate.
+    --sex ('M' or 'F'): for a sex-specific trait. SAIGE fits only the samples whose 'sex' column holds that sex's code
+      (--FemaleOnly/--MaleOnly, as All of Us did) and drops the rest. Leave every sex term out of the covariates.
+    --femaleCode, --maleCode (default 0, 1: BRaVa's phenotype coding): the values of the 'sex' column for each sex, when it
+      is numeric; a column of M and F is read as such. SAIGE's own default, and the All of Us file, use 1 for female.
     --dryRun: print the SAIGE command instead of running it.
   fit gates (the slim build): a binary trait fitted on fewer than 100 cases, a categorical covariate level with fewer
     than 10 cases or controls, a separated covariate model or a fit that did not converge is REFUSED, with the gate
@@ -202,12 +216,22 @@ if [[ ${PHENOCOL} == "" ]]; then
   exit 1
 fi
 
-# A sex-specific trait: every sample with a phenotype must carry the same value
-# in the 'sex' column. The coding of that column varies by cohort, so only an
-# M/F coding can also be compared with --sex itself.
+# A sex-specific trait, as All of Us fitted them: SAIGE keeps the samples whose
+# 'sex' equals the code (--FemaleOnly/--MaleOnly) and appends _FemaleOnly or
+# _MaleOnly to the output prefix, renamed back after the fit. The code is the
+# phenotype file's: F/M when the column holds F and M, else --femaleCode and
+# --maleCode, default 0 and 1 as BRaVa's phenotype curation writes them
+# (extract_BRaVa_phenotypes.r: female = sex 0). SAIGE's defaults and the All of
+# Us file use 1 for female, so the counts printed here are the check that the
+# code names the sex meant; no sample of that code with a phenotype is refused.
+SEX_ARGS=""; SEX_SUFFIX=""
 if [[ ${SEX:-} != "" ]]; then
   if [[ ${SEX} != "M" && ${SEX} != "F" ]]; then
     echo "--sex must be M or F"
+    exit 1
+  fi
+  if [[ ,${COVARCOLLIST},${CATEGCOVARCOLLIST}, == *,sex,* ]]; then
+    echo "--sex ${SEX}: 'sex' is also a covariate; leave every sex term (sex, age_sex, age2_sex) out of a sex-specific fit"
     exit 1
   fi
   fs=' '   # awk's whitespace splitting, unless the file is tab-delimited (empty fields keep their place)
@@ -219,17 +243,63 @@ if [[ ${SEX:-} != "" ]]; then
     echo "--sex ${SEX}: ${PHENOFILE} needs a 'sex' column and a '${PHENOCOL}' column"
     exit 1
   fi
-  sex_values=$(awk -F"${fs}" -v s="${sex_col_num}" -v p="${pheno_col_num}" \
-    'NR > 1 && $p != "NA" && $p != "" {print $s}' "${PHENOFILE}" | sort | uniq -c)
-  if (( $(grep -c . <<< "${sex_values}") > 1 )); then
-    echo "--sex ${SEX}: samples with a non-missing ${PHENOCOL} have more than one value of 'sex' (count, value):"
-    echo "${sex_values}"
+  if awk -F"${fs}" -v s="${sex_col_num}" 'NR > 1 && $s != "" && $s != "NA" && $s != "M" && $s != "F" { exit 1 }' "${PHENOFILE}"; then
+    female="F"; male="M"
+  else
+    female="${FEMALE_CODE}"; male="${MALE_CODE}"
+  fi
+  if [[ ${SEX} == "F" ]]; then code="${female}"; other="${male}"; else code="${male}"; other="${female}"; fi
+  # one pass: the sex column's values; samples with a phenotype kept and dropped;
+  # for a binary trait, the cases (1) kept and dropped
+  read -r n_kept n_dropped cases_kept cases_dropped sex_values <<< "$(awk -F"${fs}" -v s="${sex_col_num}" -v p="${pheno_col_num}" -v c="${code}" '
+    NR > 1 && $s != "" && $s != "NA" && !($s in seen) { seen[$s]; vals = vals (vals == "" ? "" : ",") $s }
+    NR > 1 && $p != "NA" && $p != "" { if ($s == c) { k++; ck += ($p == 1) } else { d++; cd += ($p == 1) } }
+    END { print k + 0, d + 0, ck + 0, cd + 0, vals }' "${PHENOFILE}")"
+  case_note=""; [[ ${TRAITTYPE} == "binary" ]] && case_note=" (${cases_kept} cases kept, ${cases_dropped} dropped)"
+  echo "--sex ${SEX}: the 'sex' column holds ${sex_values}; ${SEX} is coded ${code}"
+  # refusals: the code names nobody, or nobody with a phenotype, or (binary) no case
+  if [[ ,${sex_values}, != *,${code},* ]]; then
+    echo "REFUSED: --sex ${SEX} is coded ${code}, which is not a value of the 'sex' column (${sex_values})." >&2
+    echo "Set --femaleCode/--maleCode to the file's coding (default 0 female, 1 male: BRaVa's; SAIGE and All of Us use 1 for female)." >&2
     exit 1
   fi
-  observed_sex=$(awk '{print $2}' <<< "${sex_values}")
-  if [[ ( ${observed_sex} == "M" || ${observed_sex} == "F" ) && ${observed_sex} != "${SEX}" ]]; then
-    echo "--sex ${SEX}: samples with a non-missing ${PHENOCOL} are all sex ${observed_sex}"
+  if (( n_kept == 0 )); then
+    echo "REFUSED: no sample with sex == ${code} has a non-missing ${PHENOCOL} (${n_dropped} of the other sex do)." >&2
+    echo "Check --femaleCode/--maleCode (default 0 female, 1 male: BRaVa's coding; SAIGE and All of Us use 1 for female)." >&2
     exit 1
+  fi
+  if [[ ${TRAITTYPE} == "binary" ]] && (( cases_kept == 0 && cases_dropped > 0 )); then
+    echo "REFUSED: all ${cases_dropped} cases of ${PHENOCOL} have sex == ${other}, the sex being dropped: the codes look flipped." >&2
+    echo "Check --femaleCode/--maleCode (default 0 female, 1 male: BRaVa's coding; SAIGE and All of Us use 1 for female)." >&2
+    exit 1
+  fi
+  # loud warnings: what flipped or mismatched codes look like when they still leave samples to fit
+  warn=()
+  if [[ ,${sex_values}, != ",${code},${other}," && ,${sex_values}, != ",${other},${code}," ]]; then
+    warn+=("The 'sex' column holds ${sex_values}, not just ${female} (female) and ${male} (male): its coding may not be the one assumed.")
+  fi
+  # (quantitative only: a binary trait's other sex may be coded 0, controls, and its cases are the sharper test)
+  if [[ ${TRAITTYPE} != "binary" ]] && (( n_dropped > n_kept )); then
+    warn+=("More samples with a ${PHENOCOL} are of the sex being dropped (${n_dropped}) than kept (${n_kept}): are the codes flipped?")
+  fi
+  if [[ ${TRAITTYPE} == "binary" ]] && (( cases_dropped > 0 )); then
+    warn+=("${cases_dropped} cases of ${PHENOCOL} have sex == ${other}, the sex being dropped: flipped codes, or a trait that is not sex-specific?")
+  fi
+  if (( ${#warn[@]} > 0 )); then
+    {
+      echo "################################################################################"
+      echo "WARNING: THE SEX CODING LOOKS WRONG for --sex ${SEX} (coded ${code}; female ${female}, male ${male})."
+      for w in "${warn[@]}"; do echo "  - ${w}"; done
+      echo "  --femaleCode/--maleCode default to 0 and 1, BRaVa's coding; SAIGE and the All of"
+      echo "  Us file use 1 for female. Check the counts below before using this model."
+      echo "################################################################################"
+    } >&2
+  fi
+  echo "--sex ${SEX}: fitting the ${n_kept} samples with sex == ${code} and a non-missing ${PHENOCOL}; ${n_dropped} of the other sex are dropped${case_note}"
+  if [[ ${SEX} == "F" ]]; then
+    SEX_ARGS="--FemaleOnly=TRUE --sexCol=sex --FemaleCode=${code}"; SEX_SUFFIX="_FemaleOnly"
+  else
+    SEX_ARGS="--MaleOnly=TRUE --sexCol=sex --MaleCode=${code}"; SEX_SUFFIX="_MaleOnly"
   fi
 fi
 
@@ -335,7 +405,8 @@ cmd="""step1_fitNULLGLMM.R \
       --isCateVarianceRatio=TRUE \
       --tol ${TOL} \
       --SampleIDIncludeFile=${SAMPLEIDS} \
-      --isCovariateOffset TRUE"""
+      --isCovariateOffset TRUE \
+      ${SEX_ARGS}"""
 
 # A REFUSED fit (a gate, or any error after the output files were opened)
 # leaves 0-byte <prefix>.rda and .varianceRatio.txt behind, which a later step
@@ -344,6 +415,12 @@ cmd="""step1_fitNULLGLMM.R \
 set +e
 run_container; rc=$?
 set -e
+# a sex-specific fit's files carry SAIGE's _FemaleOnly/_MaleOnly suffix; step 2 expects <prefix>.rda
+if [[ -n ${SEX_SUFFIX} ]]; then
+  for ext in rda varianceRatio.txt; do
+    [[ -f ${OUT}${SEX_SUFFIX}.${ext} ]] && mv -f "${OUT}${SEX_SUFFIX}.${ext}" "${OUT}.${ext}"
+  done
+fi
 if (( rc != 0 )); then
   for f in "${OUT}.rda" "${OUT}.varianceRatio.txt"; do
     [[ -f ${f} && ! -s ${f} ]] && rm -f "${f}" && echo "removed empty ${f} (the fit was refused or failed; see the log)" >&2

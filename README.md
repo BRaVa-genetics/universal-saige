@@ -126,6 +126,8 @@ optional:
 - `--categCovarColList`: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
 - `--sampleIDCol` (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
 - `--relatednessCutoff` (default 0.05): the GRM is thinned to entries at or above it. It must equal step 0's and step 2's.
+- `--sex` (`M` or `F`): for a sex-specific trait. SAIGE fits only the samples of that sex (`--FemaleOnly`/`--MaleOnly`, as All of Us did) and drops the rest; step 1 prints how many it keeps and drops. Leave every sex term (`sex`, `age_sex`, `age2_sex`) out of the covariates; a `sex` covariate is refused.
+- `--femaleCode`, `--maleCode` (default `0`, `1`: BRaVa's phenotype coding): the values of a numeric `sex` column. A column of `M` and `F` is read as such. SAIGE's own default, and the All of Us file, use 1 for female. Step 1 refuses a code the column does not hold, a code no sample with a phenotype has, and (binary) a split that puts every case in the sex being dropped; it warns loudly when the column holds other values, when (quantitative) more samples with a phenotype are dropped than kept, or when (binary) some cases are in the sex being dropped. Each of these is what flipped or mismatched codes look like.
 - `--forceDenseGRM`: fit even when the sparse GRM has more than 100 relatives per sample on average, which is otherwise refused (see the note on refusals above); not recommended.
 
 ### Step 2 (once per chromosome per phenotype)

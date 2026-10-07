@@ -37,8 +37,12 @@ categorical_covariates=["sex"]
 
 # For a SEX-SPECIFIC trait, drop every sex term, as All of Us did: covariates
 # "age,age2,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20", no categorical covariates, and
-# add --sex F (or M) to the call below. The other sex's phenotype must be
-# missing (NA) in ${pheno_file}; step 1 refuses the trait otherwise.
+# add --sex F (or M) to the call below. Step 1 then fits only that sex
+# (SAIGE's --FemaleOnly/--MaleOnly, as All of Us did) and drops the rest. A
+# numeric 'sex' column is read as 0 = female, 1 = male (BRaVa's coding); if
+# yours is the other way round, add --femaleCode 1 --maleCode 0. Step 1 prints
+# how many samples it keeps and drops, refuses codes that select nobody (or no
+# case), and warns loudly when the split looks like flipped codes: check them.
 
 # Optional! Path to a sample ID file. This should be a single column of sample
 # IDs, with no header. The code will simply restrict the phenotype file to 

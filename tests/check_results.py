@@ -144,10 +144,15 @@ for name, text in [
     ("s2_refuse_partial_score", "has 299 for 300 region(s)"),
     ("s2_refuse_chr_name", "--chr chr7 is not in column 1 of"),
     ("s1_refuse_both_geno", "Pass ONE of --genotypePlink and --genotypePgen"),
-    ("s1_sex_mf_ok", "DRY RUN"),
-    ("s1_sex_mf_wrong", "are all sex F"),
-    ("s1_sex_mixed", "more than one value of 'sex'"),
-    ("s1_sex_numeric_ok", "DRY RUN"),
+    ("s1_sex_mf_ok", "--FemaleOnly=TRUE --sexCol=sex --FemaleCode=F"),
+    ("s1_sex_mf_wrong", "no sample with sex == M has a non-missing Q_f"),
+    ("s1_sex_mixed", "More samples with a Q_null are of the sex being dropped (1013) than kept (897)"),
+    ("s1_sex_code_absent", "is coded 0, which is not a value of the 'sex' column"),
+    ("s1_sex_binary_flipped", "cases of B_f have sex == 0, the sex being dropped: the codes look flipped"),
+    ("s1_sex_binary_both", "cases of B_pos have sex == 1, the sex being dropped"),
+    ("s1_sex_numeric_ok", "--FemaleOnly=TRUE --sexCol=sex --FemaleCode=0"),
+    ("s1_sex_flipped_code", "no sample with sex == 1 has a non-missing Q_female"),
+    ("s1_refuse_sex_covar", "'sex' is also a covariate"),
     ("s0_refuse_vcf", "geneticDataFormat must be in {plink,pgen}"),
     ("s0_refuse_no_out", "--outputPrefix is required"),
     ("s0_refuse_bad_relcut", "--relatednessCutoff must be a number between 0 and 1"),
@@ -254,7 +259,7 @@ check("step0: 0.125 drops the unrelated pairs 0.05 keeps", bool(n_spur_005) and 
       "%s at 0.05, %s at 0.125" % (n_spur_005, n_spur_0125), "> 0 at 0.05, 0 at 0.125")
 
 # ------------------------------------------------------------ step 1
-for trait in ("Q_pos", "Q_pos_pgen", "Q_null", "Q_perm", "B_pos", "B_rare", "Q_female"):
+for trait in ("Q_pos", "Q_pos_pgen", "Q_null", "Q_perm", "B_pos", "B_rare", "Q_female", "Q_null_female", "Q_null_malesNA"):
     section("s1_B_rare_ungated" if trait == "B_rare" else "s1_" + trait)
     vr = out(trait + ".varianceRatio.txt")
     rda = out(trait + ".rda")
@@ -268,6 +273,20 @@ for trait in ("Q_pos", "Q_pos_pgen", "Q_null", "Q_perm", "B_pos", "B_rare", "Q_f
     quant = trait.startswith("Q_")
     check("step1 %s: IRNT %s" % (trait, "applied" if quant else "not applied"), irnt == quant,
           "applied" if irnt else "not applied", "applied" if quant else "not applied")
+section("s1_Q_female", "s1_Q_null_female")
+section("s1_Q_null_female", "s1_Q_null_malesNA")
+check("step1 --sex F: SAIGE dropping the males == males NA in the file (VR bytes)",
+      same_bytes(out("Q_null_female.varianceRatio.txt"), out("Q_null_malesNA.varianceRatio.txt")), "", "identical")
+n_used = lambda name: next((l.split()[0] for l in log(name).splitlines() if "samples will be used for analysis" in l), None)
+check("step1 --sex F: same samples as males NA", n_used("s1_Q_null_female") == n_used("s1_Q_null_malesNA") is not None,
+      "%s vs %s" % (n_used("s1_Q_null_female"), n_used("s1_Q_null_malesNA")), "equal")
+for name in ("s1_sex_numeric_ok", "s1_sex_binary_ok", "s1_Q_female"):
+    check("no sex-coding warning: " + name, "SEX CODING LOOKS WRONG" not in log(name),
+          "absent" if "SEX CODING LOOKS WRONG" not in log(name) else "PRESENT", "absent", runs=[name])
+section("s1_Q_female", "s1_Q_null_female")
+for trait in ("Q_female", "Q_null_female"):
+    left = [f for f in os.listdir(OUT) if f.startswith(trait + "_FemaleOnly")]
+    check("step1 --sex F: SAIGE's _FemaleOnly files renamed: " + trait, not left, left or "none", "none")
 section("s1_Q_pos", "s1_Q_pos_pgen")
 check("step1: VR from --genotypePlink == --genotypePgen (bytes)",
       same_bytes(out("Q_pos.varianceRatio.txt"), out("Q_pos_pgen.varianceRatio.txt")), "", "identical")
