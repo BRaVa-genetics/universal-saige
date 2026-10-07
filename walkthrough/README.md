@@ -9,7 +9,7 @@
   * [Environment](#environment)
 * [Setup](#setup)
   * [Setup (if using Docker)](#setup-if-using-docker)
-  * [Setup (if using Singularity)](#setup-if-using-singularity)
+  * [Setup (if using Singularity or Apptainer)](#setup-if-using-singularity-or-apptainer)
 * [Step 0](#step-0)
 * [Step 1](#step-1)
 * [Step 2](#step-2)
@@ -28,38 +28,39 @@ If at any point you run into issues or have any questions please create an issue
 > [!WARNING]
 > A few things to be aware of:
 > - SAIGE can fail in a variety of ways due to low case count - we don't handle this within universal-SAIGE but step1/step2 failing across an entire phenotype x ancestry is a likely indicator for this
-> - When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results/crashes
+> - When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results/crashes. Drop every sex term (All of Us used `age,age2,PC1,...,PC20` and no categorical covariate), and pass `--sex F` or `--sex M` to step 1, which then fits only that sex and drops the rest (SAIGE's `--FemaleOnly`/`--MaleOnly`, as All of Us did). A numeric `sex` column is read as 0 = female, 1 = male, BRaVa's coding; add `--femaleCode 1 --maleCode 0` if yours is the other way round, and check the counts step 1 prints. Where the genotype file has genetic sex (`.fam` column 5, or the `.psam` `SEX` column; PLINK fixes 1 = male, 2 = female), step 1 checks the phenotype file's sex against it: more than half disagreeing means the codes are flipped and is refused, more than 1% is warned loudly, and a genotype file without usable sex (e.g. converted from VCF) is warned loudly as unverifiable. The phenotype file's `sex` always decides who is fitted.
 
 ## Requirements
 
 ### Data
 
 - Genotype data, plink (optional), ideally used in place of exome data for step 0
-- Exome data, VCF or plink. 
+- Exome data in PLINK 2 (`.pgen/.pvar/.psam`, recommended) or PLINK 1 (`.bed/.bim/.fam`) format; a VCF is converted once with plink2 (`plink2 --vcf exome.chr11.vcf.gz --make-pgen --out exome.chr11`). 
 - Sample IDs, (ancestry specific)
 - Annotation file ([details found here](https://docs.google.com/document/d/1emWqbX8ohi-9rYIW_pKSAFiMHZZUV6zyXwg7qWJNdlc/edit#heading=h.puz6ua3vxnca](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1)))
 - BRaVa phenotype file (.tsv) with 'IID' (sample ID) column and covariates
 
 ### Environment
 
-The only env requirement for this walkthrough is access to a linux machine with either Docker or Singularity available. With Docker or Singularity we can run Wei Zhou's [SAIGE Docker container](https://hub.docker.com/r/wzhou88/saige), giving guarantees that analyses across cohorts are equivalent and easily reproducible. 
+The only env requirement for this walkthrough is access to a linux machine with Docker, Singularity or Apptainer available (Apptainer is Singularity's successor; `--isSingularity true` uses whichever of `singularity` and `apptainer` is on PATH). With any of them we run the slim SAIGE build (`astheeggeggs/saige-slim` on Docker Hub, pinned by tag in `download_resources.sh`), which gives the same guarantee that analyses across cohorts are equivalent and reproducible. 
 
 ## Setup
 To run universal-saige we need to download plink and the SAIGE image. These steps are separated out into `download_resources.sh`:
 
 ### Setup (if using Docker)
 ```
-bash download_resources.sh --saige-image --plink
+bash download_resources.sh --saige-image --plink2 --plink
 ```
-### Setup (if using Singularity)
+### Setup (if using Singularity or Apptainer)
 ```
-bash download_resources.sh --saige-image --plink --singularity
+bash download_resources.sh --saige-image --plink2 --plink --singularity
 ```
+The image is pulled without a cache and unpacked next to `resources/saige.sif`, not in `/tmp` or `$HOME`, which are often small on clusters. Set `APPTAINER_TMPDIR` to unpack it somewhere else.
 
 ## Step 0 
 To start we must generate the sparse genetic relatedness matrix (GRM) and processed plink files for usage in variance ratio estimation during step 1. While this step may take several hours to run, it only has to be executed once per biobank/cohort.
 
-Step 0 supports (genotype data, plink format), (exome data, VCF format) and (exome data, plink format) as inputs although we reccomend the usage of (genotype, plink format) in order to reduce runtime and maximise the number of independent sites.
+Step 0 takes genotype or exome data in PLINK 1 (`--geneticDataFormat plink`) or PLINK 2 (`--geneticDataFormat pgen`) format, as steps 1 and 2 do; convert a VCF once with plink2 first. We recommend genotype array data here, to reduce runtime and maximise the number of independent sites.
 
 For this step we recommend using a larger machine - most functions in this step are parallelised across CPU cores and will benefit from high RAM. 
 
@@ -101,6 +102,8 @@ bash 00_step0_VR_and_GRM.sh \
     --generate_GRM
 ```
 
+The GRM keeps pairs related at 0.05 or more (`--relatednessCutoff`, default 0.05), and its file name records the value. The same value must be passed to steps 0, 1 and 2; nothing in SAIGE checks that they agree. All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05. Steps 0 and 1 print the GRM's mean number of relatives per sample (from the file header, so instantly), warn loudly above 100 (step 1 then refuses the GRM unless it is passed `--forceDenseGRM`), and warn when the GRM was built at a different cutoff from the step's; above 100 a fit can run for hours or never finish (All of Us amr: ~644 at 0.05, ~3.9 at 0.125; its other cohorts ~0.6).
+
 This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspecting the `out/` directory, we can see:
 ```
 .
@@ -133,7 +136,7 @@ bash 01_step1_fitNULLGLMM.sh \
     --genotypePlink out/walkthrough.plink_for_var_ratio \
     --phenoFile in/phenoFile.txt \
     --phenoCol "HDL_cholesterol" \
-    --covarColList "age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10" \
+    --covarColList "age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20" \
     --categCovarColList "sex" \
     --sampleIDs in/sample_ids.txt \
     --sampleIDCol "IID" \
@@ -145,7 +148,7 @@ bash 01_step1_fitNULLGLMM.sh \
 > [!WARNING]
 > A few things to note here:
 > - The column names flagged in `--phenoCol`, `--covarColList` and `--categCovarColList` must _exactly_ match the column names in the filepath flagged by `--phenoFile`
-> - The comma separated list of covariates flagged by `--covarColList` and `--categCovarColList` should not contain spaces (e.g. `age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10`)
+> - The comma separated list of covariates flagged by `--covarColList` and `--categCovarColList` should not contain spaces (e.g. `age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20`)
 > - If a categorical variable is to be included as a covariate, it should be flagged by _both_ `--covarColList` and `--categCovarColList` (e.g. `sex` in the above command)
   
 This command took 10 minutes with 4 cores. Checking the `out/` directory we can see:
@@ -166,6 +169,8 @@ This command took 10 minutes with 4 cores. Checking the `out/` directory we can 
 ## Step 2
 
 Step 2 requires variant annotations which can be generated [here](https://github.com/BRaVa-genetics/variant-annotation). A summary of the thresholds and software versioning used for variant annotation within BRaVa can be found [here](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1), but you don't need to worry about the annoying version alignment if you follow our [steps](https://github.com/BRaVa-genetics/variant-annotation).
+
+The labels in the `anno` lines are what `--annotations` refers to. Step 2 checks that every label you ask for appears in the group file, and refuses the run (listing the labels the file does have) if one does not. A group file written with other labels needs `--annotations` changed to match.
 
 The top of the file looks like this:
 
@@ -195,6 +200,22 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
+FlexRV on the same chromosome, once the AlphaMissense weights have been added to the group file
+(`bash download_resources.sh --alphamissense`, then `bash 04_flexrv_groupfile.sh --group in/ukb_brava_annotations.txt --chr 11 --name AM --out in/ukb_brava_annotations.flexrv_AM.txt`):
+```
+bash 02_step2_SPAtests_variant_and_gene.sh \
+    --chr chr11 \
+    --plink in/ukb_wes_450k.qced.chr11 \
+    --modelFile out/HDL_cholesterol.rda \
+    --varianceRatio out/HDL_cholesterol.varianceRatio.txt \
+    --groupFile in/ukb_brava_annotations.flexrv_AM.txt \
+    --flexRVscore AM \
+    --outputPrefix out/chr11_HDL_cholesterol.flexrv_AM \
+    --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
+    --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
+```
+The pooled FlexRV p per gene is the `Group == Cauchy` row's `Pvalue_Burden`; the other rows are the transform sets.
+
 > [!WARNING]
 > There's one more 'gotcha' here - you'll need to ensure that the chromosome name flagged by `--chr` _exactly_ matches the chromosome name in the .bim file. For example, if the chromosome is labelled as '11' in the first column of the .bim, `--chr chr11` will not work (but `--chr 11` will).
 
@@ -281,7 +302,7 @@ variant_results = pd.read_csv(variant_results, sep="\t")
 qqplot(variant_results, "HDL_cholesterol", "variant")
 ```
 
-Note that due to fast testing enables results with $P > 0.05$ may be skewed and affect the $\lambda_{GC}$ value. 
+The drivers run with fastTest off (the All of Us choice), so every _P_-value is computed in full, including those above 0.05, and $\lambda_{GC}$ can be read off the whole distribution.
 
 <img src="https://user-images.githubusercontent.com/43707014/236252715-93df0a07-9799-4e50-85af-c679631a4bc3.png" width="500">
 

@@ -1,4 +1,12 @@
 #!/bin/bash
+# SAIGE step 2: single-variant tests, SAIGE-GENE+ group tests, or FlexRV group
+# tests, for one chromosome. Genotypes are PLINK 2 (.pgen/.pvar/.psam,
+# recommended) or PLINK 1 (.bed/.bim/.fam). There is NO VCF input: the slim
+# SAIGE image has no VCF reader, and converting on every run would charge every
+# chromosome of every phenotype for a job that is done once -- convert first:
+#   resources/plink2 --vcf exome.chr20.vcf.gz --make-pgen --out exome.chr20
+# The choices below are the ones the All of Us production runs used
+# (astheeggeggs/saige-slim, docs/state/aou-saige-parameters.md).
 
 source ./run_container.sh
 
@@ -8,43 +16,27 @@ SINGULARITY=false
 OUT="out"
 TESTTYPE=""
 PLINK=""
+PGEN=""
 VCF=""
 MODELFILE=""
 VARIANCERATIO=""
 SPARSEGRM=""
 SPARSEGRMID=""
+RELCUTOFF="0.05"
 GROUPFILE=""
+ANNOTATIONS=""
+SUBSAMPLES=""
+CONDITION=""
+FLEXRV_SCORE=""
+FLEXRV_MAXMAF="0.001"
+FLEXRV_LOFANNO="pLoF"
+DRYRUN=false
 
 WD=$(pwd)
 HOME=$WD
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    # --ancestry)
-    #   ANC="$2"
-    #   shift # past argument
-    #   shift # past value
-    #   ;;
-    # --sex)
-    #   SEX="$2"
-    #   shift # past argument
-    #   shift # past value
-    #   ;;
-    # --dataset)
-    #   DATASET="$2"
-    #   shift # past argument
-    #   shift # past value
-    #   ;;
-    # --lastName)
-    #   LAST_NAME="$2"
-    #   shift # past argument
-    #   shift # past value
-    #   ;;
-    # --freezeNumber)
-    #   FREEZE_NUMBER="$2"
-    #   shift # past argument
-    #   shift # past value
-    #   ;;  
     -o|--outputPrefix)
       OUT="$2"
       shift # past argument
@@ -74,6 +66,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --pgen)
+      PGEN="$2"
+      shift # past argument
+      shift # past value
+      ;;
     --vcf)
       VCF="$2"
       shift # past argument
@@ -93,7 +90,7 @@ while [[ $# -gt 0 ]]; do
       GROUPFILE="$2"
       shift # past argument
       shift # past value
-      ;; 
+      ;;
     --annotations)
       ANNOTATIONS="$2"
       shift # past argument
@@ -114,39 +111,70 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --relatednessCutoff)
+      RELCUTOFF="$2"
+      shift # past argument
+      shift # past value
+      ;;
     --condition)
       CONDITION="$2"
       shift # past argument
       shift # past value
       ;;
-    # --phenotype)
-    #   PHENOCOL="$2"
-    #   shift # past argument
-    #   shift # past value
-    #   ;;
-    # --phenoFile)
-    #   PHENOFILE="$2"
-    #   shift # past argument
-    #   shift # past value
-    #   ;;
+    --flexRVscore)
+      FLEXRV_SCORE="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --flexRVmaxMAF)
+      FLEXRV_MAXMAF="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --flexRVlofAnno)
+      FLEXRV_LOFANNO="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --dryRun)
+      DRYRUN=true
+      shift # past argument
+      ;;
     -h|--help)
       echo "usage: 02_step2_SPAtests_variant_and_gene.sh
   required:
     --testType: type of test {variant,group}.
-    -p,--plink: plink filename prefix of bim/bed/fam files. This must be relative to, and contained within, the current working directory.
-    --vcf vcf exome file. If a plink exome file is not available then this vcf file will be used. This must be relative to, and contained within, the current working directory.
+    --pgen: plink 2 filename prefix of pgen/pvar/psam files (RECOMMENDED). This must be relative to, and contained within, the current working directory.
+    -p,--plink: plink 1 filename prefix of bim/bed/fam files, the alternative to --pgen.
     --modelFile: filename of the model file output from step 1. This must be relative to, and contained within, the current working directory.
     --varianceRatio: filename of the varianceRatio file output from step 1. This must be relative to, and contained within, the current working directory.
     --sparseGRM: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the current working directory.
     --sparseGRMID: filename of the sparseGRM ID file. This must be relative to, and contained within, the current working directory.
-    --chr: chromosome to test.
+    --chr: chromosome to test (spelled as in the .pvar/.bim, e.g. chr20 or 20; a spelling the file does not use is refused).
   optional:
-    -o,--outputPrefix:  output prefix of the SAIGE step 2 output.
-    -s,--isSingularity (default: false): is singularity available? If not, it is assumed that docker is available.
+    -o,--outputPrefix: output prefix of the SAIGE step 2 output. The results are <prefix>.txt; group tests also write
+      <prefix>.txt.singleAssoc.txt, .markerList.txt, .skatoMethod.txt (the p-value method of every SKAT-O cell), and the
+      sidecars .pooledTests.txt, .skatFailures.txt, .spaFallbacks.txt and, from image 152ffd8c, .exactByWeight.txt (weighted
+      cells one variant carries, given the exact test instead of the saddlepoint), .exactByWeightAboveCap.txt (such cells
+      with too many carriers to enumerate, left on the saddlepoint), .spaPinned.txt (binary: tests whose saddlepoint left
+      out samples the model holds certain) and .stretchGate.txt (binary weighted cells the variance ratio stretches; the
+      most stretched report the exact convolution). Each only when there is something to report; see the README.
+    -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
     -g,--groupFile: required if group test is selected. Filename of the annotation file used for group tests. This must be relative to, and contained within, the current working directory.
-    --annotations: required if group test is selected. comma seperated list of annotations to test found in groupfile. Please use
-    'pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous'
-    --condition: comma seperated list of SNPs to condition on. This must be in order of the SNP occurance in the dosage file.
+    --annotations: required if group test is selected. Comma separated list of annotation masks to test (':' joins labels INTO one mask, ',' separates masks). Please use
+      'pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous'
+      Every label (and every --flexRVlofAnno label) must be on an 'anno' line of the group file, or the run is refused.
+    --relatednessCutoff (default: 0.05): MUST equal the cutoff step 1 fitted under; nothing in SAIGE checks it.
+    --condition: comma separated list of SNPs to condition on. This must be in order of the SNP occurrence in the dosage file.
+    --subSampleFile: single-column file of sample IDs to restrict the test to.
+    --dryRun: print the SAIGE command instead of running it.
+  FlexRV (Schwartzentruber et al. 2025; a group test, burden statistic, 16 score x up to 12 MAF transforms per gene):
+    --flexRVscore NAME: run FlexRV on the group file's 'score:NAME' line, which every region must have, or the run is
+      refused (see 04_flexrv_groupfile.sh). Implies --testType group,
+      ONE annotation mask (default 'pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering'),
+      ONE max MAF (--flexRVmaxMAF, default 0.001) and r.corr = 1.
+    --flexRVlofAnno (default: pLoF): the label(s) the 'lof' score transform keys on; must be the labels used when the score line was built.
+  a VCF is refused: convert once with plink2 (--vcf FILE --make-pgen --out PREFIX) and pass --pgen.
       "
       shift # past argument
       ;;
@@ -164,13 +192,43 @@ done
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 # Checks
+check_relcutoff "${RELCUTOFF}"
+if [[ ${VCF} != "" ]]; then
+  echo "ERROR: --vcf is not accepted. The SAIGE image reads PLINK 2 (.pgen/.pvar/.psam) or PLINK 1 (.bed/.bim/.fam) only,"
+  echo "and a conversion on every run would be paid once per chromosome per phenotype. Convert ONCE, then pass --pgen:"
+  echo "    resources/plink2 --vcf ${VCF} --make-pgen --out <prefix>      (bash download_resources.sh --plink2 fetches plink2)"
+  exit 1
+fi
+
+if [[ ${FLEXRV_SCORE} != "" ]]; then
+  if [[ ${TESTTYPE} != "" && ${TESTTYPE} != "group" ]]; then
+    echo "--flexRVscore is a group test; --testType ${TESTTYPE} contradicts it"
+    exit 1
+  fi
+  TESTTYPE="group"
+  [[ ${ANNOTATIONS} == "" ]] && ANNOTATIONS="pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering"
+  if [[ ${ANNOTATIONS} == *,* ]]; then
+    echo "FlexRV tests ONE annotation mask (labels joined with ':'); --annotations '${ANNOTATIONS}' names several"
+    exit 1
+  fi
+  if [[ ${FLEXRV_MAXMAF} == *,* ]]; then
+    echo "FlexRV tests ONE max MAF; --flexRVmaxMAF '${FLEXRV_MAXMAF}' names several"
+    exit 1
+  fi
+fi
+
 if [[ ${TESTTYPE} == "" ]]; then
   echo "Test type not set"
   exit 1
 fi
 
-if [[ ${PLINK} == "" ]] && [[ ${VCF} == "" ]]; then
-  echo "plink files plink.{bim,bed,fam} and vcf not set"
+if [[ ${PLINK} == "" ]] && [[ ${PGEN} == "" ]]; then
+  echo "genotypes not set: pass --pgen <prefix> (recommended) or --plink <prefix>"
+  exit 1
+fi
+
+if [[ ${PLINK} != "" ]] && [[ ${PGEN} != "" ]]; then
+  echo "pass ONE of --pgen and --plink"
   exit 1
 fi
 
@@ -190,7 +248,7 @@ if [[ ${MODELFILE} == "" ]]; then
 fi
 
 if [[ ${VARIANCERATIO} == "" ]]; then
-  echo "variance ration file not set"
+  echo "variance ratio file not set"
   exit 1
 fi
 
@@ -201,6 +259,77 @@ fi
 
 if [[ $ANNOTATIONS == "" ]] && [[ ${TESTTYPE} == "group" ]]; then
   echo "attempting to run group tests without selected annotations"
+  exit 1
+fi
+
+# Every label the masks name (and, for FlexRV, every --flexRVlofAnno label) must
+# be on an `anno` line of the group file. SAIGE checks nothing of the kind for
+# the masks, and only warns for the lof labels (saige-slim LEDGER #170), so a
+# typo, or BRaVa labels against a group file written with other ones (AoU's say
+# damaging_missense where BRaVa's say damaging_missense_or_protein_altering),
+# would test a smaller mask, or an empty one, under the name asked for.
+if [[ ${TESTTYPE} == "group" ]]; then
+  if [[ ! -s ${GROUPFILE} ]]; then
+    echo "ERROR: group file '${GROUPFILE}' not found or empty"
+    exit 1
+  fi
+  case ${GROUPFILE} in *.gz|*.bgz) read_group="gzip -cd" ;; *) read_group="cat" ;; esac
+  asked="${ANNOTATIONS}"
+  [[ ${FLEXRV_SCORE} != "" ]] && asked="${asked},${FLEXRV_LOFANNO}"
+  # line 1: the labels asked for that the file lacks; line 2: the labels it has;
+  # line 3: regions (var lines) and, for FlexRV, score:<NAME> lines
+  labels=$(${read_group} "${GROUPFILE}" | awk -v asked="${asked}" -v score="score:${FLEXRV_SCORE}" '
+    $2 == "var" { nvar++ }
+    $2 == score { nscore++ }
+    $2 == "anno" { for (i = 3; i <= NF; i++) if (!($i in seen)) { seen[$i]; order[++n] = $i } }
+    END {
+      m = split(asked, a, /[,:;]/)
+      for (i = 1; i <= m; i++) if (a[i] != "" && !(a[i] in seen) && !(a[i] in told)) { told[a[i]]; miss = miss " " a[i] }
+      for (i = 1; i <= n; i++) have = have " " order[i]
+      print miss; print have; print nvar + 0, nscore + 0
+    }')
+  missing=$(echo "${labels}" | sed -n 1p)
+  if [[ -n ${missing# } ]]; then
+    echo "ERROR: annotation label(s) asked for but on no variant in the group file:${missing}"
+    echo "  group file:         ${GROUPFILE}"
+    echo "  labels it has:     $(echo "${labels}" | sed -n 2p)"
+    echo "  --annotations:      ${ANNOTATIONS}"
+    [[ ${FLEXRV_SCORE} != "" ]] && echo "  --flexRVlofAnno:    ${FLEXRV_LOFANNO}"
+    if [[ ${FLEXRV_SCORE} != "" ]]; then
+      echo "Pass --annotations (ONE mask, labels joined with ':') and --flexRVlofAnno with labels the file has to the FlexRV"
+      echo "call (in templates/step_2_template.sh: section 3, which uses the defaults), or pass the group file they were written for."
+    else
+      echo "Change --annotations in your step-2 call to labels the file has (in templates/step_2_template.sh: the 'annots'"
+      echo "line), or pass the group file those labels were written for."
+    fi
+    exit 1
+  fi
+  # FlexRV reads its weights from a score:<NAME> line, which every region needs
+  # (one value per variant on its var line; 04_flexrv_groupfile.sh writes them).
+  # The AoU step-2 wrapper refuses a file that lacks them before any compute.
+  if [[ ${FLEXRV_SCORE} != "" ]]; then
+    read -r nvar nscore <<< "$(echo "${labels}" | sed -n 3p)"
+    if (( nscore != nvar )); then
+      echo "ERROR: --flexRVscore ${FLEXRV_SCORE} needs one 'score:${FLEXRV_SCORE}' line per region; ${GROUPFILE}"
+      echo "  has ${nscore} for ${nvar} region(s). Build the file with 04_flexrv_groupfile.sh --name ${FLEXRV_SCORE}, or pass the"
+      echo "  name of the score line the file does carry."
+      exit 1
+    fi
+  fi
+fi
+
+if [[ ${CHR:-} == "" ]]; then
+  echo "--chr not set"
+  exit 1
+fi
+
+# --chr must be spelled as column 1 of the .pvar/.bim spells it ("20" vs "chr20"):
+# SAIGE matches it exactly, and a mismatch is not an error there. The AoU
+# step-2 wrapper refuses it before any compute; so does this.
+if [[ ${PGEN} != "" ]]; then varfile="${PGEN}.pvar"; else varfile="${PLINK}.bim"; fi
+if [[ -r ${varfile} ]] && ! awk -v c="${CHR}" '!/^#/ && $1 == c { found = 1; exit } END { exit !found }' "${varfile}"; then
+  echo "ERROR: --chr ${CHR} is not in column 1 of ${varfile}, which has: $(awk '!/^#/ { if (!($1 in s)) { s[$1]; printf "%s ", $1; if (++n == 5) exit } }' "${varfile}")"
+  echo "  Pass --chr spelled as the file spells it (e.g. '20' or 'chr20')."
   exit 1
 fi
 
@@ -215,82 +344,68 @@ fi
 echo "OUT               = ${OUT}"
 echo "TESTTYPE          = ${TESTTYPE}"
 echo "SINGULARITY       = ${SINGULARITY}"
-echo "PLINK             = ${PLINK}.{bim/bed/fam}"
+echo "PGEN              = ${PGEN:+${PGEN}.{pgen/pvar/psam}}"
+echo "PLINK             = ${PLINK:+${PLINK}.{bim/bed/fam}}"
 echo "MODELFILE         = ${MODELFILE}"
 echo "VARIANCERATIO     = ${VARIANCERATIO}"
 echo "GROUPFILE         = ${GROUPFILE}"
-echo "ANNOTATIONS"      = ${ANNOTATIONS}
+echo "ANNOTATIONS       = ${ANNOTATIONS}"
 echo "SPARSEGRM         = ${SPARSEGRM}"
 echo "SPARSEGRMID       = ${SPARSEGRMID}"
+echo "RELCUTOFF         = ${RELCUTOFF}"
 echo "CONDITION         = ${CONDITION}"
+echo "FLEXRV            = ${FLEXRV_SCORE:-off}${FLEXRV_SCORE:+ (maxMAF ${FLEXRV_MAXMAF}, lof labels ${FLEXRV_LOFANNO})}"
 
 # For debugging
-set -exo pipefail
+set -eo pipefail
 
 ## Set up directories
 WD=$( pwd )
-
-# Get number of threads
-n_threads=$(( $(nproc --all) - 1 ))
-
-## Set up directories
-WD=$( pwd )
-
 
 if [[ "$TESTTYPE" = "variant" ]]; then
   echo "variant testing"
-  min_mac="0.5"
+  min_mac="4"
   GROUPFILE=""
+  GROUP_ARGS=""
 else
   echo "gene testing"
   min_mac="0.5"
   GROUPFILE="${HOME}/${GROUPFILE}"
+  GROUP_ARGS="--groupFile=${GROUPFILE} --annotation_in_groupTest=${ANNOTATIONS} --is_output_markerList_in_groupTest=TRUE --is_single_in_groupTest=TRUE"
+  if [[ ${FLEXRV_SCORE} != "" ]]; then
+    GROUP_ARGS="${GROUP_ARGS} --maxMAF_in_groupTest=${FLEXRV_MAXMAF} --flexRV_score=${FLEXRV_SCORE} --flexRV_maxMAF=${FLEXRV_MAXMAF} --flexRV_lofAnno=${FLEXRV_LOFANNO} --r.corr=1"
+  else
+    GROUP_ARGS="${GROUP_ARGS} --maxMAF_in_groupTest=0.0001,0.001,0.01"
+  fi
 fi
 
-if [[ ${PLINK} != "" ]]; then
-  PLINK="${HOME}/${PLINK}"
-  BED=${PLINK}".bed"
-  BIM=${PLINK}".bim"
-  FAM=${PLINK}".fam"
-  VCF=""
-elif [[ ${VCF} != "" ]]; then 
-  BED=""
-  BIM=""
-  FAM="" 
-  VCF="${VCF}"
+if [[ ${PGEN} != "" ]]; then
+  GENO_ARGS="--pgenFile=${HOME}/${PGEN}.pgen --pvarFile=${HOME}/${PGEN}.pvar --psamFile=${HOME}/${PGEN}.psam"
 else
-  echo "No plink or vcf found!"
-  exit 1
+  GENO_ARGS="--bedFile=${HOME}/${PLINK}.bed --bimFile=${HOME}/${PLINK}.bim --famFile=${HOME}/${PLINK}.fam"
 fi
 
+# Firth off and fastTest off are the All of Us production choices: fastTest is
+# a two-stage screen on the variant path and inert on the region path, and
+# Firth was most of the CPU of a binary scan for effect sizes the tests do not
+# use. Missingness and imputation are the build's defaults (0.15, best_guess).
 cmd="step2_SPAtests.R \
-        --bedFile=$BED \
-        --bimFile=$BIM \
-        --famFile=$FAM \
-        --groupFile=$GROUPFILE \
-        --annotation_in_groupTest=$ANNOTATIONS \
-        --vcfFile=${VCF} \
-        --vcfField="DS" \
-        --chrom="$CHR" \
+        ${GENO_ARGS} \
+        ${GROUP_ARGS} \
+        --chrom=${CHR} \
         --minMAF=0 \
         --minMAC=${min_mac} \
         --GMMATmodelFile=${HOME}/${MODELFILE} \
         --varianceRatioFile=${HOME}/${VARIANCERATIO} \
         --sparseGRMFile=${HOME}/${SPARSEGRM} \
         --sparseGRMSampleIDFile=${HOME}/${SPARSEGRMID} \
-        --subSampleFile=${SUBSAMPLES} \
+        --relatednessCutoff=${RELCUTOFF} \
         --LOCO=FALSE \
-        --is_Firth_beta=TRUE \
-        --pCutoffforFirth=0.1 \
+        --is_Firth_beta=FALSE \
+        --is_fastTest=FALSE \
         --is_output_moreDetails=TRUE \
-        --is_fastTest=TRUE \
-        --is_output_markerList_in_groupTest=TRUE \
-        --is_single_in_groupTest=TRUE \
-        --maxMAF_in_groupTest=0.0001,0.001,0.01 \
-        --SAIGEOutputFile=${HOME}/${OUT}.txt \
-        --condition="$CONDITION" \
-        --maxMissing=1 \
-        --impute_method="mean"
-    "
+        --SAIGEOutputFile=${HOME}/${OUT}.txt"
+[[ ${SUBSAMPLES} != "" ]] && cmd="${cmd} --subSampleFile=${SUBSAMPLES}"
+[[ ${CONDITION}  != "" ]] && cmd="${cmd} --condition=${CONDITION}"
 
 run_container

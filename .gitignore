@@ -1,2 +1,4 @@
 resources/
 in/
+tests/work/
+__pycache__/
