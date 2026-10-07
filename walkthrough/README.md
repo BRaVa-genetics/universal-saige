@@ -72,7 +72,7 @@ cd universal-saige
 mkdir -p out in/genotypes
 ```
 
-For this walkthrough we will be running step 0 with plink files based on genotype array data, in a directory of their own: step 0 merges every `.bed` (or `.pgen`) in `--geneticDataDirectory`, so the exome files used in step 2 must not be in it. sample_ids.txt is a file with newline separated sample IDs.
+For this walkthrough we will be running step 0 with genotype array data, which UK Biobank supplies as PLINK 1 (`--geneticDataFormat plink`); array data in PLINK 2 takes `--geneticDataFormat pgen`, the recommended format. The files go in a directory of their own: step 0 merges every `.bed` (or `.pgen`) in `--geneticDataDirectory`, so the exome files used in step 2 must not be in it. sample_ids.txt is a file with newline separated sample IDs.
 
 > [!NOTE]
 > Docker and Singularity require all input files to be within one directory that must not contain any linked files (so no `ln -s` your input files into your dir).
@@ -154,6 +154,7 @@ bash 01_step1_fitNULLGLMM.sh \
 > - The column names flagged in `--phenoCol`, `--covarColList` and `--categCovarColList` must _exactly_ match the column names in the filepath flagged by `--phenoFile`
 > - The comma separated list of covariates flagged by `--covarColList` and `--categCovarColList` should not contain spaces (e.g. `age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20`)
 > - If a categorical variable is to be included as a covariate, it should be flagged by _both_ `--covarColList` and `--categCovarColList` (e.g. `sex` in the above command)
+> - `--genotypePlink` takes step 0's variance-ratio markers, which step 0 writes as PLINK 1; that is the one PLINK 1 input to pass as is (`--genotypePgen` takes a PLINK 2 copy, with byte-identical results). Every other genotype input should be PLINK 2.
   
 This command took 10 minutes with 4 cores. Checking the `out/` directory we can see:
 
@@ -189,13 +190,18 @@ ENSG00000187961 anno synonymous damaging_missense_or_protein_altering pLoF
 
 Here, each gene (coded according to ensembl ID in column 1) receives two lines, a variant line (`var`) and an annotation line `anno` (column two). All subsequent information on each pair of gene specific lines contains space delimited information mapping the variant information onto the associated annotation(s). 
 
-Finally, we perform the association testing for chromosome 11:
+Finally, we perform the association testing for chromosome 11. The exome data is converted to PLINK 2 once, which step 2 reads directly and which is smaller:
+
+```
+resources/plink2 --bfile in/ukb_wes_450k.qced.chr11 --make-pgen --out in/ukb_wes_450k.qced.chr11
+```
+
 
 ```
 bash 02_step2_SPAtests_variant_and_gene.sh \
     --chr chr11 \
     --testType "group" \
-    --plink in/ukb_wes_450k.qced.chr11 \
+    --pgen in/ukb_wes_450k.qced.chr11 \
     --modelFile out/HDL_cholesterol.rda \
     --varianceRatio out/HDL_cholesterol.varianceRatio.txt \
     --groupFile in/ukb_brava_annotations.txt \
@@ -209,7 +215,7 @@ FlexRV on the same chromosome, once the AlphaMissense weights have been added to
 ```
 bash 02_step2_SPAtests_variant_and_gene.sh \
     --chr chr11 \
-    --plink in/ukb_wes_450k.qced.chr11 \
+    --pgen in/ukb_wes_450k.qced.chr11 \
     --modelFile out/HDL_cholesterol.rda \
     --varianceRatio out/HDL_cholesterol.varianceRatio.txt \
     --groupFile in/ukb_brava_annotations.flexrv_AM.txt \

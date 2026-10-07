@@ -9,9 +9,10 @@
 # exome files step 2 reads.
 genetic_data_directory=["in/genotypes/"]
 
-# PLINK 1 (.bed/.bim/.fam) or PLINK 2 (.pgen/.pvar/.psam). A VCF is refused:
-# convert it once with resources/plink2 --vcf FILE.vcf.gz --make-pgen --out PREFIX
-GENETIC_DATA_FORMAT={"plink","pgen"}
+# PLINK 2 (.pgen/.pvar/.psam), RECOMMENDED, or PLINK 1 (.bed/.bim/.fam) if that
+# is what your array data is in. A VCF is refused: convert it once with
+#   resources/plink2 --vcf FILE.vcf.gz --make-pgen --out PREFIX
+GENETIC_DATA_FORMAT={"pgen","plink"}
 
 GENETIC_DATA_TYPE={"WES","WGS","genotype"}
 
