@@ -35,6 +35,11 @@ covariates=["age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,P
 # included in both ${covariates} and ${categorical_covariates}. 
 categorical_covariates=["sex"]
 
+# For a SEX-SPECIFIC trait, drop every sex term, as All of Us did: covariates
+# "age,age2,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20", no categorical covariates, and
+# add --sex F (or M) to the call below. The other sex's phenotype must be
+# missing (NA) in ${pheno_file}; step 1 refuses the trait otherwise.
+
 # Optional! Path to a sample ID file. This should be a single column of sample
 # IDs, with no header. The code will simply restrict the phenotype file to 
 # these samples.

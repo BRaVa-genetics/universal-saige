@@ -28,7 +28,7 @@ If at any point you run into issues or have any questions please create an issue
 > [!WARNING]
 > A few things to be aware of:
 > - SAIGE can fail in a variety of ways due to low case count - we don't handle this within universal-SAIGE but step1/step2 failing across an entire phenotype x ancestry is a likely indicator for this
-> - When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results/crashes
+> - When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results/crashes. Drop every sex term (All of Us used `age,age2,PC1,...,PC20` and no categorical covariate), pass `--sex F` or `--sex M` to step 1, and code the other sex's phenotype as missing (NA): step 1 refuses the trait otherwise.
 
 ## Requirements
 
