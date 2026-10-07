@@ -275,6 +275,44 @@ if [[ ${SEX:-} != "" ]]; then
   fi
   # loud warnings: what flipped or mismatched codes look like when they still leave samples to fit
   warn=()
+  # Genetic sex, where the genotype file has it, is a reference whose coding the
+  # format fixes (PLINK: 1 male, 2 female), so it can check the phenotype file's
+  # codes. The phenotype file still decides who is fitted (SAIGE filters on it).
+  # A .psam may have no SEX column, and a .fam may carry 0 (unknown) for all, as
+  # data converted from VCF usually does: then the codes cannot be checked.
+  if [[ ${GENOTYPE_PGEN} != "" ]]; then genofile="${GENOTYPE_PGEN}.psam"; else genofile="${GENOTYPE_PLINK}.fam"; fi
+  id_col_num=$(grep -n -x -F "${SAMPLEIDCOL}" <<< "${header}" | cut -d: -f1)
+  if [[ ! -r ${genofile} || ${id_col_num} == "" ]]; then
+    echo "--sex ${SEX}: genetic sex not checked (${genofile} not readable, or no ${SAMPLEIDCOL} column in ${PHENOFILE})"
+  else
+    # genetic sex per IID: 1 male, 2 female, anything else unknown
+    read -r g_males g_females n_compared n_discordant <<< "$(awk -v psam="${GENOTYPE_PGEN}" -v gf="${genofile}" \
+        -v idc="${id_col_num}" -v s="${sex_col_num}" -v fc="${female}" -v mc="${male}" '
+      FILENAME == gf {
+        if (psam != "") {                       # .psam: a #FID/#IID header naming IID and SEX
+          if (FNR == 1) { for (i = 1; i <= NF; i++) { h = $i; sub(/^#/, "", h); if (h == "IID") ic = i; if (toupper(h) == "SEX") sc = i }; next }
+          id = $ic; g = sc ? $sc : ""
+        } else { id = $2; g = $5 }              # .fam: FID IID father mother sex phenotype
+        g = (g == "1" || g == "M" || g == "m") ? 1 : (g == "2" || g == "F" || g == "f") ? 2 : 0
+        if (g) { gsex[id] = g; if (g == 1) nm++; else nf++ }
+        next
+      }
+      FNR > 1 && ($idc in gsex) && ($s == fc || $s == mc) { n++; if (($s == fc ? 2 : 1) != gsex[$idc]) d++ }
+      END { print nm + 0, nf + 0, n + 0, d + 0 }' "${genofile}" FS="${fs}" "${PHENOFILE}")"   # whitespace for the genotype file, the phenotype file's own after
+    if (( g_males == 0 || g_females == 0 || n_compared == 0 )); then
+      warn+=("The genotype file (${genofile}) has no usable genetic sex (${g_males} male, ${g_females} female, ${n_compared} matched), so the codes cannot be checked against it. The phenotype file's 'sex' column decides who is fitted.")
+    else
+      pct=$(awk -v d="${n_discordant}" -v n="${n_compared}" 'BEGIN { printf "%.1f", 100 * d / n }')
+      echo "--sex ${SEX}: genetic sex (${genofile}) agrees with the phenotype file's for $(( n_compared - n_discordant )) of ${n_compared} samples (${pct}% discordant)"
+      if awk -v d="${n_discordant}" -v n="${n_compared}" 'BEGIN { exit !(d > n / 2) }'; then
+        echo "REFUSED: under --femaleCode ${female} / --maleCode ${male}, ${pct}% of samples disagree with their genetic sex" >&2
+        echo "(${genofile}, where 1 is male and 2 female): the codes are flipped. Set --femaleCode/--maleCode to the phenotype file's coding." >&2
+        exit 1
+      elif awk -v d="${n_discordant}" -v n="${n_compared}" 'BEGIN { exit !(d > n / 100) }'; then
+        warn+=("${n_discordant} of ${n_compared} samples (${pct}%) have a 'sex' that disagrees with their genetic sex in ${genofile}: more than sample QC usually leaves. The phenotype file's 'sex' decides who is fitted.")
+      fi
+    fi
+  fi
   if [[ ,${sex_values}, != ",${code},${other}," && ,${sex_values}, != ",${other},${code}," ]]; then
     warn+=("The 'sex' column holds ${sex_values}, not just ${female} (female) and ${male} (male): its coding may not be the one assumed.")
   fi
@@ -288,7 +326,7 @@ if [[ ${SEX:-} != "" ]]; then
   if (( ${#warn[@]} > 0 )); then
     {
       echo "################################################################################"
-      echo "WARNING: THE SEX CODING LOOKS WRONG for --sex ${SEX} (coded ${code}; female ${female}, male ${male})."
+      echo "WARNING: CHECK THE SEX CODING for --sex ${SEX} (coded ${code}; female ${female}, male ${male})."
       for w in "${warn[@]}"; do echo "  - ${w}"; done
       echo "  --femaleCode/--maleCode default to 0 and 1, BRaVa's coding; SAIGE and the All of"
       echo "  Us file use 1 for female. Check the counts below before using this model."

@@ -160,6 +160,15 @@ run s1_B_pos         ok   "${S1[@]}" --traitType binary --phenoCol B_pos  --cova
 run s1_B_rare_gated  fail "${S1[@]}" --traitType binary --phenoCol B_rare --covarColList "${COV}" --categCovarColList sex --genotypePlink "${VR}" --outputPrefix "${OUT}/B_rare_gated"
 run s1_B_rare_ungated ok  env SAIGE_FIT_GATES=0 "${S1[@]}" --traitType binary --phenoCol B_rare --covarColList "${COV}" --categCovarColList sex --genotypePlink "${VR}" --outputPrefix "${OUT}/B_rare"
 run s1_Q_female      ok   "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList "age,age2,PC1,PC2,PC3,PC4" --genotypePlink "${VR}" --outputPrefix "${OUT}/Q_female"
+# genetic sex against the phenotype file's: flipped codes with a phenotype in both sexes (refused);
+# a .fam with sex 0 for everyone, as data from VCF has (warned: cannot check); 1 in 20 sexes swapped (warned)
+for v in nosex partial; do cp "${VR}.bed" "${OUT}/vr_${v}.bed"; cp "${VR}.bim" "${OUT}/vr_${v}.bim"; done
+awk '{ $5 = 0; print }' "${VR}.fam" > "${OUT}/vr_nosex.fam"
+awk 'NR % 20 == 0 { $5 = ($5 == 1) ? 2 : 1 } { print }' "${VR}.fam" > "${OUT}/vr_partial.fam"
+run s1_sex_genetic_flipped fail "${S1[@]}" --traitType quantitative --phenoCol Q_null --sex F --femaleCode 1 --maleCode 0 --covarColList age,age2 --genotypePlink "${VR}" --dryRun
+run s1_sex_genetic_unknown ok   "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList age,age2 --genotypePlink "${OUT}/vr_nosex" --dryRun
+run s1_sex_genetic_partial ok   "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList age,age2 --genotypePlink "${OUT}/vr_partial" --dryRun
+run s1_sex_genetic_pgen    ok   "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList age,age2 --genotypePgen "${VR}" --dryRun
 # Q_null, --sex F: SAIGE drops the males (--FemaleOnly), which must give exactly the model of Q_null with the
 # males set NA in the file and no --sex (the same samples and values)
 run s1_Q_null_female ok   "${S1[@]}" --traitType quantitative --phenoCol Q_null --sex F --covarColList "age,age2,PC1,PC2,PC3,PC4" --genotypePlink "${VR}" --outputPrefix "${OUT}/Q_null_female"

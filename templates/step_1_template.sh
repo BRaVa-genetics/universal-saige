@@ -43,6 +43,8 @@ categorical_covariates=["sex"]
 # yours is the other way round, add --femaleCode 1 --maleCode 0. Step 1 prints
 # how many samples it keeps and drops, refuses codes that select nobody (or no
 # case), and warns loudly when the split looks like flipped codes: check them.
+# Where the genotype file carries genetic sex, step 1 also checks the codes
+# against it (refusing flipped ones); without it, it warns that it cannot.
 
 # Optional! Path to a sample ID file. This should be a single column of sample
 # IDs, with no header. The code will simply restrict the phenotype file to 

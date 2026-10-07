@@ -150,6 +150,11 @@ for name, text in [
     ("s1_sex_code_absent", "is coded 0, which is not a value of the 'sex' column"),
     ("s1_sex_binary_flipped", "cases of B_f have sex == 0, the sex being dropped: the codes look flipped"),
     ("s1_sex_binary_both", "cases of B_pos have sex == 1, the sex being dropped"),
+    ("s1_sex_genetic_flipped", "100.0% of samples disagree with their genetic sex"),
+    ("s1_sex_genetic_unknown", "has no usable genetic sex (0 male, 0 female"),
+    ("s1_sex_genetic_partial", "94 of 1873 samples (5.0%) have a 'sex' that disagrees with their genetic sex"),
+    ("s1_sex_genetic_pgen", "plink_for_var_ratio.psam) agrees with the phenotype file's for 1873 of 1873 samples"),
+    ("s1_Q_female", "plink_for_var_ratio.fam) agrees with the phenotype file's for 1873 of 1873 samples"),
     ("s1_sex_numeric_ok", "--FemaleOnly=TRUE --sexCol=sex --FemaleCode=0"),
     ("s1_sex_flipped_code", "no sample with sex == 1 has a non-missing Q_female"),
     ("s1_refuse_sex_covar", "'sex' is also a covariate"),
@@ -280,9 +285,9 @@ check("step1 --sex F: SAIGE dropping the males == males NA in the file (VR bytes
 n_used = lambda name: next((l.split()[0] for l in log(name).splitlines() if "samples will be used for analysis" in l), None)
 check("step1 --sex F: same samples as males NA", n_used("s1_Q_null_female") == n_used("s1_Q_null_malesNA") is not None,
       "%s vs %s" % (n_used("s1_Q_null_female"), n_used("s1_Q_null_malesNA")), "equal")
-for name in ("s1_sex_numeric_ok", "s1_sex_binary_ok", "s1_Q_female"):
-    check("no sex-coding warning: " + name, "SEX CODING LOOKS WRONG" not in log(name),
-          "absent" if "SEX CODING LOOKS WRONG" not in log(name) else "PRESENT", "absent", runs=[name])
+for name in ("s1_sex_numeric_ok", "s1_sex_binary_ok", "s1_Q_female", "s1_sex_genetic_pgen"):
+    check("no sex-coding warning: " + name, "CHECK THE SEX CODING" not in log(name),
+          "absent" if "CHECK THE SEX CODING" not in log(name) else "PRESENT", "absent", runs=[name])
 section("s1_Q_female", "s1_Q_null_female")
 for trait in ("Q_female", "Q_null_female"):
     left = [f for f in os.listdir(OUT) if f.startswith(trait + "_FemaleOnly")]
