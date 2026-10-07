@@ -100,6 +100,8 @@ while [[ $# -gt 0 ]]; do
       ;;
     --sampleIDs)
       SAMPLEIDS="$2"
+      # an empty value (e.g. an unset variable) would let --sampleIDs swallow the next flag
+      [[ ${SAMPLEIDS} == "" || ${SAMPLEIDS} == -* ]] && { echo "--sampleIDs needs a file; to use every sample, leave the flag out"; exit 1; }
       shift
       shift
       ;;

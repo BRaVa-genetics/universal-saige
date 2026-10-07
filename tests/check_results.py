@@ -161,6 +161,7 @@ for name, text in [
     ("s0_refuse_vcf", "geneticDataFormat must be in {plink,pgen}"),
     ("s0_refuse_no_out", "--outputPrefix is required"),
     ("s0_refuse_bad_relcut", "--relatednessCutoff must be a number between 0 and 1"),
+    ("s1_refuse_empty_ids", "--sampleIDs needs a file; to use every sample, leave the flag out"),
     ("s1_refuse_bad_relcut", "--relatednessCutoff must be a number between 0 and 1"),
     ("s1_relcut_dryrun", "--relatednessCutoff 0.125"),
     ("s3_nglmm_nomount", "does not exist"),

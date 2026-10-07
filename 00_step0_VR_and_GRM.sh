@@ -165,7 +165,9 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     --sampleIDs)
-      SAMPLEIDS="$2" 
+      SAMPLEIDS="$2"
+      # an empty value (e.g. an unset variable) would let --sampleIDs swallow the next flag
+      [[ ${SAMPLEIDS} == "" || ${SAMPLEIDS} == -* ]] && { echo "--sampleIDs needs a file; to use every sample, leave the flag out"; exit 1; }
       shift
       shift
       ;; 

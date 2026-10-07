@@ -13,6 +13,7 @@
 * [Step 0](#step-0)
 * [Step 1](#step-1)
 * [Step 2](#step-2)
+* [Step 3](#step-3)
 
 ## Introduction
 
@@ -27,7 +28,7 @@ If at any point you run into issues or have any questions please create an issue
 ## Caution
 > [!WARNING]
 > A few things to be aware of:
-> - SAIGE can fail in a variety of ways due to low case count - we don't handle this within universal-SAIGE but step1/step2 failing across an entire phenotype x ancestry is a likely indicator for this
+> - A binary trait with fewer than 100 cases (in the fitted samples), a categorical covariate level with fewer than 10 cases or controls, a separated covariate model, or a fit that did not converge is refused in step 1, and again in step 2, with the reason in the log. That refusal is the right answer for such a trait; `SAIGE_FIT_GATES=0` turns it into a warning (not recommended).
 > - When running sex-specific phenotypes do not include sex as a covariate. This can cause invalid results/crashes. Drop every sex term (All of Us used `age,age2,PC1,...,PC20` and no categorical covariate), and pass `--sex F` or `--sex M` to step 1, which then fits only that sex and drops the rest (SAIGE's `--FemaleOnly`/`--MaleOnly`, as All of Us did). A numeric `sex` column is read as 0 = female, 1 = male, BRaVa's coding; add `--femaleCode 1 --maleCode 0` if yours is the other way round, and check the counts step 1 prints. Where the genotype file has genetic sex (`.fam` column 5, or the `.psam` `SEX` column; PLINK fixes 1 = male, 2 = female), step 1 checks the phenotype file's sex against it: more than half disagreeing means the codes are flipped and is refused, more than 1% is warned loudly, and a genotype file without usable sex (e.g. converted from VCF) is warned loudly as unverifiable. The phenotype file's `sex` always decides who is fitted.
 
 ## Requirements
@@ -37,7 +38,7 @@ If at any point you run into issues or have any questions please create an issue
 - Genotype data, plink (optional), ideally used in place of exome data for step 0
 - Exome data in PLINK 2 (`.pgen/.pvar/.psam`, recommended) or PLINK 1 (`.bed/.bim/.fam`) format; a VCF is converted once with plink2 (`plink2 --vcf exome.chr11.vcf.gz --make-pgen --out exome.chr11`). 
 - Sample IDs, (ancestry specific)
-- Annotation file ([details found here](https://docs.google.com/document/d/1emWqbX8ohi-9rYIW_pKSAFiMHZZUV6zyXwg7qWJNdlc/edit#heading=h.puz6ua3vxnca](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1)))
+- Annotation (group) file, generated [here](https://github.com/BRaVa-genetics/variant-annotation) ([details](https://docs.google.com/document/d/1emWqbX8ohi-9rYIW_pKSAFiMHZZUV6zyXwg7qWJNdlc/edit#heading=h.puz6ua3vxnca); [thresholds and versions](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1))
 - BRaVa phenotype file (.tsv) with 'IID' (sample ID) column and covariates
 
 ### Environment
@@ -68,10 +69,10 @@ To begin, clone the latest version of universal-saige
 ```
 git clone git@github.com:BRaVa-genetics/universal-saige.git
 cd universal-saige
-mkdir out in
+mkdir -p out in/genotypes
 ```
 
-For this walkthrough we will be running step 0 with plink files based on genotype array data. sample_ids.txt is a file with newline separated sample IDs.
+For this walkthrough we will be running step 0 with plink files based on genotype array data, in a directory of their own: step 0 merges every `.bed` (or `.pgen`) in `--geneticDataDirectory`, so the exome files used in step 2 must not be in it. sample_ids.txt is a file with newline separated sample IDs.
 
 > [!NOTE]
 > Docker and Singularity require all input files to be within one directory that must not contain any linked files (so no `ln -s` your input files into your dir).
@@ -84,16 +85,17 @@ Currently my directory looks like:
 ├── 00_step0_VR_and_GRM.sh
 ├── out/
 ├── in/
-│   ├── ukb_genotypes_chr*.bed   # genotype bed files
-│   ├── ukb_genotypes_chr*.bim   # genotype bim files
-│   ├── ukb_genotypes_chr*.fam   # genotype fam files
-│   ├── sample_ids.txt           # --sampleIDs
+│   ├── genotypes/
+│   │   ├── ukb_genotypes_chr*.bed   # genotype bed files
+│   │   ├── ukb_genotypes_chr*.bim   # genotype bim files
+│   │   ├── ukb_genotypes_chr*.fam   # genotype fam files
+│   ├── sample_ids.txt               # --sampleIDs
 ```
 
 And I run step 0 with the arguments:
 ```
 bash 00_step0_VR_and_GRM.sh \
-    --geneticDataDirectory in/ \
+    --geneticDataDirectory in/genotypes/ \
     --geneticDataFormat "plink" \
     --geneticDataType "genotype" \
     --outputPrefix out/walkthrough \
@@ -112,10 +114,12 @@ This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspectin
 │   ├── walkthrough.plink_for_var_ratio.bed
 │   ├── walkthrough.plink_for_var_ratio.bim
 │   ├── walkthrough.plink_for_var_ratio.fam
+│   ├── walkthrough.plink_for_grm.{bed,bim,fam}   # the LD-pruned markers the GRM was built from
 │   ├── walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx
 │   ├── walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
-
 ```
+
+The last line step 0 prints is the GRM's density, e.g. `sparse GRM: 400000 samples, ... relatives per sample (built at --relatednessCutoff 0.05)`; a loud warning there means the cutoff should be raised before step 1.
 
 ## Step 1
 
@@ -178,9 +182,9 @@ The top of the file looks like this:
 
 ```
 ENSG00000187634 var chr1:943315:T:C chr1:962890:T:A
-ENSG00000187634 anno damaging_missense non_coding
+ENSG00000187634 anno damaging_missense_or_protein_altering non_coding
 ENSG00000187961 var chr1:961514:T:C chr1:962037:C:T chr1:962807:T:C 
-ENSG00000187961 anno synonymous damaging_missense pLoF
+ENSG00000187961 anno synonymous damaging_missense_or_protein_altering pLoF
 ```
 
 Here, each gene (coded according to ensembl ID in column 1) receives two lines, a variant line (`var`) and an annotation line `anno` (column two). All subsequent information on each pair of gene specific lines contains space delimited information mapping the variant information onto the associated annotation(s). 
@@ -217,9 +221,9 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
 The pooled FlexRV p per gene is the `Group == Cauchy` row's `Pvalue_Burden`; the other rows are the transform sets.
 
 > [!WARNING]
-> There's one more 'gotcha' here - you'll need to ensure that the chromosome name flagged by `--chr` _exactly_ matches the chromosome name in the .bim file. For example, if the chromosome is labelled as '11' in the first column of the .bim, `--chr chr11` will not work (but `--chr 11` will).
+> The chromosome name flagged by `--chr` must _exactly_ match the chromosome name in the first column of the `.bim` (or `.pvar`): if it is labelled '11', pass `--chr 11`, not `--chr chr11`. Step 2 refuses a mismatch before SAIGE starts, and the message shows the file's own spelling.
 
-This command took 1 hour 47 minutes with 8 cores. For verification of rare variant association results [genebass](https://app.genebass.org/) is a useful resource. Checking [HDL cholesterol](https://app.genebass.org/gene/undefined/phenotype/continuous-30760-both_sexes--irnt?resultIndex=gene-manhattan&resultLayout=full) we can see that APOC3 (ENSG00000110245) (pLoF, SKAT-O) has a association with $P=1.24\times 10^{-322}$. Looking at the gene result file `out/chr11_HDL_cholesterol.txt` we see the result:
+This command took 1 hour 47 minutes (on an earlier SAIGE build). Step 2 runs single-threaded, so run chromosomes, and phenotypes, side by side rather than giving one run more cores. For verification of rare variant association results [genebass](https://app.genebass.org/) is a useful resource. Checking [HDL cholesterol](https://app.genebass.org/gene/undefined/phenotype/continuous-30760-both_sexes--irnt?resultIndex=gene-manhattan&resultLayout=full) we can see that APOC3 (ENSG00000110245) (pLoF, SKAT-O) has a association with $P=1.24\times 10^{-322}$. Looking at the gene result file `out/chr11_HDL_cholesterol.txt` we see the result:
 
 ```
 Region	Group	max_MAF	Pvalue	Pvalue_Burden	Pvalue_SKAT	BETA_Burden	SE_Burden	MAC	Number_rare	Number_ultra_rare
@@ -250,8 +254,9 @@ def qqplot(results, pheno, type, max_maf=None, anno=None):
         intervals=stats.beta.interval(CI, a, b)
         return intervals
 
-    def get_lambda_gc(chisq_vec):
-        return np.median(chisq_vec)/stats.chi2.ppf(q=0.5, df=1)
+    def get_lambda_gc(p):
+        # median 1-df chi-square of the observed p-values over its expectation under the null
+        return np.median(stats.chi2.isf(p, df=1))/stats.chi2.ppf(q=0.5, df=1)
 
     if type == "gene":
         pvals = results["Pvalue"][
@@ -262,7 +267,7 @@ def qqplot(results, pheno, type, max_maf=None, anno=None):
         pvals = results["p.value"]
 
     if len(pvals) == 0:
-        print(f"No results for {pheno} {sex}")
+        print(f"No results for {pheno}")
         return
 
     pvals = np.sort(pvals)
@@ -294,7 +299,7 @@ results_dir = "out/"
 gene_results = results_dir + "chr11_HDL_cholesterol.txt"
 gene_results = pd.read_csv(gene_results, sep="\t")
 
-qqplot(gene_results, "HDL_cholesterol", "gene", max_maf=0.01, anno="damaging_missense")
+qqplot(gene_results, "HDL_cholesterol", "gene", max_maf=0.01, anno="damaging_missense_or_protein_altering")
 
 variant_results = results_dir + "chr11_HDL_cholesterol.txt.singleAssoc.txt"
 variant_results = pd.read_csv(variant_results, sep="\t")
@@ -313,3 +318,19 @@ Taking a closer look:
 <img src="https://user-images.githubusercontent.com/43707014/236253166-f298e828-1954-4edf-96c9-c7638032dde9.png" width="500">
 
 In this QQ-plot while we see some inflation from the expected p-values this is plausibly polygenicity given what we know about the trait. 
+
+## Step 3
+
+Finally, the effective sample size of each phenotype's null model, Nglmm, which the BRaVa meta-analysis uses. It is computed once per phenotype from the sparse GRM, on the samples step 1 fitted:
+
+```
+bash 03_estimate_nGlmm.sh \
+    --contPhenos "HDL_cholesterol" \
+    --phenoFile in/phenoFile.txt \
+    --covarList "age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20" \
+    --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
+    --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt \
+    --outputFile out/neff.csv
+```
+
+`out/neff.csv` has one `pheno,nglmm` row per phenotype (`--binaryPhenos` takes the binary ones, space separated). Pass `--relatednessCutoff` if steps 0-2 used a value other than 0.05: Nglmm is computed at the same cutoff as the fit.

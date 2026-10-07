@@ -4,9 +4,10 @@
 # all steps.
 
 # All files contained within --geneticDataDirectory of the type flagged by
-# --geneticDataFormat will be globbed, so please ensure that this contains all
-# of the autosomes for just one biobank/cohort and not multiple!
-genetic_data_directory=["in/"]
+# --geneticDataFormat will be globbed AND MERGED, so give this step a directory
+# of its own: all of the autosomes for just one biobank/cohort, and not the
+# exome files step 2 reads.
+genetic_data_directory=["in/genotypes/"]
 
 # PLINK 1 (.bed/.bim/.fam) or PLINK 2 (.pgen/.pvar/.psam). A VCF is refused:
 # convert it once with resources/plink2 --vcf FILE.vcf.gz --make-pgen --out PREFIX
@@ -21,12 +22,12 @@ IS_SINGULARITY={"false","true"}
 out_step0=["out"]
 
 # These are the sampleIDs (single column) to be used to define the GRM.
-# Note that if nothing is passed (the string is empty), then all of the samples
-# in the files will be used
+# To use all of the samples in the files, DELETE the --sampleIDs line below
+# (an empty value is refused: it would swallow the next flag).
 sample_id_path=["path/to/sampleIDs"]
 
 # Relatedness cutoff: GRM entries below it are dropped. Use the SAME value in
-# steps 1 and 2. 0.05 is the default; All of Us used 0.125 for its admixed amr
+# steps 1, 2 and 3. 0.05 is the default; All of Us used 0.125 for its admixed amr
 # cohort, whose GRM was too dense to fit at 0.05. Steps 0 and 1 print the
 # GRM's relatives per sample and warn loudly when it is dense: raise it then.
 relatedness_cutoff=0.05

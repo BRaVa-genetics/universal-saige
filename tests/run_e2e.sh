@@ -128,6 +128,8 @@ run s0_refuse_no_out       fail bash 00_step0_VR_and_GRM.sh --isSingularity "${S
   --geneticDataType genotype --generate_GRM
 run s0_refuse_bad_relcut   fail bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
   --geneticDataType genotype --outputPrefix "${OUT}/never" --generate_GRM --relatednessCutoff 5
+# an empty --sampleIDs (an unset template variable) would swallow the next flag as its value
+run s1_refuse_empty_ids    fail "${S1[@]}" --traitType quantitative --phenoCol Q_pos --genotypePlink "${VR}" --sampleIDs "" --sampleIDCol IID --dryRun
 run s1_refuse_bad_relcut   fail "${S1[@]}" --traitType quantitative --phenoCol Q_pos --genotypePlink "${VR}" --relatednessCutoff 0 --dryRun
 run s1_relcut_dryrun       ok   "${S1[@]}" --traitType quantitative --phenoCol Q_pos --genotypePlink "${VR}" --relatednessCutoff 0.125 --dryRun
 
