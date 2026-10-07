@@ -164,7 +164,7 @@ while [[ $# -gt 0 ]]; do
     --annotations: required if group test is selected. Comma separated list of annotation masks to test (':' joins labels INTO one mask, ',' separates masks). Please use
       'pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous'
       Every label (and every --flexRVlofAnno label) must be on an 'anno' line of the group file, or the run is refused.
-    --relatednessCutoff (default: 0.05): MUST equal the cutoff step 1 fitted under; nothing in SAIGE checks it.
+    --relatednessCutoff (default: 0.05): MUST equal the cutoff steps 0, 1 and 3 used; nothing in SAIGE checks it.
     --condition: comma separated list of SNPs to condition on. This must be in order of the SNP occurrence in the dosage file.
     --subSampleFile: single-column file of sample IDs to restrict the test to.
     --dryRun: print the SAIGE command instead of running it.
@@ -176,6 +176,7 @@ while [[ $# -gt 0 ]]; do
     --flexRVlofAnno (default: pLoF): the label(s) the 'lof' score transform keys on; must be the labels used when the score line was built.
   a VCF is refused: convert once with plink2 (--vcf FILE --make-pgen --out PREFIX) and pass --pgen.
       "
+      exit 0
       shift # past argument
       ;;
     -*|--*)

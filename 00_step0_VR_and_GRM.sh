@@ -174,7 +174,8 @@ while [[ $# -gt 0 ]]; do
     -h|--help)
       echo "usage: 00_step0_VR_and_GRM.sh
             required:
-                --geneticDataDirectory: directory containing the genetic data (genotype/WES/WGS data in PLINK 1 or PLINK 2 format)
+                --geneticDataDirectory: directory containing the genetic data (genotype/WES/WGS data in PLINK 1 or PLINK 2 format).
+                  EVERY .bed (or .pgen) in it is merged: give step 0 a directory of its own, one cohort, all autosomes.
                 --geneticDataFormat: format of the genetic data {plink,pgen}: PLINK 1 .bed/.bim/.fam or PLINK 2 .pgen/.pvar/.psam.
                   A VCF is refused; convert it once with plink2 (--vcf FILE --make-pgen --out PREFIX).
                 --geneticDataType: type of the genetic data {WES,WGS,genotype}.
@@ -182,14 +183,15 @@ while [[ $# -gt 0 ]]; do
             optional:
                 -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
                 --generate_GRM (default: false): generate GRM for the genetic data.
-                --generate_plink_for_vr (default: false): generate plink file for vr.
-                --relatednessCutoff (default: 0.05): GRM entries below it are dropped. Pass the SAME value to steps 1 and 2
+                --generate_plink_for_vr (default: false): generate plink file for vr. (At least one of the two is required.)
+                --relatednessCutoff (default: 0.05): GRM entries below it are dropped. Pass the SAME value to steps 1, 2 and 3
                   (All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05). The output
                   is <outputPrefix>_relatednessCutoff_<value>_5000_randomMarkersUsed.sparseGRM.mtx.
                 --sampleIDs: path to a file containing sampleIDs (as a single column) to be used to define the GRM.
                 Note that if nothing is passed, then all of the samples in the plink/pgen files will be used.
                 Samples are matched on IID.
       "
+      exit 0
       shift # past argument
       ;;
     -*|--*)

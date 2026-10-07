@@ -12,8 +12,8 @@ up next. The parameter record it implements is
    Google registries). Consequences carried into the drivers and README:
    - **no VCF reader**: step 2 refuses `--vcf` with the one-line plink2
      conversion; converting per run would charge every chromosome of every
-     phenotype for a one-off job. Step 0 still reads a VCF through plink 1.9
-     for the GRM.
+     phenotype for a one-off job. (Step 0 then still read a VCF through plink
+     1.9; since the second pass below it refuses one too.)
    - **PLINK 2 (.pgen) is the recommended input**, and a `--pgen` option exists
      beside `--plink` in steps 1 and 2. Measured on the SAIGE fixture: the two
      arms give byte-identical variance ratios and byte-identical FlexRV results.
@@ -49,6 +49,8 @@ up next. The parameter record it implements is
 - A refused step-1 fit leaves 0-byte `.rda`/`.varianceRatio.txt` (SAIGE creates
   them before the eligibility check; `saige-slim` LEDGER #171); the step-1 driver
   removes them on a non-zero exit so a refused trait leaves no false model.
+  saige-slim fixed #171 on 2026-10-04, after the pinned `152ffd8c`, so the
+  cleanup stays until the pin moves past it.
 - `03_estimate_nGlmm.sh` ran the old image by hand, patched R source inside it
   and reinstalled the package; the slim image has `extractNglmm.R` on its PATH.
 - `--dryRun` on steps 1 and 2 prints the SAIGE command.
@@ -95,8 +97,8 @@ around it changed:
 - Step 0: `shuf` (absent on macOS) replaced by a seeded sampler; scratch in a
   per-run `mktemp -d` instead of shared `/tmp` names; `--outputPrefix` required.
 - Step 1 `--sex` read unset variables (so it read stdin) and could not stop the
-  run from inside `| while`. It now requires one value of `sex` among samples
-  with a phenotype, and that value to equal `--sex` when the column is M/F.
+  run from inside `| while`. It then required one value of `sex` among samples
+  with a phenotype (replaced in the third pass below).
 - Step 3 mounted the working directory at the host `$HOME` and took `$?` from
   `tee`, so it only ran from `$HOME` and hid failures. It now uses
   `run_container` (Singularity, fit-gate pass-through), takes `--outputFile`,
@@ -112,3 +114,39 @@ around it changed:
   against earlier BRaVa submissions, which all used 0.125.
 - `04_flexrv_groupfile.sh` failed under macOS bash 3.2 (an empty array under `set -u`).
 - Templates: `--t` -> `--traitType`; the GRM file is `<out>_relatednessCutoff_...`.
+
+## Third pass (2026-10-06/07): AoU parity checked against its job logs, and guards
+
+The AoU step-1 wrapper (`saige_step1.sh`) and three of its v4 job logs, and the
+step-2 wrapper, were read flag by flag against the drivers; the record in
+saige-slim was completed from them. The end-to-end test grew from 111 to 200
+checks; it also passes on a SLURM cluster under Apptainer.
+
+- **Runtime**: Apptainer is used when `singularity` is not on PATH; the `.sif`
+  is pulled without a cache and re-pulled when the pin changes. The UKB RAP
+  `/mnt/project` bind is gone (`SAIGE_EXTRA_MOUNTS` remains). Image
+  `1.5.2-dev-152ffd8c` (LEDGER #172 and #176 fixed); plink2 alpha 7.11 and
+  plink 1.9.0 stable.
+- **Step 1**: IRNT for quantitative traits, as AoU (now in the record, from the
+  logs). `--relatednessCutoff` is a flag in steps 0, 1 and 3, as in step 2: AoU
+  fitted amr at 0.125. Phenotype and covariate names must be plain R names
+  (SAIGE pastes them into a formula, LEDGER #68; the old check accepted
+  everything). An empty `--sampleIDs` is refused (it swallowed the next flag).
+- **Dense GRM**: steps 0 and 1 print relatives per sample from the `.mtx`
+  header; step 1 refuses above 100 unless `--forceDenseGRM` (AoU amr at 0.05:
+  ~644, fits that never finished; at 0.125 ~3.9; other cohorts ~0.6).
+- **`--sex`**: passes `--FemaleOnly/--MaleOnly --sexCol sex` as AoU did, with
+  BRaVa's coding (0 = female, 1 = male; SAIGE's default and the AoU file are the
+  opposite) and `--femaleCode/--maleCode`. Codes that select nobody or put every
+  case in the dropped sex are refused; suspicious splits warned; genetic sex in
+  the `.fam`/`.psam` checks the codes (over half discordant refused as flipped).
+  Verified: `--sex F` gives byte-identical variance ratios to males set NA.
+- **Step 2**: refused before SAIGE runs: mask labels absent from the group file,
+  a FlexRV score line missing from any region, a `--chr` spelled unlike the
+  `.pvar`/`.bim`. The four new sidecars of `152ffd8c` are documented.
+- **Step 3**: Nglmm at the same cutoff as the fit (default 0.05; it was
+  `extractNglmm.R`'s own 0.125, which every earlier BRaVa submission used).
+- **Docs**: templates use 20 PCs, as AoU did; walkthrough and templates checked
+  against the drivers (an example that merged the exome into the GRM, outdated
+  mask labels, a lambda_GC computed from p-values); every driver's `-h` now exits
+  after printing.
