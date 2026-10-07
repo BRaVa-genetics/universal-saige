@@ -34,11 +34,13 @@ grm_density_check () {   # $1 = sparse GRM .mtx, $2 = the cutoff this step uses;
   # with the N diagonal entries): instant at any size, and exact for the GRM as
   # built, since step 0 writes only the pairs at or above its cutoff. A GRM from
   # 5,000 random markers is noisy, and in an admixed cohort ancestry also reads
-  # as relatedness, so a low cutoff can flood it. All of Us amr (N 52,192): ~885
-  # relatives per sample at 0.05 (46.2M entries), a step-1 fit that never
-  # finished and tau collapsed to 0 in ~95% of models; at 0.125, ~5.7 and a fit
-  # in 58 s (saige-slim handoff 2026-09-25). Real families give a few (the e2e
-  # pedigree ~2.4). The threshold, 100, is a judgement between. Step 0 only
+  # as relatedness, so a low cutoff can flood it. All of Us amr (71,609 samples
+  # in the GRM): ~644 relatives per sample at 0.05 (23,137,932 stored entries;
+  # 46,204,255 counting both triangles), a step-1 fit that never finished and
+  # tau collapsed to 0 in ~95% of models; ~3.9 at 0.125 (349,445) and a fit in
+  # 58 s. The other four AoU cohorts: ~0.6 at 0.05 (saige-slim handoff
+  # 2026-09-25 and its note on the two GRM locations). The e2e pedigree: 2.4.
+  # The threshold, 100, is a judgement between ~0.6 and ~644. Step 0 only
   # warns (the GRM exists by then); step 1 refuses, before paying for the fit,
   # unless it is passed --forceDenseGRM.
   local mtx=$1 cutoff=$2 stats n pairs rel built
@@ -61,7 +63,7 @@ grm_density_check () {   # $1 = sparse GRM .mtx, $2 = the cutoff this step uses;
       echo "  At this density the step-1 fit can run for hours or never finish, and the"
       echo "  random effect can collapse to 0. Most of these 'relatives' are noise or"
       echo "  shared ancestry, not family. RAISE --relatednessCutoff -- All of Us used"
-      echo "  0.125 for its admixed amr cohort: ~885 relatives per sample at 0.05, ~5.7"
+      echo "  0.125 for its admixed amr cohort: ~644 relatives per sample at 0.05, ~3.9"
       echo "  at 0.125, and a fit that never finished took 58 s -- rerun step 0 with it,"
       echo "  and pass the SAME value to steps 1 and 2. Step 1 REFUSES a GRM this dense"
       echo "  unless it is passed --forceDenseGRM (not recommended)."

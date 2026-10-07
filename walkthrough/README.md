@@ -102,7 +102,7 @@ bash 00_step0_VR_and_GRM.sh \
     --generate_GRM
 ```
 
-The GRM keeps pairs related at 0.05 or more (`--relatednessCutoff`, default 0.05), and its file name records the value. The same value must be passed to steps 0, 1 and 2; nothing in SAIGE checks that they agree. All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05. Steps 0 and 1 print the GRM's mean number of relatives per sample (from the file header, so instantly), warn loudly above 100 (step 1 then refuses the GRM unless it is passed `--forceDenseGRM`), and warn when the GRM was built at a different cutoff from the step's; above 100 a fit can run for hours or never finish (All of Us amr: ~885 at 0.05, ~5.7 at 0.125).
+The GRM keeps pairs related at 0.05 or more (`--relatednessCutoff`, default 0.05), and its file name records the value. The same value must be passed to steps 0, 1 and 2; nothing in SAIGE checks that they agree. All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05. Steps 0 and 1 print the GRM's mean number of relatives per sample (from the file header, so instantly), warn loudly above 100 (step 1 then refuses the GRM unless it is passed `--forceDenseGRM`), and warn when the GRM was built at a different cutoff from the step's; above 100 a fit can run for hours or never finish (All of Us amr: ~644 at 0.05, ~3.9 at 0.125; its other cohorts ~0.6).
 
 This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspecting the `out/` directory, we can see:
 ```

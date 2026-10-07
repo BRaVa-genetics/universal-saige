@@ -148,7 +148,7 @@ while [[ $# -gt 0 ]]; do
     than 10 cases or controls, a separated covariate model or a fit that did not converge is REFUSED, with the gate
     named in the log. SAIGE_FIT_GATES=0 in the environment downgrades the refusal to a warning (not recommended).
   dense GRM: a sparse GRM with more than 100 relatives per sample on average is REFUSED before the fit (All of Us amr
-    at 0.05: ~885, a fit that never finished). Raise --relatednessCutoff in steps 0, 1 and 2; --forceDenseGRM
+    at 0.05: ~644, a fit that never finished). Raise --relatednessCutoff in steps 0, 1 and 2; --forceDenseGRM
     fits anyway (not recommended).
       "
       shift # past argument
