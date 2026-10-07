@@ -184,6 +184,9 @@ colon-separated, in the `SAIGE_EXTRA_MOUNTS` environment variable (bound read-on
 
 optional:
 - `--covarList`: comma separated covariate column names in `--phenoFile`.
+- `--relatednessCutoff` (default 0.05): the GRM is thinned to entries above it, as in steps 1 and 2; pass the value steps 0-2 used.
+  Until 2026-10, step 3 left `extractNglmm.R` at its own default, 0.125, whatever steps 0-2 used, so Nglmm from earlier
+  BRaVa runs describes a sparser GRM than the fit. Nglmm now follows the cutoff, which changes it slightly against those.
 - `-o`,`--outputFile` (default `neff.csv`): one `pheno,nglmm` row per phenotype; each phenotype's log is `<outputFile without .csv>.<pheno>.log`.
 - `-s`,`--isSingularity` (default: false), `--dryRun`.
 

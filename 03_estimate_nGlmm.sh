@@ -14,6 +14,7 @@ COVAR_LIST=""
 SPARSE_GRM_FILE=""
 SPARSE_GRM_ID_FILE=""
 OUT_FILE="neff.csv"
+RELCUTOFF="0.05"
 SINGULARITY=false
 
 WD=$(pwd)
@@ -51,6 +52,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --relatednessCutoff)
+      RELCUTOFF="$2"
+      shift # past argument
+      shift # past value
+      ;;
     -o|--outputFile)
       OUT_FILE="$2"
       shift # past argument
@@ -77,6 +83,8 @@ while [[ $# -gt 0 ]]; do
     colon-separated, in SAIGE_EXTRA_MOUNTS (bound read-only).
   optional:
     --covarList: comma separated column names of covariates in --phenoFile.
+    --relatednessCutoff (default: 0.05): the GRM is thinned to entries above it, as in steps 1 and 2. Pass the value
+      steps 0-2 used. (extractNglmm.R's own default is 0.125, which BRaVa's earlier step 3 used for every cohort.)
     -o,--outputFile (default: neff.csv): the csv written, one 'pheno,nglmm' row per phenotype. Each phenotype's log is
       <outputFile without .csv>.<pheno>.log.
     -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
@@ -107,6 +115,8 @@ if [[ ${binary_phenos} == "" && ${cont_phenos} == "" ]]; then
   exit 1
 fi
 
+check_relcutoff "${RELCUTOFF}"
+grm_density_check "${SPARSE_GRM_FILE}" "${RELCUTOFF}" || true   # its density, and a cutoff that differs from the GRM's
 check_container_env $SINGULARITY
 
 # relative paths are inside the working directory; an absolute path is used as
@@ -128,7 +138,8 @@ estimate () {   # $1 = phenotype, $2 = trait type
     --traitType $2 \
     --sparseGRMFile $(container_path "${SPARSE_GRM_FILE}") \
     --sparseGRMSampleIDFile $(container_path "${SPARSE_GRM_ID_FILE}") \
-    --useSparseGRMtoFitNULL TRUE"
+    --useSparseGRMtoFitNULL TRUE \
+    --relatednessCutoff ${RELCUTOFF}"
   echo "Estimating Nglmm for $1 ($2); log: ${log}"
   run_container > "${log}" 2>&1; rc=$?
   if [[ ${DRYRUN:-false} = true ]]; then

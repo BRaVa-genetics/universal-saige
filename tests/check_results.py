@@ -490,7 +490,8 @@ def nglmm_direct(trait, binary):
         for line in fh:
             i, j, v = line.split()
             i, j, v = int(i) - 1, int(j) - 1, float(v)
-            if i in use and j in use and v > 0.125:
+            # getsubGRM's drop0(tol = cutoff) keeps entries ABOVE the cutoff, 0.05 here as in steps 1-2
+            if i in use and j in use and v > 0.05:
                 val[(i, j)] = val[(j, i)] = v
                 if i != j:
                     adj[i].add(j)

@@ -104,5 +104,11 @@ around it changed:
   directory go through read-only binds in `run_container`, listed in
   `SAIGE_EXTRA_MOUNTS`; step 3 takes absolute paths under them. Nglmm
   reconciles exactly with 1'K^-1 1 on the GRM.
+- Step 3 never passed `--relatednessCutoff`, so `extractNglmm.R` thinned the GRM
+  at its own default, 0.125, while steps 1 and 2 used 0.05: Nglmm described a
+  sparser GRM than the model was fitted on. It now passes the same cutoff as
+  steps 0-2 (default 0.05). The e2e check had mirrored the 0.125 and so could
+  not see this; it now recomputes 1'K^-1 1 at 0.05. Nglmm changes slightly
+  against earlier BRaVa submissions, which all used 0.125.
 - `04_flexrv_groupfile.sh` failed under macOS bash 3.2 (an empty array under `set -u`).
 - Templates: `--t` -> `--traitType`; the GRM file is `<out>_relatednessCutoff_...`.
