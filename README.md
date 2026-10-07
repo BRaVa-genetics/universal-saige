@@ -122,7 +122,7 @@ required:
 optional:
 - `-o`,`--outputPrefix`:  output prefix from this program (SAIGE step 1) to be used as SAIGE step 2 input.
 - `-s`,`--isSingularity`: (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
-- `-c`,`--covarColList`: comma separated column names (e.g. `age,pc1,pc2`) of continuous covariates to include as fixed effects in the file specified in `--phenoFile`. Recall, proposed pilot fixed effect covariates are `age,age2,sex,age*sex,age2*sex,PCs`.
+- `-c`,`--covarColList`: comma separated column names (e.g. `age,pc1,pc2`) of continuous covariates to include as fixed effects in the file specified in `--phenoFile`. Recall, proposed pilot fixed effect covariates are `age,age2,sex,age*sex,age2*sex,PCs`; the templates use 20 PCs, as All of Us did, but the number of PCs is each biobank's choice.
 - `--categCovarColList`: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
 - `--sampleIDCol` (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
 - `--relatednessCutoff` (default 0.05): the GRM is thinned to entries at or above it. It must equal step 0's and step 2's.

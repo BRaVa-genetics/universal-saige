@@ -28,7 +28,8 @@ pheno=["pheno_col"]
 
 # Comma separated (without spaces!) list of covariates. These covariate names
 # must exactly match the corresponding column names in ${pheno_file}.
-covariates=["age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10"]
+# 20 PCs, as All of Us used; the number of PCs is the biobank's choice.
+covariates=["age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20"]
 # Comma separated (without spaces!) list of categorical covariates
 # If a categorical variable is to be included as a covariate, it should be
 # included in both ${covariates} and ${categorical_covariates}. 

@@ -136,7 +136,7 @@ bash 01_step1_fitNULLGLMM.sh \
     --genotypePlink out/walkthrough.plink_for_var_ratio \
     --phenoFile in/phenoFile.txt \
     --phenoCol "HDL_cholesterol" \
-    --covarColList "age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10" \
+    --covarColList "age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20" \
     --categCovarColList "sex" \
     --sampleIDs in/sample_ids.txt \
     --sampleIDCol "IID" \
@@ -148,7 +148,7 @@ bash 01_step1_fitNULLGLMM.sh \
 > [!WARNING]
 > A few things to note here:
 > - The column names flagged in `--phenoCol`, `--covarColList` and `--categCovarColList` must _exactly_ match the column names in the filepath flagged by `--phenoFile`
-> - The comma separated list of covariates flagged by `--covarColList` and `--categCovarColList` should not contain spaces (e.g. `age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10`)
+> - The comma separated list of covariates flagged by `--covarColList` and `--categCovarColList` should not contain spaces (e.g. `age,age2,age_sex,age2_sex,sex,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,PC11,PC12,PC13,PC14,PC15,PC16,PC17,PC18,PC19,PC20`)
 > - If a categorical variable is to be included as a covariate, it should be flagged by _both_ `--covarColList` and `--categCovarColList` (e.g. `sex` in the above command)
   
 This command took 10 minutes with 4 cores. Checking the `out/` directory we can see:
