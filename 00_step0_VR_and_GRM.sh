@@ -90,6 +90,10 @@ generate_plink_for_vr(){
         --freq counts \
         --out "${TMPD}/merged"
 
+    # 2,000 markers at 10 <= MAC < 20 and 2,000 at MAC >= 20, for step 1's two
+    # variance-ratio categories. SAIGE's are 10 < MAC <= 20.5 and MAC > 20.5
+    # (cateVarRatioMinMACVecExclude 10,20.5), counted on the samples step 1 fits,
+    # which shifts every MAC anyway; it samples ~30 markers per category.
     variants_lessthan_20_MAC=2000
     variants_greaterthan_20_MAC=2000
 
@@ -109,10 +113,10 @@ generate_plink_for_vr(){
     actual_variants_greaterthan_20_MAC=$(awk 'NR > 1 {mac = ($5 < $6) ? $5 : $6} NR > 1 && mac >= 20' "${TMPD}/merged.frq.counts" | wc -l)
 
     if [[ $variants_lessthan_20_MAC -gt $actual_variants_lessthan_20_MAC ]]; then
-        echo "Error: ${actual_variants_lessthan_20_MAC} variants (MAC<20) found - less than the required ${variants_lessthan_20_MAC} variants."
+        echo "Error: ${actual_variants_lessthan_20_MAC} variants with 10 <= MAC < 20 found - fewer than the required ${variants_lessthan_20_MAC} variants."
         exit 1
     elif [[ $variants_greaterthan_20_MAC -gt $actual_variants_greaterthan_20_MAC ]]; then
-        echo "Error: ${actual_variants_greaterthan_20_MAC} variants (MAC>20) found - less than the required ${variants_greaterthan_20_MAC} variants."
+        echo "Error: ${actual_variants_greaterthan_20_MAC} variants with MAC >= 20 found - fewer than the required ${variants_greaterthan_20_MAC} variants."
         exit 1
     fi
 
