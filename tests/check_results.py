@@ -22,7 +22,11 @@ first run and derived from the simulation (N ~ 1,800 analysed):
     0.5 and no unrelated pair above 0.12 (noise SD ~ 1/sqrt(5000) = 0.014);
   * the same analysis computed two ways (PLINK 1 vs PLINK 2 input) is
     byte-identical, as it was on the saige-slim fixture; step 3's Nglmm
-    equals 1'K^-1 1 recomputed here from the GRM file.
+    equals 1'K^-1 1 recomputed here from the GRM file at the same cutoff, and
+    --sex F equals males set NA (byte-identical variance ratios);
+  * every guard both ways: each refusal (VCF, labels, score lines, --chr,
+    cutoffs, dense GRM, sex codes, names, empty --sampleIDs) fires with its
+    message on a planted fault, and stays silent on the real runs.
 """
 
 import json
@@ -161,6 +165,9 @@ for name, text in [
     ("s0_refuse_vcf", "geneticDataFormat must be in {plink,pgen}"),
     ("s0_refuse_no_out", "--outputPrefix is required"),
     ("s0_refuse_bad_relcut", "--relatednessCutoff must be a number between 0 and 1"),
+    ("s1_refuse_pheno_name", "The column name 'Q+pos' contains '+'"),
+    ("s1_refuse_covar_name", "The column name 'age:sex' contains ':'"),
+    ("s1_refuse_empty_ids", "--sampleIDs needs a file; to use every sample, leave the flag out"),
     ("s1_refuse_bad_relcut", "--relatednessCutoff must be a number between 0 and 1"),
     ("s1_relcut_dryrun", "--relatednessCutoff 0.125"),
     ("s3_nglmm_nomount", "does not exist"),

@@ -100,6 +100,8 @@ while [[ $# -gt 0 ]]; do
       ;;
     --sampleIDs)
       SAMPLEIDS="$2"
+      # an empty value (e.g. an unset variable) would let --sampleIDs swallow the next flag
+      [[ ${SAMPLEIDS} == "" || ${SAMPLEIDS} == -* ]] && { echo "--sampleIDs needs a file; to use every sample, leave the flag out"; exit 1; }
       shift
       shift
       ;;
@@ -148,10 +150,11 @@ while [[ $# -gt 0 ]]; do
     -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
     -c,--covarColList: comma separated column names (e.g. age,pc1,pc2) of continuous covariates to include as fixed effects in the file specified in --phenoFile.
     --categCovarColList: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
+    --sampleIDs: single-column file of sample IDs to restrict the fit to; leave the flag out to use every sample.
     --sampleIDCol (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
     --forceDenseGRM: fit even when the sparse GRM is dense (more than 100 relatives per sample), which is otherwise
       refused; not recommended.
-    --relatednessCutoff (default: 0.05): the GRM is thinned to entries at or above it. MUST equal step 0's and step 2's
+    --relatednessCutoff (default: 0.05): the GRM is thinned to entries above it. MUST equal steps 0, 2 and 3's
       (All of Us: 0.05, and 0.125 for amr); nothing in SAIGE checks it.
     --sex ('M' or 'F'): for a sex-specific trait. SAIGE fits only the samples whose 'sex' column holds that sex's code
       (--FemaleOnly/--MaleOnly, as All of Us did) and drops the rest. Leave every sex term out of the covariates.
@@ -165,6 +168,7 @@ while [[ $# -gt 0 ]]; do
     at 0.05: ~644, a fit that never finished). Raise --relatednessCutoff in steps 0, 1 and 2; --forceDenseGRM
     fits anyway (not recommended).
       "
+      exit 0
       shift # past argument
       ;;
     -*|--*)
@@ -368,14 +372,10 @@ echo "SAMPLEIDS         = ${SAMPLEIDS}"
 echo "SAMPLEIDCOL       = ${SAMPLEIDCOL}"
 
 
-if is_valid_r_var "$PHENOCOL"; then
-    echo "The variable name '$PHENOCOL' is valid for an R variable."
-fi
-
-if [[ "$PHENOCOL" =~ .*"-".* || "$PHENOCOL" =~ .*",".* || "$PHENOCOL" =~ .*"=".* ]]; then
-  echo "Phenotype name cannot contain \"-\" or \",\" or \"=\""
-  exit 1
-fi
+# every name SAIGE puts in its formula: the phenotype and each covariate (check_pheno.sh)
+for name in "${PHENOCOL}" $(tr ',' ' ' <<< "${COVARCOLLIST},${CATEGCOVARCOLLIST}"); do
+  is_valid_r_var "${name}" || exit 1
+done
 
 GENOTYPE_PLINK="${GENOTYPE_PLINK:-}"; GENOTYPE_PGEN="${GENOTYPE_PGEN:-}"
 if [[ ${GENOTYPE_PLINK} == "" && ${GENOTYPE_PGEN} == "" ]]; then

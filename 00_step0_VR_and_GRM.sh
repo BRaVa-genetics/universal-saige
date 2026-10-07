@@ -90,6 +90,10 @@ generate_plink_for_vr(){
         --freq counts \
         --out "${TMPD}/merged"
 
+    # 2,000 markers at 10 <= MAC < 20 and 2,000 at MAC >= 20, for step 1's two
+    # variance-ratio categories. SAIGE's are 10 < MAC <= 20.5 and MAC > 20.5
+    # (cateVarRatioMinMACVecExclude 10,20.5), counted on the samples step 1 fits,
+    # which shifts every MAC anyway; it samples ~30 markers per category.
     variants_lessthan_20_MAC=2000
     variants_greaterthan_20_MAC=2000
 
@@ -109,10 +113,10 @@ generate_plink_for_vr(){
     actual_variants_greaterthan_20_MAC=$(awk 'NR > 1 {mac = ($5 < $6) ? $5 : $6} NR > 1 && mac >= 20' "${TMPD}/merged.frq.counts" | wc -l)
 
     if [[ $variants_lessthan_20_MAC -gt $actual_variants_lessthan_20_MAC ]]; then
-        echo "Error: ${actual_variants_lessthan_20_MAC} variants (MAC<20) found - less than the required ${variants_lessthan_20_MAC} variants."
+        echo "Error: ${actual_variants_lessthan_20_MAC} variants with 10 <= MAC < 20 found - fewer than the required ${variants_lessthan_20_MAC} variants."
         exit 1
     elif [[ $variants_greaterthan_20_MAC -gt $actual_variants_greaterthan_20_MAC ]]; then
-        echo "Error: ${actual_variants_greaterthan_20_MAC} variants (MAC>20) found - less than the required ${variants_greaterthan_20_MAC} variants."
+        echo "Error: ${actual_variants_greaterthan_20_MAC} variants with MAC >= 20 found - fewer than the required ${variants_greaterthan_20_MAC} variants."
         exit 1
     fi
 
@@ -165,14 +169,17 @@ while [[ $# -gt 0 ]]; do
       shift # past value
       ;;
     --sampleIDs)
-      SAMPLEIDS="$2" 
+      SAMPLEIDS="$2"
+      # an empty value (e.g. an unset variable) would let --sampleIDs swallow the next flag
+      [[ ${SAMPLEIDS} == "" || ${SAMPLEIDS} == -* ]] && { echo "--sampleIDs needs a file; to use every sample, leave the flag out"; exit 1; }
       shift
       shift
       ;; 
     -h|--help)
       echo "usage: 00_step0_VR_and_GRM.sh
             required:
-                --geneticDataDirectory: directory containing the genetic data (genotype/WES/WGS data in PLINK 1 or PLINK 2 format)
+                --geneticDataDirectory: directory containing the genetic data (genotype/WES/WGS data in PLINK 1 or PLINK 2 format).
+                  EVERY .bed (or .pgen) in it is merged: give step 0 a directory of its own, one cohort, all autosomes.
                 --geneticDataFormat: format of the genetic data {plink,pgen}: PLINK 1 .bed/.bim/.fam or PLINK 2 .pgen/.pvar/.psam.
                   A VCF is refused; convert it once with plink2 (--vcf FILE --make-pgen --out PREFIX).
                 --geneticDataType: type of the genetic data {WES,WGS,genotype}.
@@ -180,14 +187,15 @@ while [[ $# -gt 0 ]]; do
             optional:
                 -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
                 --generate_GRM (default: false): generate GRM for the genetic data.
-                --generate_plink_for_vr (default: false): generate plink file for vr.
-                --relatednessCutoff (default: 0.05): GRM entries below it are dropped. Pass the SAME value to steps 1 and 2
+                --generate_plink_for_vr (default: false): generate plink file for vr. (At least one of the two is required.)
+                --relatednessCutoff (default: 0.05): GRM entries below it are dropped. Pass the SAME value to steps 1, 2 and 3
                   (All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05). The output
                   is <outputPrefix>_relatednessCutoff_<value>_5000_randomMarkersUsed.sparseGRM.mtx.
                 --sampleIDs: path to a file containing sampleIDs (as a single column) to be used to define the GRM.
                 Note that if nothing is passed, then all of the samples in the plink/pgen files will be used.
                 Samples are matched on IID.
       "
+      exit 0
       shift # past argument
       ;;
     -*|--*)

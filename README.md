@@ -16,7 +16,7 @@
 
 > [!TIP]
 > Here's a [walkthrough](https://github.com/BRaVa-genetics/universal-saige/tree/main/walkthrough) 
- of a single trait and chromosome 11 for all three steps
+ of a single trait and chromosome 11, steps 0 to 3
 
 ### Contents
 * [Overview](#overview)
@@ -27,6 +27,8 @@
   * [Step 0 (once per cohort/biobank)](#step-0-once-per-cohortbiobank)
   * [Step 1 (once per phenotype)](#step-1-once-per-phenotype)
   * [Step 2 (once per chromosome per phenotype)](#step-2-once-per-chromosome-per-phenotype)
+  * [Step 4: FlexRV weights](#step-4-flexrv-weights-once-per-chromosome-per-weight-set)
+  * [Step 3](#step-3)
 
 ## Overview
 
@@ -35,7 +37,7 @@ _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 - Containerised SAIGE (Docker / Singularity / Apptainer): the slim build `astheeggeggs/saige-slim`, pulled from Docker Hub ✅
 - PLINK 2 (`.pgen/.pvar/.psam`, **recommended**) and PLINK 1 (`.bed/.bim/.fam`) exome data ✅
 - SAIGE-GENE+ group tests and **FlexRV** (Schwartzentruber et al. 2025), with an AlphaMissense weight builder ✅
-- Parallelised across ancestry, phenotypes and chromosomes ✅
+- One run per ancestry, phenotype and chromosome, so they run side by side ✅
 - Sanity checks, and the image's own fit gates ✅
 
 > [!IMPORTANT]
@@ -51,12 +53,13 @@ _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 >
 > Step 1 also **refuses a dense sparse GRM**: more than 100 relatives per sample on average, where a fit can run for hours
 > or never finish (All of Us amr at `--relatednessCutoff 0.05`: ~644, and the fits never finished; at 0.125: ~3.9, a minute; the other four AoU cohorts: ~0.6 at 0.05).
-> Step 0 warns about it as it finishes. Rerun step 0 with a higher `--relatednessCutoff` and pass the same value to steps 1
-> and 2; step 1's `--forceDenseGRM` fits anyway (not recommended).
+> Step 0 warns about it as it finishes. Rerun step 0 with a higher `--relatednessCutoff` and pass the same value to steps 1,
+> 2 and 3; step 1's `--forceDenseGRM` fits anyway (not recommended).
 
-The choices baked into the drivers (Firth off, fastTest off, `--tol 0.02` for both trait types, `--minMAC 4` for
-single-variant tests, the build's missingness defaults) are the ones the All of Us production runs used; the record is
-`docs/state/aou-saige-parameters.md` in the `saige-slim` repository.
+The choices baked into the drivers (a sparse-GRM fit with `sparse` variance ratios, `--tol 0.02` for both trait types,
+inverse-rank normalisation of quantitative traits, Firth off, fastTest off, `--minMAC 4` for single-variant tests, the
+build's missingness defaults) are the ones the All of Us production runs used; the record, checked against the AoU job
+logs, is `docs/state/aou-saige-parameters.md` in the `saige-slim` repository.
 
 ## System Requirements
 - Internet connection (only needed once for download_resources.sh)
@@ -74,7 +77,7 @@ bash download_resources.sh --alphamissense                  # the AlphaMissense 
 ## Input data (required)
 - WES data in PLINK 2 (`.pgen/.pvar/.psam`, recommended) or PLINK 1 (`.bim/.bed/.fam`) format, one file set per chromosome
 - Sample IDs, (ancestry specific)
-- SAIGE annotation file ([details found here](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1))
+- SAIGE annotation (group) file, generated [here](https://github.com/BRaVa-genetics/variant-annotation) ([details](https://docs.google.com/document/d/11Nnb_nUjHnqKCkIB3SQAbR6fl66ICdeA-x_HyGWsBXM/edit#heading=h.649be2dis6c1))
 - BRaVa phenotype file (tsv) with 'IID' (sample ID) column and covariates
 
 ## Input data (optional)
@@ -83,7 +86,7 @@ bash download_resources.sh --alphamissense                  # the AlphaMissense 
 
 ## Usage
 ### Step 0 (once per cohort/biobank)
-Take genotyping array data, or `{WES, WGS}` data, in PLINK 1 (`.bed/.bim/.fam`) or PLINK 2 (`.pgen/.pvar/.psam`) format, and generate variance ratios and a sparse GRM.
+Take genotyping array data, or `{WES, WGS}` data, in PLINK 1 (`.bed/.bim/.fam`) or PLINK 2 (`.pgen/.pvar/.psam`) format, and generate a sparse GRM and the markers step 1 estimates its variance ratios on.
 
 ```
 usage: 00_step0_VR_and_GRM.sh
@@ -97,14 +100,14 @@ required:
 optional:
 - `-s`,`--isSingularity` (default: `false`): is singularity (or apptainer) available? If not, it is assumed that docker is available.
 - `--generate_GRM` (default: false): generate GRM for the genetic data.
-- `--generate_plink_for_vr` (default: false): generate plink file for vr.
+- `--generate_plink_for_vr` (default: false): generate plink file for vr. At least one of the two is required.
 - `--relatednessCutoff` (default 0.05): GRM entries below it are dropped; the GRM is written to
-  `<outputPrefix>_relatednessCutoff_<value>_5000_randomMarkersUsed.sparseGRM.mtx`. The same value must be passed to steps 0, 1 and 2; nothing in SAIGE checks that they agree. All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05.
+  `<outputPrefix>_relatednessCutoff_<value>_5000_randomMarkersUsed.sparseGRM.mtx`. The same value must be passed to steps 0, 1, 2 and 3; nothing in SAIGE checks that they agree. All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05.
   Steps 0 and 1 print the GRM's mean number of relatives per sample (from the file header, so instantly), warn loudly above 100 (step 1 then refuses the GRM, see the note on refusals above), and warn when the GRM was built at a different cutoff from the step's; above 100 a fit can run for hours or never finish (All of Us amr: ~644 at 0.05, ~3.9 at 0.125; its other cohorts ~0.6).
-- `--sampleIDs`: single column of sample IDs (matched on IID) to define the GRM and the variance-ratio markers' samples; all samples when omitted. **Note, if this is not _all_ of the samples in the `{WES, WGS}` dataset, the `{WES, WGS}` data must be filtered to these samples before running step 1**
+- `--sampleIDs`: single column of sample IDs (matched on IID) to define the GRM and the variance-ratio markers' samples; all samples when the flag is left out (an empty value is refused). Steps 1 and 2 then use only samples in the GRM: SAIGE fits step 1 on them, and step 2 tests the model's samples, ignoring any other samples in the `{WES, WGS}` files.
 
 > [!IMPORTANT]
-> All files contained within `--geneticDataDirectory` of the type flagged by `--geneticDataFormat` will be globbed, so please ensure that this contains all of the autosomes for _just one biobank/cohort_ and not multiple!
+> Every file in `--geneticDataDirectory` of the type flagged by `--geneticDataFormat` is globbed and **merged**, so give step 0 a directory of its own holding all of the autosomes for _just one biobank/cohort_, and not the exome files step 2 reads.
 
 ### Step 1 (once per phenotype)
 
@@ -113,22 +116,24 @@ usage: 01_step1_fitNULLGLMM.sh
 ```
 required:
 - `-t`,`--traitType`: type of the trait `{quantitative, binary}`.
-- `--genotypePlink`: variance ratio plink filename prefix of `.bim/.bed/.fam` files. This must relative to the current working directory. Note that samples will be restricted to samples present within the plink `.fam` file.
+- `--genotypePlink`: the variance-ratio markers from step 0, the PLINK 1 prefix of `.bim/.bed/.fam`; or `--genotypePgen`, a PLINK 2 prefix. Relative to the current working directory. The fit uses only samples in the GRM.
 - `--sparseGRM`: filename of the sparseGRM `.mtx` file (output from step 0). This must be relative to the current working directory.
 - `--sparseGRMID`: filename of the sparseGRM ID file (output from step 0). This must be relative to the current working directory.
 - `--phenoFile`: filename of the phenotype file. This must be relative to the working directory.
-- `--phenoCol`: the column names of the phenotype to be analysed in the file specified in `--phenoFile`.
+- `--phenoCol`: the column names of the phenotype to be analysed in the file specified in `--phenoFile`. It and every covariate name must be a plain R name (letters, digits, `.` and `_`, starting with a letter or `.`): SAIGE pastes them into an R formula, where `-`, `+`, `:` or a space would change the model, so such a name is refused.
 
 optional:
 - `-o`,`--outputPrefix`:  output prefix from this program (SAIGE step 1) to be used as SAIGE step 2 input.
 - `-s`,`--isSingularity`: (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
 - `-c`,`--covarColList`: comma separated column names (e.g. `age,pc1,pc2`) of continuous covariates to include as fixed effects in the file specified in `--phenoFile`. Recall, proposed pilot fixed effect covariates are `age,age2,sex,age*sex,age2*sex,PCs`; the templates use 20 PCs, as All of Us did, but the number of PCs is each biobank's choice.
 - `--categCovarColList`: comma separated column names of categorical variables to include as fixed effects in the file specified in --phenoFile.
+- `--sampleIDs`: single-column file of sample IDs to restrict the fit to; leave the flag out to use every sample (an empty value is refused).
 - `--sampleIDCol` (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
-- `--relatednessCutoff` (default 0.05): the GRM is thinned to entries at or above it. It must equal step 0's and step 2's.
+- `--relatednessCutoff` (default 0.05): the GRM is thinned to entries above it. It must equal steps 0, 2 and 3's.
 - `--sex` (`M` or `F`): for a sex-specific trait. SAIGE fits only the samples of that sex (`--FemaleOnly`/`--MaleOnly`, as All of Us did) and drops the rest; step 1 prints how many it keeps and drops. Leave every sex term (`sex`, `age_sex`, `age2_sex`) out of the covariates; a `sex` covariate is refused.
 - `--femaleCode`, `--maleCode` (default `0`, `1`: BRaVa's phenotype coding): the values of a numeric `sex` column. A column of `M` and `F` is read as such. SAIGE's own default, and the All of Us file, use 1 for female. Step 1 refuses a code the column does not hold, a code no sample with a phenotype has, and (binary) a split that puts every case in the sex being dropped; it warns loudly when the column holds other values, when (quantitative) more samples with a phenotype are dropped than kept, or when (binary) some cases are in the sex being dropped. Each of these is what flipped or mismatched codes look like. Where the genotype file has genetic sex (`.fam` column 5, or the `.psam` `SEX` column; PLINK fixes 1 = male, 2 = female), step 1 checks the phenotype file's sex against it: more than half disagreeing means the codes are flipped and is refused, more than 1% is warned loudly, and a genotype file without usable sex (e.g. converted from VCF) is warned loudly as unverifiable. The phenotype file's `sex` always decides who is fitted.
 - `--forceDenseGRM`: fit even when the sparse GRM has more than 100 relatives per sample on average, which is otherwise refused (see the note on refusals above); not recommended.
+- `--dryRun`: print the SAIGE command instead of running it.
 
 ### Step 2 (once per chromosome per phenotype)
 
@@ -147,14 +152,14 @@ optional:
   - `.exactByWeight.txt`: weighted cells (a FlexRV transform or a weight line) whose weight one variant effectively carries. They take the exact test on their carriers instead of the saddlepoint, which converged to confident wrong answers there (saige-slim LEDGER #172). The exact test carries no relatedness correction (LEDGER #177).
   - `.exactByWeightAboveCap.txt`: cells concentrated the same way but with more than 13 material carriers, too many to enumerate, so their p-value is still the saddlepoint, in the regime where it is least trusted (LEDGER #176). Observation only: the first place to look if a result is surprising.
   - `.spaPinned.txt` (binary traits): tests whose saddlepoint left out samples the null model holds near-certain (flip probability at or below 1e-8), or would have but for the budget (LEDGER #174).
-  - `.stretchGate.txt` (binary traits, weighted cells): cells the variance ratio stretches far relative to the rest of their score; the most stretched report the exact convolution at the unstretched score in place of the saddlepoint (LEDGER #176).
+  - `.stretchGate.txt` (binary traits, weighted cells): cells the variance ratio stretches far relative to the rest of their score; the most stretched report the exact convolution at the unstretched score in place of the saddlepoint (LEDGER #176). From image `928f95ad` it always has the same columns, so per-chromosome files stack under one header.
 - `-s`,`--isSingularity` (default: false).
 - `-g`,`--groupFile`: required for a group test. The annotation file.
 - `--annotations`: required for a group test. `':'` joins labels into one mask, `','` separates masks. For SAIGE-GENE+ use `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`.
   Every label must be on an `anno` line of the group file (for FlexRV, the `--flexRVlofAnno` labels too); otherwise the run
   is refused before SAIGE starts, naming the missing labels and the ones the file has. SAIGE itself would quietly test a
   smaller or empty mask under the name asked for.
-- `--relatednessCutoff` (default 0.05): must equal the cutoff steps 0 and 1 used; nothing in SAIGE checks it.
+- `--relatednessCutoff` (default 0.05): must equal the cutoff steps 0, 1 and 3 used; nothing in SAIGE checks it.
 - `--condition`, `--subSampleFile`, `--dryRun` (prints the SAIGE command).
 
 FlexRV (one run per weight set):
@@ -171,14 +176,14 @@ annotation, missense variants their AlphaMissense pathogenicity, a missense vari
 A second weight set goes through the same door: `--annoTable <BRaVa long-form table> --scoreColumn <column> --name <NAME>`
 for a score carried as a column of the annotation table, or `--am <table>` for a score in AlphaMissense's per-variant
 layout. One score line per file, so one file and one step-2 run per weight set. The tool behind it is
-`flexrv_score_from_alphamissense.py` (`--help`, and `--selftest` for its controls).
+`flexrv_score_from_alphamissense.py` (`--help`, and `--selftest` for its controls). `04_flexrv_groupfile.sh -h` lists the rest of its options (`--lofAnno`, `--missenseAnno`, `--dropAnno`, `--missing`, `--isoforms`).
 
 ### Step 3
 
 ```
 usage: 03_estimate_nGlmm.sh
 ```
-required:
+required (at least one of the first two):
 - `--binaryPhenos`: space separated list of binary phenotypes.
 - `--contPhenos`: space separated list of continuous phenotypes.
 - `--phenoFile`: filename of the phenotype file.

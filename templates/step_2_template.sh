@@ -10,7 +10,8 @@
 # rather than paying for a conversion on every chromosome of every phenotype.
 
 # Which chromosome to analyse. Spell it as the .pvar/.bim does: if the first
-# column reads '20', --chr chr20 will not work (but --chr 20 will).
+# column reads '20', pass 20, not chr20 (a mismatch is refused, showing the
+# file's spelling).
 chrom=["chr20"]
 
 # Plink 2 filename prefix of .pgen/.pvar/.psam for WES (or WGS restricted to
@@ -21,12 +22,12 @@ plink=["path/to/plink/files"]
 
 # Model file and variance-ratio file from SAIGE step 1: ${out_step1}.rda and
 # ${out_step1}.varianceRatio.txt, relative to the current working directory.
-model_file=["/path/to/model/file"]
-variance_ratio=["/path/to/varianceratio"]
+model_file=["path/to/model/file"]
+variance_ratio=["path/to/varianceratio"]
 
 # Variant annotations (the BRaVa group file), generated here:
 # https://github.com/BRaVa-genetics/variant-annotation
-group_file=["/path/to/group_file"]
+group_file=["path/to/group_file"]
 # The masks for the SAIGE-GENE+ run, ':' joining labels into one mask and
 # ',' separating masks. Every label must appear in the group file, or step 2
 # refuses the run and lists the labels the file has: change them here.
@@ -39,10 +40,14 @@ out_step2=["out"]
 IS_SINGULARITY={"false","true"}
 
 # The GRM from step 0 and its sample IDs:
-# ${out_step0}_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx and
-# the same with .sampleIDs.txt appended.
+# ${out_step0}_relatednessCutoff_${relatedness_cutoff}_5000_randomMarkersUsed.sparseGRM.mtx
+# and the same with .sampleIDs.txt appended.
 GRM=["path/to/GRM/file"]
 GRM_samples=["path/to/GRM/sampleID/file"]
+
+# The relatedness cutoff steps 0 and 1 used (MUST be the same; nothing in SAIGE
+# checks it).
+relatedness_cutoff=0.05
 
 # ---- 1. single-variant tests ------------------------------------------------
 bash 02_step2_SPAtests_variant_and_gene.sh \
@@ -54,7 +59,8 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --outputPrefix ${out_step2}.variant \
     --isSingularity $IS_SINGULARITY \
     --sparseGRM ${GRM} \
-    --sparseGRMID ${GRM_samples}
+    --sparseGRMID ${GRM_samples} \
+    --relatednessCutoff ${relatedness_cutoff}
 
 # ---- 2. SAIGE-GENE+ group tests (six masks x three max MAFs, SKAT-O) --------
 bash 02_step2_SPAtests_variant_and_gene.sh \
@@ -68,14 +74,18 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --outputPrefix ${out_step2}.skato \
     --isSingularity $IS_SINGULARITY \
     --sparseGRM ${GRM} \
-    --sparseGRMID ${GRM_samples}
+    --sparseGRMID ${GRM_samples} \
+    --relatednessCutoff ${relatedness_cutoff}
 
 # ---- 3. FlexRV (one run per weight set) -------------------------------------
 # The group file for a weight set is built ONCE per chromosome by
 # 04_flexrv_groupfile.sh (AlphaMissense first; a second weight set the same
 # way under another name). One mask, one max MAF (0.001), burden statistic;
-# the run writes every transform set's row and the pooled p_FlexRV row.
-flexrv_group_file_AM=["/path/to/group_file.flexrv_AM.txt"]
+# the run writes every transform set's row and the pooled p_FlexRV row (the
+# Group == Cauchy row's Pvalue_Burden). Built with, once per chromosome:
+#   bash download_resources.sh --alphamissense      (once)
+#   bash 04_flexrv_groupfile.sh --group ${group_file} --chr <chromosome number> --name AM --out ${flexrv_group_file_AM}
+flexrv_group_file_AM=["path/to/group_file.flexrv_AM.txt"]
 bash 02_step2_SPAtests_variant_and_gene.sh \
     --chr $chrom \
     --pgen ${pgen} \
@@ -86,7 +96,7 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --outputPrefix ${out_step2}.flexrv_AM \
     --isSingularity $IS_SINGULARITY \
     --sparseGRM ${GRM} \
-    --sparseGRMID ${GRM_samples}
+    --sparseGRMID ${GRM_samples} \
+    --relatednessCutoff ${relatedness_cutoff}
 
-# With --plink instead of --pgen for PLINK 1 genotypes. If step 1 was fitted at
-# a relatedness cutoff other than 0.05, add --relatednessCutoff <that value>.
+# With --plink instead of --pgen for PLINK 1 genotypes.
