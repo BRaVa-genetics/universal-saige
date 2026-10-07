@@ -49,8 +49,8 @@ up next. The parameter record it implements is
 - A refused step-1 fit leaves 0-byte `.rda`/`.varianceRatio.txt` (SAIGE creates
   them before the eligibility check; `saige-slim` LEDGER #171); the step-1 driver
   removes them on a non-zero exit so a refused trait leaves no false model.
-  saige-slim fixed #171 on 2026-10-04, after the pinned `152ffd8c`, so the
-  cleanup stays until the pin moves past it.
+  saige-slim fixed #171 on 2026-10-04 and the pinned `928f95ad` includes it;
+  the driver's cleanup stays, a no-op now, against an older image.
 - `03_estimate_nGlmm.sh` ran the old image by hand, patched R source inside it
   and reinstalled the package; the slim image has `extractNglmm.R` on its PATH.
 - `--dryRun` on steps 1 and 2 prints the SAIGE command.
@@ -125,7 +125,9 @@ checks; it also passes on a SLURM cluster under Apptainer.
 - **Runtime**: Apptainer is used when `singularity` is not on PATH; the `.sif`
   is pulled without a cache and re-pulled when the pin changes. The UKB RAP
   `/mnt/project` bind is gone (`SAIGE_EXTRA_MOUNTS` remains). Image
-  `1.5.2-dev-152ffd8c` (LEDGER #172 and #176 fixed); plink2 alpha 7.11 and
+  `1.5.2-dev-928f95ad` (LEDGER #171, #172 and #176 fixed, and a
+  `.stretchGate.txt` with fixed columns; results byte-identical to
+  `152ffd8c`, which came first); plink2 alpha 7.11 and
   plink 1.9.0 stable.
 - **Step 1**: IRNT for quantitative traits, as AoU (now in the record, from the
   logs). `--relatednessCutoff` is a flag in steps 0, 1 and 3, as in step 2: AoU
