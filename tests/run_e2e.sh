@@ -97,6 +97,11 @@ run s2_refuse_anno_labels fail "${S2[@]}" --testType group --pgen "${IN}/exome/c
   --annotations pLoF,damaging_missense,pLoF:damaging_missense:other_missense --dryRun
 run s2_refuse_lof_label   fail "${S2[@]}" --flexRVscore AM --flexRVlofAnno LoF --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" \
   --modelFile m --varianceRatio v --dryRun
+# FlexRV against a group file with no score:AM line; --chr spelled unlike the .pvar ("chr7" vs "7")
+run s2_refuse_no_score    fail "${S2[@]}" --flexRVscore AM --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" \
+  --modelFile m --varianceRatio v --dryRun
+run s2_refuse_chr_name    fail bash 02_step2_SPAtests_variant_and_gene.sh --isSingularity "${SING}" --chr chr7 --sparseGRM "${GRM}" \
+  --sparseGRMID "${GRMID}" --testType variant --pgen "${IN}/exome/chr7" --modelFile m --varianceRatio v --dryRun
 run s1_refuse_both_geno    fail "${S1[@]}" --traitType quantitative --phenoCol Q_pos --genotypePlink "${VR}" --genotypePgen "${VR}" --dryRun
 run s1_sex_mf_ok           ok   "${S1[@]}" --traitType quantitative --phenoFile "${IN}/pheno_mf.tsv" --phenoCol Q_f --sex F --genotypePlink "${VR}" --dryRun
 run s1_sex_mf_wrong        fail "${S1[@]}" --traitType quantitative --phenoFile "${IN}/pheno_mf.tsv" --phenoCol Q_f --sex M --genotypePlink "${VR}" --dryRun
@@ -158,6 +163,10 @@ with open(sys.argv[1]) as fh, open(sys.argv[2], "w") as out:
             line = " ".join(p[:2] + vals) + "\n"
         out.write(line)
 EOF
+# the FlexRV group file with one region's score line removed: refused before SAIGE runs
+awk '$2 == "score:AM" && !done { done = 1; next } 1' "${OUT}/group.chr7.flexrv_AM.txt" > "${OUT}/group.chr7.flexrv_AM_partial.txt"
+run s2_refuse_partial_score fail "${S2[@]}" --flexRVscore AM --pgen "${IN}/exome/chr7" --groupFile "${OUT}/group.chr7.flexrv_AM_partial.txt" \
+  --modelFile m --varianceRatio v --dryRun
 
 echo "== step 2 (${MAXJOBS} at a time)"
 # independent single-threaded runs (the image sets OMP, OpenBLAS and RcppParallel threads to 1), so

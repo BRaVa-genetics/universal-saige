@@ -134,14 +134,18 @@ optional:
 usage: 02_step2_SPAtests_variant_and_gene.sh
 ```
 required:
-- `--chr`: chromosome to test, spelled as in the `.pvar`/`.bim` (`chr20` or `20`).
+- `--chr`: chromosome to test, spelled as in the `.pvar`/`.bim` (`chr20` or `20`). A spelling the file does not use is refused, with the file's own spelling in the message.
 - `--testType`: type of test `{variant,group}` (implied by `--flexRVscore`).
 - `--pgen`: PLINK 2 filename prefix of `.pgen/.pvar/.psam` for WES (or WGS restricted to exons), **recommended**; or `-p`,`--plink`: the PLINK 1 prefix. Relative to the current working directory. A `--vcf` is refused: convert once with plink2.
 - `--modelFile`, `--varianceRatio`: the step-1 outputs. Relative to the current working directory.
 - `--sparseGRM`, `--sparseGRMID`: the step-0 GRM and its sample IDs. Relative to the current working directory.
 
 optional:
-- `-o`,`--outputPrefix`: output prefix (step 2). Group tests also write `<prefix>.txt.singleAssoc.txt`, `.markerList.txt`, `.skatoMethod.txt` (which p-value method each SKAT-O cell used) and, when there is something to report, the sidecars `.pooledTests.txt`, `.skatFailures.txt`, `.spaFallbacks.txt`.
+- `-o`,`--outputPrefix`: output prefix (step 2). Group tests also write `<prefix>.txt.singleAssoc.txt`, `.markerList.txt`, `.skatoMethod.txt` (which p-value method each SKAT-O cell used) and, when there is something to report, the sidecars `.pooledTests.txt`, `.skatFailures.txt`, `.spaFallbacks.txt`, and four that name cells whose p-value came by an unusual route (image `152ffd8c`; each written only when non-empty, one row per cell with its region, mask, max MAF and weight set):
+  - `.exactByWeight.txt`: weighted cells (a FlexRV transform or a weight line) whose weight one variant effectively carries. They take the exact test on their carriers instead of the saddlepoint, which converged to confident wrong answers there (saige-slim LEDGER #172). The exact test carries no relatedness correction (LEDGER #177).
+  - `.exactByWeightAboveCap.txt`: cells concentrated the same way but with more than 13 material carriers, too many to enumerate, so their p-value is still the saddlepoint, in the regime where it is least trusted (LEDGER #176). Observation only: the first place to look if a result is surprising.
+  - `.spaPinned.txt` (binary traits): tests whose saddlepoint left out samples the null model holds near-certain (flip probability at or below 1e-8), or would have but for the budget (LEDGER #174).
+  - `.stretchGate.txt` (binary traits, weighted cells): cells the variance ratio stretches far relative to the rest of their score; the most stretched report the exact convolution at the unstretched score in place of the saddlepoint (LEDGER #176).
 - `-s`,`--isSingularity` (default: false).
 - `-g`,`--groupFile`: required for a group test. The annotation file.
 - `--annotations`: required for a group test. `':'` joins labels into one mask, `','` separates masks. For SAIGE-GENE+ use `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`.
@@ -152,7 +156,7 @@ optional:
 - `--condition`, `--subSampleFile`, `--dryRun` (prints the SAIGE command).
 
 FlexRV (one run per weight set):
-- `--flexRVscore NAME`: run FlexRV on the group file's `score:NAME` line (built by step 4 below). One annotation mask (default `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`), one max MAF (`--flexRVmaxMAF`, default 0.001), burden statistic. The results file carries one row per transform set and the pooled `p_FlexRV` row (`Group == Cauchy`).
+- `--flexRVscore NAME`: run FlexRV on the group file's `score:NAME` line (built by step 4 below). Every region needs that line; a group file with none, or one per some regions only, is refused. One annotation mask (default `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`), one max MAF (`--flexRVmaxMAF`, default 0.001), burden statistic. The results file carries one row per transform set and the pooled `p_FlexRV` row (`Group == Cauchy`).
 - `--flexRVlofAnno` (default `pLoF`): the label(s) the `lof` transform keys on, the same labels the score line was built with.
 
 ### Step 4: FlexRV weights (once per chromosome per weight set)

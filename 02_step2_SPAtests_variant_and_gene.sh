@@ -150,11 +150,15 @@ while [[ $# -gt 0 ]]; do
     --varianceRatio: filename of the varianceRatio file output from step 1. This must be relative to, and contained within, the current working directory.
     --sparseGRM: filename of the sparseGRM .mtx file. This must be relative to, and contained within, the current working directory.
     --sparseGRMID: filename of the sparseGRM ID file. This must be relative to, and contained within, the current working directory.
-    --chr: chromosome to test (spelled as in the .pvar/.bim, e.g. chr20 or 20).
+    --chr: chromosome to test (spelled as in the .pvar/.bim, e.g. chr20 or 20; a spelling the file does not use is refused).
   optional:
     -o,--outputPrefix: output prefix of the SAIGE step 2 output. The results are <prefix>.txt; group tests also write
       <prefix>.txt.singleAssoc.txt, .markerList.txt, .skatoMethod.txt (the p-value method of every SKAT-O cell), and the
-      sidecars .pooledTests.txt, .skatFailures.txt, .spaFallbacks.txt (each only when there is something to report).
+      sidecars .pooledTests.txt, .skatFailures.txt, .spaFallbacks.txt and, from image 152ffd8c, .exactByWeight.txt (weighted
+      cells one variant carries, given the exact test instead of the saddlepoint), .exactByWeightAboveCap.txt (such cells
+      with too many carriers to enumerate, left on the saddlepoint), .spaPinned.txt (binary: tests whose saddlepoint left
+      out samples the model holds certain) and .stretchGate.txt (binary weighted cells the variance ratio stretches; the
+      most stretched report the exact convolution). Each only when there is something to report; see the README.
     -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
     -g,--groupFile: required if group test is selected. Filename of the annotation file used for group tests. This must be relative to, and contained within, the current working directory.
     --annotations: required if group test is selected. Comma separated list of annotation masks to test (':' joins labels INTO one mask, ',' separates masks). Please use
@@ -165,7 +169,8 @@ while [[ $# -gt 0 ]]; do
     --subSampleFile: single-column file of sample IDs to restrict the test to.
     --dryRun: print the SAIGE command instead of running it.
   FlexRV (Schwartzentruber et al. 2025; a group test, burden statistic, 16 score x up to 12 MAF transforms per gene):
-    --flexRVscore NAME: run FlexRV on the group file's 'score:NAME' line (see 04_flexrv_groupfile.sh). Implies --testType group,
+    --flexRVscore NAME: run FlexRV on the group file's 'score:NAME' line, which every region must have, or the run is
+      refused (see 04_flexrv_groupfile.sh). Implies --testType group,
       ONE annotation mask (default 'pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering'),
       ONE max MAF (--flexRVmaxMAF, default 0.001) and r.corr = 1.
     --flexRVlofAnno (default: pLoF): the label(s) the 'lof' score transform keys on; must be the labels used when the score line was built.
@@ -271,14 +276,17 @@ if [[ ${TESTTYPE} == "group" ]]; then
   case ${GROUPFILE} in *.gz|*.bgz) read_group="gzip -cd" ;; *) read_group="cat" ;; esac
   asked="${ANNOTATIONS}"
   [[ ${FLEXRV_SCORE} != "" ]] && asked="${asked},${FLEXRV_LOFANNO}"
-  # line 1: the labels asked for that the file lacks; line 2: the labels it has
-  labels=$(${read_group} "${GROUPFILE}" | awk -v asked="${asked}" '
+  # line 1: the labels asked for that the file lacks; line 2: the labels it has;
+  # line 3: regions (var lines) and, for FlexRV, score:<NAME> lines
+  labels=$(${read_group} "${GROUPFILE}" | awk -v asked="${asked}" -v score="score:${FLEXRV_SCORE}" '
+    $2 == "var" { nvar++ }
+    $2 == score { nscore++ }
     $2 == "anno" { for (i = 3; i <= NF; i++) if (!($i in seen)) { seen[$i]; order[++n] = $i } }
     END {
       m = split(asked, a, /[,:;]/)
       for (i = 1; i <= m; i++) if (a[i] != "" && !(a[i] in seen) && !(a[i] in told)) { told[a[i]]; miss = miss " " a[i] }
       for (i = 1; i <= n; i++) have = have " " order[i]
-      print miss; print have
+      print miss; print have; print nvar + 0, nscore + 0
     }')
   missing=$(echo "${labels}" | sed -n 1p)
   if [[ -n ${missing# } ]]; then
@@ -296,10 +304,32 @@ if [[ ${TESTTYPE} == "group" ]]; then
     fi
     exit 1
   fi
+  # FlexRV reads its weights from a score:<NAME> line, which every region needs
+  # (one value per variant on its var line; 04_flexrv_groupfile.sh writes them).
+  # The AoU step-2 wrapper refuses a file that lacks them before any compute.
+  if [[ ${FLEXRV_SCORE} != "" ]]; then
+    read -r nvar nscore <<< "$(echo "${labels}" | sed -n 3p)"
+    if (( nscore != nvar )); then
+      echo "ERROR: --flexRVscore ${FLEXRV_SCORE} needs one 'score:${FLEXRV_SCORE}' line per region; ${GROUPFILE}"
+      echo "  has ${nscore} for ${nvar} region(s). Build the file with 04_flexrv_groupfile.sh --name ${FLEXRV_SCORE}, or pass the"
+      echo "  name of the score line the file does carry."
+      exit 1
+    fi
+  fi
 fi
 
 if [[ ${CHR:-} == "" ]]; then
   echo "--chr not set"
+  exit 1
+fi
+
+# --chr must be spelled as column 1 of the .pvar/.bim spells it ("20" vs "chr20"):
+# SAIGE matches it exactly, and a mismatch is not an error there. The AoU
+# step-2 wrapper refuses it before any compute; so does this.
+if [[ ${PGEN} != "" ]]; then varfile="${PGEN}.pvar"; else varfile="${PLINK}.bim"; fi
+if [[ -r ${varfile} ]] && ! awk -v c="${CHR}" '!/^#/ && $1 == c { found = 1; exit } END { exit !found }' "${varfile}"; then
+  echo "ERROR: --chr ${CHR} is not in column 1 of ${varfile}, which has: $(awk '!/^#/ { if (!($1 in s)) { s[$1]; printf "%s ", $1; if (++n == 5) exit } }' "${varfile}")"
+  echo "  Pass --chr spelled as the file spells it (e.g. '20' or 'chr20')."
   exit 1
 fi
 
