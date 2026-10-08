@@ -201,7 +201,13 @@ def stream_alphamissense(path, wanted, chrom_filter=None, source="canonical",
             score = float(f[idx_p])
             tx = f[idx_t]
             if collect_all:
-                allrows.setdefault(key, []).append((score, tx, source))
+                # UniProt accession, isoform suffix dropped; the isoforms file
+                # has no such column. It is what ties two canonical-file
+                # transcripts to one protein (NEB: ENST00000409198 and
+                # ENST00000172853 are both P20929).
+                up = (f[header.index("uniprot_id")].split("-")[0]
+                      if "uniprot_id" in header else None)
+                allrows.setdefault(key, []).append((score, tx, source, up))
             prev = hits.get(key)
             if prev is None:
                 hits[key] = (score, tx)
@@ -556,8 +562,11 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
     # times upward and 411 downward, and 392 of 4,172 variants in two genes
     # with different transcripts got the identical score in both
     # (genebass-burden controls/AM_ACMG_CUTOFF.md, 2026-10-08). Now, in order:
-    #   a. the canonical-file row (the transcript DeepMind evaluated), if
-    #      exactly one is eligible -- two are two genes' canonicals, ambiguous;
+    #   a. the canonical-file row (the transcript DeepMind evaluated). That file
+    #      is one transcript per UniProt entry, not per gene, so a coordinate
+    #      can carry several: rows sharing ONE accession are one protein and
+    #      are averaged (NEB, 5,904 chr2 variants); rows of different
+    #      accessions are different genes, ambiguous, and fall through to b;
     #   b. the eligible isoform rows, restricted to those the MANE summary puts
     #      in this gene when there are any; several are AVERAGED, a choice that
     #      does not look at the scores (a max would reintroduce the bias);
@@ -567,7 +576,8 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
     # puts it in a different gene. No rule here picks a row by its score.
     pick_stats = dict.fromkeys(
         ("by_transcript", "fallback_canonical", "fallback_isoform",
-         "fallback_isoform_averaged", "missing_no_row", "missing_excluded",
+         "fallback_canonical_averaged", "fallback_isoform_averaged",
+         "missing_no_row", "missing_excluded",
          "fallback_max"), 0)
     mane_genes = read_mane_genes(mane_path) if (mane_path and prefer_tx) else None
     tx_at = {}  # variant -> {gene: annotation transcript}, version-stripped
@@ -590,7 +600,7 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
             return None
         if want:
             w = want.split(".")[0]
-            for score, tx, src in cands:
+            for score, tx, src, _ in cands:
                 if tx.split(".")[0] == w:
                     pick_stats["by_transcript"] += 1
                     return (score, tx, True, "matched")
@@ -604,16 +614,19 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
             return mane_genes.get(tx) if mane_genes is not None else None
 
         ok = []
-        for score, tx, src in cands:
+        for score, tx, src, up in cands:
             t = tx.split(".")[0]
             mg = gene_of(t)
             if t in others or (mg is not None and gene not in mg):
                 continue
-            ok.append((score, tx, src, mg is not None))
+            ok.append((score, tx, src, mg is not None, up))
         canon = [c for c in ok if c[2] == "canonical"]
-        if len(canon) == 1:
+        if canon and len(set(c[4] for c in canon)) == 1:
             pick_stats["fallback_canonical"] += 1
-            return (canon[0][0], canon[0][1], False, "canonical")
+            if len(canon) > 1:
+                pick_stats["fallback_canonical_averaged"] += 1
+            return (sum(c[0] for c in canon) / len(canon),
+                    ",".join(sorted(c[1] for c in canon)), False, "canonical")
         iso = [c for c in ok if c[2] == "isoforms"]
         if any(c[3] for c in iso):
             iso = [c for c in iso if c[3]]
@@ -811,12 +824,14 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
             print("# fallback (LEGACY max over every row at the coordinate): %d"
                   % ps["fallback_max"], file=log)
         else:
-            print("# fallback%s: %d fallback-canonical, %d fallback-same-gene-isoform "
-                  "(%d averaged over >1 isoform), %d missing (only rows of "
-                  "transcripts another gene uses -> --missing); plus %d with no "
+            print("# fallback%s: %d fallback-canonical (%d averaged over >1 transcript "
+                  "of one UniProt entry), %d fallback-same-gene-isoform "
+                  "(%d averaged over >1 isoform), %d missing (only rows another gene "
+                  "uses, or canonical rows of >1 UniProt entry -> --missing); plus %d with no "
                   "AlphaMissense row at all"
                   % ("" if chrom_filter is None else " on chr%s" % chrom_filter,
-                     ps["fallback_canonical"], ps["fallback_isoform"],
+                     ps["fallback_canonical"], ps["fallback_canonical_averaged"],
+                     ps["fallback_isoform"],
                      ps["fallback_isoform_averaged"], ps["missing_excluded"],
                      ps["missing_no_row"]), file=log)
             if mane_genes is None:
@@ -1313,12 +1328,14 @@ def _selftest():
     #   S3 P only: TP 0.20 (iso), TPC 0.70      -> P: 0.20 (matched beats canonical)
     #   S4 shared: TP1 0.40, TP2 0.60 (iso), TQ 0.99 -> P: 0.50 (isoform mean)
     #   S5 P only: TR 0.80 (iso), MANE puts TR in GENER -> with --mane: missing
-    #   S6 P only: two canonical rows TX 0.10, TY 0.85 -> ambiguous: missing
+    #   S6 P only: canonical TX 0.10 (UniProt P1), TY 0.85 (P2) -> ambiguous: missing
+    #   S7 P only: canonical TZ1 0.20, TZ2 0.60, both P3 -> one protein: 0.40
     #   M1..M3 P only: matched TP 0.11/0.22/0.33
     fx = {"S1": 5001, "S2": 5002, "S3": 5003, "S4": 5004, "S5": 5005,
-          "S6": 5006, "M1": 5011, "M2": 5012, "M3": 5013}
+          "S6": 5006, "S7": 5007, "M1": 5011, "M2": 5012, "M3": 5013}
     vid = dict((k, "20:%d:A:G" % p) for k, p in fx.items())
-    p_ids = [vid[k] for k in ("S1", "S2", "S3", "S4", "S5", "S6", "M1", "M2", "M3")]
+    p_ids = [vid[k] for k in ("S1", "S2", "S3", "S4", "S5", "S6", "S7",
+                              "M1", "M2", "M3")]
     q_ids = [vid[k] for k in ("S1", "S2", "S4")]
     gf3 = os.path.join(tmp, "group_shared.txt")
     with open(gf3, "w") as fh:
@@ -1337,8 +1354,9 @@ def _selftest():
                 fh.write("\t".join([v, g, "NA", "0", "0", "missense_variant", tx,
                                     "NM_1", "YES", "protein_coding", "0",
                                     "missense"]) + "\n")
-    canon_rows = [("S1", "ENST000000TPC.1", 0.30), ("S3", "ENST000000TPC.1", 0.70),
-                  ("S6", "ENST0000000TX.1", 0.10), ("S6", "ENST0000000TY.1", 0.85)]
+    canon_rows = [("S1", "ENST000000TPC.1", 0.30, "P0"), ("S3", "ENST000000TPC.1", 0.70, "P0"),
+                  ("S6", "ENST0000000TX.1", 0.10, "P1"), ("S6", "ENST0000000TY.1", 0.85, "P2"),
+                  ("S7", "ENST000000TZ1.1", 0.20, "P3"), ("S7", "ENST000000TZ2.1", 0.60, "P3-2")]
     iso_rows = [("S1", "ENST0000000TQ.2", 0.95), ("S2", "ENST0000000TQ.2", 0.90),
                 ("S3", "ENST0000000TP.2", 0.20), ("S4", "ENST000000TP1.1", 0.40),
                 ("S4", "ENST000000TP2.1", 0.60), ("S4", "ENST0000000TQ.2", 0.99),
@@ -1347,8 +1365,8 @@ def _selftest():
     am3c = os.path.join(tmp, "am_shared_canon.tsv.gz")
     with gzip.open(am3c, "wt") as fh:
         fh.write("\t".join(AM_CANONICAL_COLS) + "\n")
-        for k, tx, sc in canon_rows:
-            fh.write("\t".join(["chr20", str(fx[k]), "A", "G", "hg38", "P0", tx,
+        for k, tx, sc, up in canon_rows:
+            fh.write("\t".join(["chr20", str(fx[k]), "A", "G", "hg38", up, tx,
                                 "A1B", "%.4f" % sc, "ambiguous"]) + "\n")
     am3i = os.path.join(tmp, "am_shared_iso.tsv.gz")
     with gzip.open(am3i, "wt") as fh:
@@ -1396,11 +1414,13 @@ def _selftest():
           abs(new3[P][vid["S3"]] - 0.20) < 5e-5 and abs(old3[P][vid["S3"]] - 0.20) < 5e-5)
     check("fallback: same-gene isoforms averaged (0.50), other gene's 0.99 excluded",
           abs(new3[P][vid["S4"]] - 0.50) < 5e-5)
-    # with --mane: scored P rows are S1 .30, S3 .20, S4 .50, M .11 .22 .33
-    gm = (0.30 + 0.20 + 0.50 + 0.11 + 0.22 + 0.33) / 6
+    # with --mane: scored P rows are S1 .30, S3 .20, S4 .50, S7 .40, M .11 .22 .33
+    gm = (0.30 + 0.20 + 0.50 + 0.40 + 0.11 + 0.22 + 0.33) / 7
     check("fallback: only another gene's row -> --missing (P's gene mean)",
           abs(newm3[P][vid["S2"]] - gm) < 5e-5)
-    check("fallback: two canonical rows of unknown gene -> missing, not max",
+    check("fallback: canonical rows of ONE UniProt entry averaged (0.40), not max",
+          abs(newm3[P][vid["S7"]] - 0.40) < 5e-5 and abs(old3[P][vid["S7"]] - 0.60) < 5e-5)
+    check("fallback: canonical rows of two UniProt entries -> missing, not max",
           abs(newm3[P][vid["S6"]] - gm) < 5e-5)
     check("fallback: --mane excludes an isoform MANE puts in another gene",
           abs(newm3[P][vid["S5"]] - gm) < 5e-5 and abs(new3[P][vid["S5"]] - 0.80) < 5e-5)
