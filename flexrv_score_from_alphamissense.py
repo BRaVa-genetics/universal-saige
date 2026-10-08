@@ -297,7 +297,7 @@ def read_gtf_genes(path, chrom_filter=None):
 
 def read_anno_table(path, id_col="ID", gene_col="GENE", tx_col="TRANSCRIPT",
                     mane_col="MANE_SELECT", csq_col="CSQ", score_col=None,
-                    zero_is_missing=True):
+                    zero_is_missing=True, keep_ids=None):
     """Per-variant transcript context from a BRaVa long-form annotation table.
 
     That table is the SOURCE of the group file -- one row per (gene, variant),
@@ -308,6 +308,10 @@ def read_anno_table(path, id_col="ID", gene_col="GENE", tx_col="TRANSCRIPT",
     transcript it scored, and this names the transcript the annotation used.
 
     Returns {(gene, variant_id): (transcript, mane_accession_or_None, csq)}.
+    `keep_ids`: keep only rows at these variant IDs (every gene, every
+    consequence). Every lookup is at a missense-bin variant, so passing that
+    set changes no output; it drops the non_coding bulk, which on AoU is most
+    of the table and made 4 large chromosomes at once swap a 16 GB machine.
     """
     ctx = {}
     with smart_open(path) as fh:
@@ -321,6 +325,8 @@ def read_anno_table(path, id_col="ID", gene_col="GENE", tx_col="TRANSCRIPT",
             raise SystemExit("%s: expected columns %s; got %s (%s)" % (
                 path, [id_col, gene_col, tx_col, mane_col, csq_col], header, e))
         for raw in fh:
+            if keep_ids is not None and raw.split("\t", i_id + 1)[i_id] not in keep_ids:
+                continue
             f = raw.rstrip("\n").split("\t")
             mane = f[i_m]
             extra = None
@@ -478,8 +484,10 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
     zim = SCORE_COLUMNS.get(score_column, (None, True))[1]
     if zero_is_missing is not None:
         zim = zero_is_missing
+    mis_ids = set(v for g in order
+                  for v, a in zip(regions[g]["var"], regions[g]["anno"]) if a in mis)
     anno_ctx = (read_anno_table(anno_table_path, score_col=score_column,
-                                zero_is_missing=zim)
+                                zero_is_missing=zim, keep_ids=mis_ids)
                 if anno_table_path else None)
 
     # --- the keys we need: missense variants only
@@ -769,7 +777,10 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
 
     prov = open(provenance, "w") if provenance else None
     if prov is not None:
-        prov.write("GENE\tID\tSOURCE\tTRANSCRIPT\tAM\n")
+        # ANNOTATION/CSQ/ANNO_TRANSCRIPT: the bin, the most severe VEP consequence
+        # and the transcript it was called on -- whether a missense-bin variant
+        # is missense at all; SOURCE/TRANSCRIPT/AM: where its score came from
+        prov.write("GENE\tID\tANNOTATION\tCSQ\tANNO_TRANSCRIPT\tSOURCE\tTRANSCRIPT\tAM\n")
     out_lines = []
     for gene in order:
         r = regions[gene]
@@ -785,8 +796,10 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
                 key = parse_variant_id(vid, id_format)
                 hit = pick(gene, vid, key)
                 if prov is not None:
-                    prov.write("%s\t%s\t%s\t%s\t%s\n" % (
-                        gene, vid, "missing" if hit is None else hit[3],
+                    actx = (anno_ctx.get((gene, vid)) if anno_ctx else None) or ("NA",) * 3
+                    prov.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (
+                        gene, vid, anno, actx[2], actx[0],
+                        "missing" if hit is None else hit[3],
                         "." if hit is None else hit[1],
                         "NA" if hit is None else "%.6f" % hit[0]))
                 if hit is None:
@@ -1492,6 +1505,13 @@ def _selftest():
               anno_table_path=anno3, isoforms_path=am3i, prefer_anno_transcript=True,
               mane_path=mane3, gtf_path=gtf3, log=lg)
     newg3 = per_gene(o)
+    prov3 = os.path.join(tmp, "shared_gtf.prov.tsv")
+    build(gf3, os.path.join(tmp, "shared_prov.txt"), am3c, ["pLoF"], ["missense"],
+          score_name="AM", anno_table_path=anno3, isoforms_path=am3i,
+          prefer_anno_transcript=True, mane_path=mane3, gtf_path=gtf3,
+          provenance=prov3, log=open(os.devnull, "w"))
+    prows = [l.rstrip("\n").split("\t") for l in open(prov3)]
+    pz = [r for r in prows if r[0] == "GENEZ"]
     P, Q = "GENEP", "GENEQ"
     check("fallback: LEGACY rule takes GENEQ's 0.95 for GENEP at a shared site",
           abs(old3[P][vid["S1"]] - 0.95) < 5e-5 and abs(old3[P][vid["S2"]] - 0.90) < 5e-5
@@ -1525,6 +1545,13 @@ def _selftest():
           "GENEZ (1 of 1 missense)" in open(gtf_log).read())
     check("gtf: GENEP/GENEQ unchanged (own rows kept; retired TZ1/TZ2 still averaged)",
           all(newg3[g][v] == newm3[g][v] for g in (P, Q) for v in newm3[g]))
+    check("provenance: header carries the annotation context and the AM source",
+          prows[0] == ["GENE", "ID", "ANNOTATION", "CSQ", "ANNO_TRANSCRIPT",
+                       "SOURCE", "TRANSCRIPT", "AM"])
+    check("provenance: one row per missense variant, bin/CSQ/transcript from the table",
+          len(prows) - 1 == len(p_ids) + len(q_ids) + 1 and
+          pz == [["GENEZ", vid["S8"], "missense", "missense_variant",
+                  "ENST000000TZZ", "missing", ".", "NA"]])
     check("fallback: no non-imputed score moves UP against the legacy max",
           all(new3[P][vid[k]] <= old3[P][vid[k]] + 5e-5 for k in ("S1", "S3", "S4", "S5")))
 
@@ -1607,8 +1634,10 @@ def main():
                     "built on (v39 for AoU v8). With --prefer-anno-transcript, a "
                     "fallback row whose transcript it puts in another gene is never "
                     "used -- e.g. a readthrough gene taking its partner's score.")
-    ap.add_argument("--provenance", help="write GENE/ID/SOURCE/TRANSCRIPT/AM per "
-                    "missense variant: which row each score came from")
+    ap.add_argument("--provenance", help="write one line per missense-bin variant: "
+                    "GENE, ID, ANNOTATION, CSQ, ANNO_TRANSCRIPT (from --anno-table) "
+                    "and SOURCE, TRANSCRIPT, AM (which AlphaMissense row its score "
+                    "came from, before imputation)")
     # Reproduces group files built before 2026-10 (fallback = max over every
     # row at the coordinate); biased upward, so not offered in --help.
     ap.add_argument("--legacy-max-fallback", action="store_true",
