@@ -55,6 +55,12 @@ release offers directly. Two honest routes:
     falling back to canonical otherwise. This is the literal request, and it
     inherits DeepMind's caution on every row it takes from the isoforms file.
     The run reports how many rows came from each source.
+  * --isoforms --anno-table <BRaVa table> --prefer-anno-transcript (what
+    04_flexrv_groupfile.sh does with --annoTable): the row scored on the
+    transcript the annotation used. Where AlphaMissense has none, the
+    canonical row, else a same-gene isoform row, else --missing; never a row
+    on a transcript another gene uses (pick() in build() has the rule and the
+    measurement behind it).
 
 Join keys are built from the group file's own variant IDs; the format is
 auto-detected from the first ID and can be forced with --id-format. Only the
@@ -195,7 +201,7 @@ def stream_alphamissense(path, wanted, chrom_filter=None, source="canonical",
             score = float(f[idx_p])
             tx = f[idx_t]
             if collect_all:
-                allrows.setdefault(key, []).append((score, tx))
+                allrows.setdefault(key, []).append((score, tx, source))
             prev = hits.get(key)
             if prev is None:
                 hits[key] = (score, tx)
@@ -231,6 +237,25 @@ def read_mane_transcripts(path):
                     if cell.startswith("ENST"):
                         mane.add(cell.split(".")[0])
     return mane
+
+
+def read_mane_genes(path):
+    """{Ensembl transcript (version-stripped): {Ensembl gene, symbol}} for
+    EVERY transcript in a MANE summary (Select and Plus Clinical), so a row's
+    transcript can be checked against the gene it is being used for."""
+    genes = {}
+    with smart_open(path) as fh:
+        header = fh.readline().rstrip("\n").split("\t")
+        try:
+            i_t, i_g = header.index("Ensembl_nuc"), header.index("Ensembl_Gene")
+            i_s = header.index("symbol")
+        except ValueError as e:
+            raise SystemExit("%s: expected Ensembl_nuc/Ensembl_Gene/symbol columns "
+                             "of a MANE summary (%s)" % (path, e))
+        for raw in fh:
+            f = raw.rstrip("\n").split("\t")
+            genes[f[i_t].split(".")[0]] = {f[i_g].split(".")[0], f[i_s]}
+    return genes
 
 
 def read_anno_table(path, id_col="ID", gene_col="GENE", tx_col="TRANSCRIPT",
@@ -353,8 +378,15 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
           chrom_filter=None, isoforms_path=None, mane_path=None,
           replace_existing=False, anno_table_path=None,
           prefer_anno_transcript=False, drop_anno=(), score_column=None,
-          score_transform=None, zero_is_missing=None, log=sys.stderr):
+          score_transform=None, zero_is_missing=None, fallback="safe",
+          provenance=None, log=sys.stderr):
     """Write `group_out` = `group_in` with a score line per region.
+
+    `fallback` is what --prefer-anno-transcript does when AlphaMissense has no
+    row on the annotation's transcript: "safe" (see pick()), or "max", the rule
+    before 2026-10, kept only so files built with it can be reproduced.
+    `provenance`, a path, gets one line per missense (gene, variant): the
+    source of its score, the transcript(s) and the value before imputation.
 
     Returns a dict of counts -- the report is part of the output, because
     "how many missense variants got a real AlphaMissense score" is the number
@@ -515,29 +547,84 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
     # on coordinates alone would let a neighbouring gene's MANE transcript win
     # at a shared position, which is real here: 606 coordinates carry more than
     # one row.
-    pick_stats = {"by_transcript": 0, "fallback_other_tx": 0, "none": 0}
+    #
+    # When AlphaMissense has no row on that transcript, the fallback used to be
+    # the max over EVERY row at the coordinate, any transcript of any gene.
+    # That is biased upward (a max over correlated scores) and borrows an
+    # overlapping gene's score: on AoU chr20, against the shipped-canonical
+    # build, changed rows moved up 63.5% / down 36.5%, 0.906 was crossed 1,007
+    # times upward and 411 downward, and 392 of 4,172 variants in two genes
+    # with different transcripts got the identical score in both
+    # (genebass-burden controls/AM_ACMG_CUTOFF.md, 2026-10-08). Now, in order:
+    #   a. the canonical-file row (the transcript DeepMind evaluated), if
+    #      exactly one is eligible -- two are two genes' canonicals, ambiguous;
+    #   b. the eligible isoform rows, restricted to those the MANE summary puts
+    #      in this gene when there are any; several are AVERAGED, a choice that
+    #      does not look at the scores (a max would reintroduce the bias);
+    #   c. nothing, so the --missing policy applies.
+    # A row is ineligible when its transcript is the one the annotation assigns
+    # to a DIFFERENT gene at this coordinate, or (with --mane) the MANE summary
+    # puts it in a different gene. No rule here picks a row by its score.
+    pick_stats = dict.fromkeys(
+        ("by_transcript", "fallback_canonical", "fallback_isoform",
+         "fallback_isoform_averaged", "missing_no_row", "missing_excluded",
+         "fallback_max"), 0)
+    mane_genes = read_mane_genes(mane_path) if (mane_path and prefer_tx) else None
+    tx_at = {}  # variant -> {gene: annotation transcript}, version-stripped
+    if prefer_tx:
+        for (g, vid), ctx in anno_ctx.items():
+            if ctx[0] and ctx[0] not in ("NA", "."):
+                tx_at.setdefault(vid, {})[g] = ctx[0].split(".")[0]
 
     def pick(gene, vid, key):
-        """(score, transcript, matched_annotation_transcript) or None."""
+        """(score, transcript, matched_annotation_transcript, source) or None."""
         if key is None:
             return None
         if not prefer_tx:
             h = hits.get(key)
-            return None if h is None else (h[0], h[1], None)
+            return None if h is None else (h[0], h[1], None, "canonical")
         want = anno_ctx.get((gene, vid), (None, None, None, None))[0]
         cands = allrows.get(key)
         if not cands:
-            pick_stats["none"] += 1
+            pick_stats["missing_no_row"] += 1
             return None
         if want:
             w = want.split(".")[0]
-            for score, tx in cands:
+            for score, tx, src in cands:
                 if tx.split(".")[0] == w:
                     pick_stats["by_transcript"] += 1
-                    return (score, tx, True)
-        best = max(cands, key=lambda c: c[0])
-        pick_stats["fallback_other_tx"] += 1
-        return (best[0], best[1], False)
+                    return (score, tx, True, "matched")
+        if fallback == "max":
+            best = max(cands, key=lambda c: c[0])
+            pick_stats["fallback_max"] += 1
+            return (best[0], best[1], False, "max")
+        others = set(t for g, t in tx_at.get(vid, {}).items() if g != gene)
+
+        def gene_of(tx):
+            return mane_genes.get(tx) if mane_genes is not None else None
+
+        ok = []
+        for score, tx, src in cands:
+            t = tx.split(".")[0]
+            mg = gene_of(t)
+            if t in others or (mg is not None and gene not in mg):
+                continue
+            ok.append((score, tx, src, mg is not None))
+        canon = [c for c in ok if c[2] == "canonical"]
+        if len(canon) == 1:
+            pick_stats["fallback_canonical"] += 1
+            return (canon[0][0], canon[0][1], False, "canonical")
+        iso = [c for c in ok if c[2] == "isoforms"]
+        if any(c[3] for c in iso):
+            iso = [c for c in iso if c[3]]
+        if iso:
+            pick_stats["fallback_isoform"] += 1
+            if len(iso) > 1:
+                pick_stats["fallback_isoform_averaged"] += 1
+            return (sum(c[0] for c in iso) / len(iso),
+                    ",".join(sorted(c[1] for c in iso)), False, "isoform")
+        pick_stats["missing_excluded"] += 1
+        return None
 
     # --- transcript diagnostics, and an EXPLAINED coverage gap ------------
     # A bare coverage percentage is not interpretable: AlphaMissense scores
@@ -616,6 +703,9 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
               "from_isoform": from_isoform, "mane_hits": mane_hits}
     counts.update({"diag_" + k: v for k, v in counts_diag.items()})
 
+    prov = open(provenance, "w") if provenance else None
+    if prov is not None:
+        prov.write("GENE\tID\tSOURCE\tTRANSCRIPT\tAM\n")
     out_lines = []
     for gene in order:
         r = regions[gene]
@@ -630,6 +720,11 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
                 counts["missense"] += 1
                 key = parse_variant_id(vid, id_format)
                 hit = pick(gene, vid, key)
+                if prov is not None:
+                    prov.write("%s\t%s\t%s\t%s\t%s\n" % (
+                        gene, vid, "missing" if hit is None else hit[3],
+                        "." if hit is None else hit[1],
+                        "NA" if hit is None else "%.6f" % hit[0]))
                 if hit is None:
                     raw_scores.append(None)
                     kinds.append("missense_missing")
@@ -700,14 +795,34 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
             else:
                 out_lines.append(raw)
 
+    if prov is not None:
+        prov.close()
     if prefer_tx:
-        tot = pick_stats["by_transcript"] + pick_stats["fallback_other_tx"]
-        print("# transcript-matched selection: %d of %d scored rows took the row "
-              "AlphaMissense computed on the ANNOTATION's own transcript (%.2f%%); "
-              "%d fell back to another transcript's row"
-              % (pick_stats["by_transcript"], tot,
-                 100.0 * pick_stats["by_transcript"] / max(1, tot),
-                 pick_stats["fallback_other_tx"]), file=log)
+        ps = pick_stats
+        fell = (ps["fallback_canonical"] + ps["fallback_isoform"] + ps["fallback_max"]
+                + ps["missing_excluded"])
+        tot = ps["by_transcript"] + fell
+        print("# transcript-matched selection: %d of %d missense rows with an "
+              "AlphaMissense row took the row AlphaMissense computed on the "
+              "ANNOTATION's own transcript (%.2f%%); %d had no row on it"
+              % (ps["by_transcript"], tot,
+                 100.0 * ps["by_transcript"] / max(1, tot), fell), file=log)
+        if fallback == "max":
+            print("# fallback (LEGACY max over every row at the coordinate): %d"
+                  % ps["fallback_max"], file=log)
+        else:
+            print("# fallback%s: %d fallback-canonical, %d fallback-same-gene-isoform "
+                  "(%d averaged over >1 isoform), %d missing (only rows of "
+                  "transcripts another gene uses -> --missing); plus %d with no "
+                  "AlphaMissense row at all"
+                  % ("" if chrom_filter is None else " on chr%s" % chrom_filter,
+                     ps["fallback_canonical"], ps["fallback_isoform"],
+                     ps["fallback_isoform_averaged"], ps["missing_excluded"],
+                     ps["missing_no_row"]), file=log)
+            if mane_genes is None:
+                print("# (no --mane: a row is excluded only when the annotation "
+                      "assigns its transcript to another gene at that coordinate)",
+                      file=log)
 
     with open(group_out, "w") as fh:
         fh.write("\n".join(out_lines) + "\n")
@@ -1189,6 +1304,114 @@ def _selftest():
     check("column: percentile-in-gene gives EACH gene its own top rank of 1.0",
           len(tops) == 2 and all(abs(t - 1.0) < 1e-9 for t in tops))
 
+    # ---- FALLBACK CONTROL: no row on the annotation's transcript
+    # Two genes share coordinates. GENEP's annotation transcript TP is absent
+    # from AlphaMissense; GENEQ's TQ is present and scores HIGH. The legacy max
+    # fallback hands GENEP GENEQ's score; the fallback must not.
+    #   S1 shared: canonical TPC 0.30, TQ 0.95  -> P: 0.30 (canonical)
+    #   S2 shared: only TQ 0.90                 -> P: missing (gene mean)
+    #   S3 P only: TP 0.20 (iso), TPC 0.70      -> P: 0.20 (matched beats canonical)
+    #   S4 shared: TP1 0.40, TP2 0.60 (iso), TQ 0.99 -> P: 0.50 (isoform mean)
+    #   S5 P only: TR 0.80 (iso), MANE puts TR in GENER -> with --mane: missing
+    #   S6 P only: two canonical rows TX 0.10, TY 0.85 -> ambiguous: missing
+    #   M1..M3 P only: matched TP 0.11/0.22/0.33
+    fx = {"S1": 5001, "S2": 5002, "S3": 5003, "S4": 5004, "S5": 5005,
+          "S6": 5006, "M1": 5011, "M2": 5012, "M3": 5013}
+    vid = dict((k, "20:%d:A:G" % p) for k, p in fx.items())
+    p_ids = [vid[k] for k in ("S1", "S2", "S3", "S4", "S5", "S6", "M1", "M2", "M3")]
+    q_ids = [vid[k] for k in ("S1", "S2", "S4")]
+    gf3 = os.path.join(tmp, "group_shared.txt")
+    with open(gf3, "w") as fh:
+        for g, ids in (("GENEP", p_ids), ("GENEQ", q_ids)):
+            lof_id = "20:%d:A:T" % (5090 if g == "GENEP" else 5091)
+            fh.write("%s var %s %s\n" % (g, " ".join(ids), lof_id))
+            fh.write("%s anno %s pLoF\n" % (g, " ".join(["missense"] * len(ids))))
+    anno3 = os.path.join(tmp, "anno_shared.tsv")
+    with open(anno3, "w") as fh:
+        fh.write("\t".join(["ID", "GENE", "LOF", "REVEL_SCORE", "CADD_PHRED",
+                            "CSQ", "TRANSCRIPT", "MANE_SELECT", "CANONICAL",
+                            "BIOTYPE", "DS_MAX", "ANNOTATION"]) + "\n")
+        for g, ids, tx in (("GENEP", p_ids, "ENST0000000TP"),
+                           ("GENEQ", q_ids, "ENST0000000TQ")):
+            for v in ids:
+                fh.write("\t".join([v, g, "NA", "0", "0", "missense_variant", tx,
+                                    "NM_1", "YES", "protein_coding", "0",
+                                    "missense"]) + "\n")
+    canon_rows = [("S1", "ENST000000TPC.1", 0.30), ("S3", "ENST000000TPC.1", 0.70),
+                  ("S6", "ENST0000000TX.1", 0.10), ("S6", "ENST0000000TY.1", 0.85)]
+    iso_rows = [("S1", "ENST0000000TQ.2", 0.95), ("S2", "ENST0000000TQ.2", 0.90),
+                ("S3", "ENST0000000TP.2", 0.20), ("S4", "ENST000000TP1.1", 0.40),
+                ("S4", "ENST000000TP2.1", 0.60), ("S4", "ENST0000000TQ.2", 0.99),
+                ("S5", "ENST0000000TR.1", 0.80), ("M1", "ENST0000000TP.2", 0.11),
+                ("M2", "ENST0000000TP.2", 0.22), ("M3", "ENST0000000TP.2", 0.33)]
+    am3c = os.path.join(tmp, "am_shared_canon.tsv.gz")
+    with gzip.open(am3c, "wt") as fh:
+        fh.write("\t".join(AM_CANONICAL_COLS) + "\n")
+        for k, tx, sc in canon_rows:
+            fh.write("\t".join(["chr20", str(fx[k]), "A", "G", "hg38", "P0", tx,
+                                "A1B", "%.4f" % sc, "ambiguous"]) + "\n")
+    am3i = os.path.join(tmp, "am_shared_iso.tsv.gz")
+    with gzip.open(am3i, "wt") as fh:
+        fh.write("\t".join(["#CHROM", "POS", "REF", "ALT", "genome",
+                            "transcript_id", "protein_variant",
+                            "am_pathogenicity", "am_class"]) + "\n")
+        for k, tx, sc in iso_rows:
+            fh.write("\t".join(["chr20", str(fx[k]), "A", "G", "hg38", tx,
+                                "A1B", "%.4f" % sc, "ambiguous"]) + "\n")
+    mane3 = os.path.join(tmp, "mane_shared.tsv")
+    with open(mane3, "w") as fh:
+        fh.write("\t".join(["#NCBI_GeneID", "Ensembl_Gene", "HGNC_ID", "symbol",
+                            "name", "RefSeq_nuc", "RefSeq_prot", "Ensembl_nuc",
+                            "Ensembl_prot", "MANE_status"]) + "\n")
+        fh.write("\t".join(["GeneID:9", "ENSG0000000R.3", "HGNC:9", "GENER", "r",
+                            "NM_9.1", "NP_9.1", "ENST0000000TR.1", "ENSP9.1",
+                            "MANE Select"]) + "\n")
+
+    def per_gene(path):
+        out = {}
+        for gene, kind, name, values, raw in read_group_regions(path):
+            if kind == "var":
+                cv = values
+            elif kind == "score":
+                out[gene] = dict(zip(cv, [float(x) for x in values]))
+        return out
+
+    def run3(tag, **kw):
+        o = os.path.join(tmp, "shared_%s.txt" % tag)
+        c = build(gf3, o, am3c, ["pLoF"], ["missense"], score_name="AM",
+                  anno_table_path=anno3, isoforms_path=am3i,
+                  prefer_anno_transcript=True, log=open(os.devnull, "w"), **kw)
+        return per_gene(o), c
+
+    old3, _ = run3("max", fallback="max")
+    new3, _ = run3("safe_nomane")
+    newm3, _ = run3("safe_mane", mane_path=mane3)
+    P, Q = "GENEP", "GENEQ"
+    check("fallback: LEGACY rule takes GENEQ's 0.95 for GENEP at a shared site",
+          abs(old3[P][vid["S1"]] - 0.95) < 5e-5 and abs(old3[P][vid["S2"]] - 0.90) < 5e-5
+          and abs(old3[P][vid["S4"]] - 0.99) < 5e-5)
+    check("fallback: new rule takes the canonical row (0.30), not the max",
+          abs(new3[P][vid["S1"]] - 0.30) < 5e-5)
+    check("fallback: matched transcript still beats canonical (0.20, not 0.70)",
+          abs(new3[P][vid["S3"]] - 0.20) < 5e-5 and abs(old3[P][vid["S3"]] - 0.20) < 5e-5)
+    check("fallback: same-gene isoforms averaged (0.50), other gene's 0.99 excluded",
+          abs(new3[P][vid["S4"]] - 0.50) < 5e-5)
+    # with --mane: scored P rows are S1 .30, S3 .20, S4 .50, M .11 .22 .33
+    gm = (0.30 + 0.20 + 0.50 + 0.11 + 0.22 + 0.33) / 6
+    check("fallback: only another gene's row -> --missing (P's gene mean)",
+          abs(newm3[P][vid["S2"]] - gm) < 5e-5)
+    check("fallback: two canonical rows of unknown gene -> missing, not max",
+          abs(newm3[P][vid["S6"]] - gm) < 5e-5)
+    check("fallback: --mane excludes an isoform MANE puts in another gene",
+          abs(newm3[P][vid["S5"]] - gm) < 5e-5 and abs(new3[P][vid["S5"]] - 0.80) < 5e-5)
+    check("fallback: GENEQ's matched scores identical under both rules",
+          all(old3[Q][v] == new3[Q][v] == newm3[Q][v] for v in q_ids))
+    check("fallback: matched rows (S3, M1-M3) bit-identical to the legacy rule",
+          all(old3[P][vid[k]] == new3[P][vid[k]] == newm3[P][vid[k]]
+              for k in ("S3", "M1", "M2", "M3")))
+    check("fallback: no non-imputed score moves UP against the legacy max",
+          all(new3[P][vid[k]] <= old3[P][vid[k]] + 5e-5 for k in ("S1", "S3", "S4", "S5")))
+
     print("\n%s" % ("selftest PASSED" if ok else "selftest FAILED"))
     return 0 if ok else 1
 
@@ -1203,7 +1426,10 @@ def main():
     ap.add_argument("--am", help="AlphaMissense_hg38.tsv.gz (canonical transcripts)")
     ap.add_argument("--isoforms", help="AlphaMissense_isoforms_hg38.tsv.gz; with "
                                        "--mane, prefer the MANE Select transcript")
-    ap.add_argument("--mane", help="MANE summary file (MANE.GRCh38.vX.summary.txt.gz)")
+    ap.add_argument("--mane", help="MANE summary file (MANE.GRCh38.vX.summary.txt.gz). "
+                                   "With --prefer-anno-transcript, a fallback row "
+                                   "whose transcript MANE puts in another gene is "
+                                   "never used.")
     ap.add_argument("--lof-anno", default="pLoF",
                     help="comma-separated annotation labels scored 1.0 by "
                          "construction (default: pLoF). Pass the same labels to "
@@ -1261,6 +1487,12 @@ def main():
                          "found when it is not AlphaMissense's canonical one.")
     ap.add_argument("--chrom", help="only read AlphaMissense rows on this "
                                     "chromosome (large speedup on the 71M-row file)")
+    ap.add_argument("--provenance", help="write GENE/ID/SOURCE/TRANSCRIPT/AM per "
+                    "missense variant: which row each score came from")
+    # Reproduces group files built before 2026-10 (fallback = max over every
+    # row at the coordinate); biased upward, so not offered in --help.
+    ap.add_argument("--legacy-max-fallback", action="store_true",
+                    help=argparse.SUPPRESS)
     ap.add_argument("--replace-existing", action="store_true",
                     help="overwrite an existing score line instead of refusing")
     ap.add_argument("--selftest", action="store_true",
@@ -1285,7 +1517,9 @@ def main():
                    prefer_anno_transcript=a.prefer_anno_transcript,
                    drop_anno=[x for x in a.drop_anno.split(",") if x],
                    score_column=a.score_column,
-                   score_transform=a.score_transform, zero_is_missing=a.zim)
+                   score_transform=a.score_transform, zero_is_missing=a.zim,
+                   fallback="max" if a.legacy_max_fallback else "safe",
+                   provenance=a.provenance)
 
     print("# wrote %s" % a.out)
     print("# %(genes)d regions, %(variants)d variants: %(lof)d lof -> 1.0, "
