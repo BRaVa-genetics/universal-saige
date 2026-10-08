@@ -264,6 +264,37 @@ def read_mane_genes(path):
     return genes
 
 
+def read_gtf_genes(path, chrom_filter=None):
+    """{Ensembl transcript: Ensembl gene}, both version-stripped, from the
+    `transcript` lines of a GENCODE GTF. It must be the release the annotation
+    table was built on (GENCODE v39 for AoU v8: the earliest release holding
+    every one of its 19,543 gene and transcript IDs; v38 lacks 22 genes),
+    so that gene IDs compare without translation. An AlphaMissense transcript
+    (GENCODE v32) retired by then is simply absent: no evidence either way."""
+    genes = {}
+    with smart_open(path) as fh:
+        for raw in fh:
+            if raw.startswith("#"):
+                continue
+            f = raw.split("\t", 8)
+            if len(f) < 9 or f[2] != "transcript":
+                continue
+            if chrom_filter is not None:
+                c = f[0][3:] if f[0].lower().startswith("chr") else f[0]
+                if c != chrom_filter:
+                    continue
+            g = t = None
+            for kv in f[8].split(";"):
+                kv = kv.strip()
+                if kv.startswith("gene_id "):
+                    g = kv[8:].strip('"').split(".")[0]
+                elif kv.startswith("transcript_id "):
+                    t = kv[14:].strip('"').split(".")[0]
+            if g and t:
+                genes[t] = g
+    return genes
+
+
 def read_anno_table(path, id_col="ID", gene_col="GENE", tx_col="TRANSCRIPT",
                     mane_col="MANE_SELECT", csq_col="CSQ", score_col=None,
                     zero_is_missing=True):
@@ -385,12 +416,14 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
           replace_existing=False, anno_table_path=None,
           prefer_anno_transcript=False, drop_anno=(), score_column=None,
           score_transform=None, zero_is_missing=None, fallback="safe",
-          provenance=None, log=sys.stderr):
+          provenance=None, gtf_path=None, log=sys.stderr):
     """Write `group_out` = `group_in` with a score line per region.
 
     `fallback` is what --prefer-anno-transcript does when AlphaMissense has no
     row on the annotation's transcript: "safe" (see pick()), or "max", the rule
     before 2026-10, kept only so files built with it can be reproduced.
+    `gtf_path`: GENCODE GTF of the annotation's release; a fallback row whose
+    transcript it puts in another gene is never used (see pick()).
     `provenance`, a path, gets one line per missense (gene, variant): the
     source of its score, the transcript(s) and the value before imputation.
 
@@ -572,14 +605,26 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
     #      does not look at the scores (a max would reintroduce the bias);
     #   c. nothing, so the --missing policy applies.
     # A row is ineligible when its transcript is the one the annotation assigns
-    # to a DIFFERENT gene at this coordinate, or (with --mane) the MANE summary
-    # puts it in a different gene. No rule here picks a row by its score.
+    # to a DIFFERENT gene at this coordinate, or (with --mane) the MANE summary,
+    # or (with --gtf) the annotation's own GENCODE release, puts it in a
+    # different gene. The GTF is what catches a partner gene's NON-annotated
+    # transcript: on AoU chr20, 1,559 fallback rows took one -- readthrough and
+    # overlapping genes (AL031681.2 <- L3MBTL1/SRSF6, AL121845.3 <- LIME1/ZGPAT)
+    # -- which neither the annotation nor MANE marks. A gene left with no
+    # scored missense variant is named in the log. No rule here picks a row by
+    # its score.
     pick_stats = dict.fromkeys(
         ("by_transcript", "fallback_canonical", "fallback_isoform",
          "fallback_canonical_averaged", "fallback_isoform_averaged",
          "missing_no_row", "missing_excluded",
          "fallback_max"), 0)
     mane_genes = read_mane_genes(mane_path) if (mane_path and prefer_tx) else None
+    gtf_genes = read_gtf_genes(gtf_path, chrom_filter) if (gtf_path and prefer_tx) else None
+    if gtf_genes is not None:
+        print("# GTF: %d transcripts mapped to genes%s" % (
+            len(gtf_genes), "" if chrom_filter is None else " on chr%s" % chrom_filter),
+            file=log)
+    excluded_by_gene = {}
     tx_at = {}  # variant -> {gene: annotation transcript}, version-stripped
     if prefer_tx:
         for (g, vid), ctx in anno_ctx.items():
@@ -610,16 +655,15 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
             return (best[0], best[1], False, "max")
         others = set(t for g, t in tx_at.get(vid, {}).items() if g != gene)
 
-        def gene_of(tx):
-            return mane_genes.get(tx) if mane_genes is not None else None
-
         ok = []
         for score, tx, src, up in cands:
             t = tx.split(".")[0]
-            mg = gene_of(t)
-            if t in others or (mg is not None and gene not in mg):
+            mg = mane_genes.get(t) if mane_genes is not None else None
+            gg = gtf_genes.get(t) if gtf_genes is not None else None
+            if (t in others or (mg is not None and gene not in mg)
+                    or (gg is not None and gg != gene)):
                 continue
-            ok.append((score, tx, src, mg is not None, up))
+            ok.append((score, tx, src, mg is not None or gg is not None, up))
         canon = [c for c in ok if c[2] == "canonical"]
         if canon and len(set(c[4] for c in canon)) == 1:
             pick_stats["fallback_canonical"] += 1
@@ -637,6 +681,7 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
             return (sum(c[0] for c in iso) / len(iso),
                     ",".join(sorted(c[1] for c in iso)), False, "isoform")
         pick_stats["missing_excluded"] += 1
+        excluded_by_gene[gene] = excluded_by_gene.get(gene, 0) + 1
         return None
 
     # --- transcript diagnostics, and an EXPLAINED coverage gap ------------
@@ -705,6 +750,8 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
 
     for k in pick_stats:
         pick_stats[k] = 0
+    excluded_by_gene.clear()
+    no_scored = []  # (gene, missense count) with no scored missense variant
 
     # --- per-gene score vectors
     drop = set(drop_anno)
@@ -752,6 +799,9 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
 
         # resolve missing missense
         scored = [s for s, k in zip(raw_scores, kinds) if k == "missense"]
+        n_mis = sum(1 for k in kinds if k in ("missense", "missense_missing"))
+        if n_mis and not scored:
+            no_scored.append((gene, n_mis))
         if missing == "gene-mean":
             fill = sum(scored) / len(scored) if scored else 0.0
         elif missing == "drop":
@@ -834,10 +884,20 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
                      ps["fallback_isoform"],
                      ps["fallback_isoform_averaged"], ps["missing_excluded"],
                      ps["missing_no_row"]), file=log)
-            if mane_genes is None:
-                print("# (no --mane: a row is excluded only when the annotation "
-                      "assigns its transcript to another gene at that coordinate)",
-                      file=log)
+            if mane_genes is None and gtf_genes is None:
+                print("# (no --mane or --gtf: a row is excluded only when the "
+                      "annotation assigns its transcript to another gene at that "
+                      "coordinate)", file=log)
+        lost = [(g, n) for g, n in no_scored if excluded_by_gene.get(g)]
+        if no_scored:
+            print("# %d regions have NO scored missense variant (--missing %s fills "
+                  "them%s); %d of these only because every AlphaMissense row "
+                  "there is another gene's%s"
+                  % (len(no_scored), missing,
+                     " with 0.0" if missing == "gene-mean" else "", len(lost),
+                     (": " + ", ".join("%s (%d of %d missense)" % (
+                         g, excluded_by_gene[g], n) for g, n in lost)) if lost else ""),
+                  file=log)
 
     with open(group_out, "w") as fh:
         fh.write("\n".join(out_lines) + "\n")
@@ -1331,16 +1391,19 @@ def _selftest():
     #   S6 P only: canonical TX 0.10 (UniProt P1), TY 0.85 (P2) -> ambiguous: missing
     #   S7 P only: canonical TZ1 0.20, TZ2 0.60, both P3 -> one protein: 0.40
     #   M1..M3 P only: matched TP 0.11/0.22/0.33
+    #   S8 GENEZ only (annotated on TZZ, absent): the one row is TQC 0.90, a
+    #      canonical transcript of GENEQ that no annotation uses -- the
+    #      readthrough case. Only --gtf (TQC -> GENEQ) can exclude it.
     fx = {"S1": 5001, "S2": 5002, "S3": 5003, "S4": 5004, "S5": 5005,
-          "S6": 5006, "S7": 5007, "M1": 5011, "M2": 5012, "M3": 5013}
+          "S6": 5006, "S7": 5007, "S8": 5008, "M1": 5011, "M2": 5012, "M3": 5013}
     vid = dict((k, "20:%d:A:G" % p) for k, p in fx.items())
     p_ids = [vid[k] for k in ("S1", "S2", "S3", "S4", "S5", "S6", "S7",
                               "M1", "M2", "M3")]
     q_ids = [vid[k] for k in ("S1", "S2", "S4")]
     gf3 = os.path.join(tmp, "group_shared.txt")
     with open(gf3, "w") as fh:
-        for g, ids in (("GENEP", p_ids), ("GENEQ", q_ids)):
-            lof_id = "20:%d:A:T" % (5090 if g == "GENEP" else 5091)
+        for g, ids in (("GENEP", p_ids), ("GENEQ", q_ids), ("GENEZ", [vid["S8"]])):
+            lof_id = "20:%d:A:T" % {"GENEP": 5090, "GENEQ": 5091, "GENEZ": 5092}[g]
             fh.write("%s var %s %s\n" % (g, " ".join(ids), lof_id))
             fh.write("%s anno %s pLoF\n" % (g, " ".join(["missense"] * len(ids))))
     anno3 = os.path.join(tmp, "anno_shared.tsv")
@@ -1349,14 +1412,16 @@ def _selftest():
                             "CSQ", "TRANSCRIPT", "MANE_SELECT", "CANONICAL",
                             "BIOTYPE", "DS_MAX", "ANNOTATION"]) + "\n")
         for g, ids, tx in (("GENEP", p_ids, "ENST0000000TP"),
-                           ("GENEQ", q_ids, "ENST0000000TQ")):
+                           ("GENEQ", q_ids, "ENST0000000TQ"),
+                           ("GENEZ", [vid["S8"]], "ENST000000TZZ")):
             for v in ids:
                 fh.write("\t".join([v, g, "NA", "0", "0", "missense_variant", tx,
                                     "NM_1", "YES", "protein_coding", "0",
                                     "missense"]) + "\n")
     canon_rows = [("S1", "ENST000000TPC.1", 0.30, "P0"), ("S3", "ENST000000TPC.1", 0.70, "P0"),
                   ("S6", "ENST0000000TX.1", 0.10, "P1"), ("S6", "ENST0000000TY.1", 0.85, "P2"),
-                  ("S7", "ENST000000TZ1.1", 0.20, "P3"), ("S7", "ENST000000TZ2.1", 0.60, "P3-2")]
+                  ("S7", "ENST000000TZ1.1", 0.20, "P3"), ("S7", "ENST000000TZ2.1", 0.60, "P3-2"),
+                  ("S8", "ENST000000TQC.1", 0.90, "P9")]
     iso_rows = [("S1", "ENST0000000TQ.2", 0.95), ("S2", "ENST0000000TQ.2", 0.90),
                 ("S3", "ENST0000000TP.2", 0.20), ("S4", "ENST000000TP1.1", 0.40),
                 ("S4", "ENST000000TP2.1", 0.60), ("S4", "ENST0000000TQ.2", 0.99),
@@ -1385,6 +1450,18 @@ def _selftest():
                             "NM_9.1", "NP_9.1", "ENST0000000TR.1", "ENSP9.1",
                             "MANE Select"]) + "\n")
 
+    # GENCODE-style GTF of the annotation's release: TPC is GENEP's, TQC is
+    # GENEQ's; TZ1/TZ2 are absent (retired by that release: no evidence).
+    gtf3 = os.path.join(tmp, "gencode_shared.gtf")
+    with open(gtf3, "w") as fh:
+        fh.write("##description: selftest\n")
+        for tx, g in (("ENST000000TPC.1", "GENEP.4"), ("ENST0000000TP.2", "GENEP.4"),
+                      ("ENST000000TQC.1", "GENEQ.2"), ("ENST0000000TQ.2", "GENEQ.2"),
+                      ("ENST000000TQX.1", "GENEQ.2")):
+            fh.write("chr20\tHAVANA\tgene\t1\t9\t.\t+\t.\tgene_id \"%s\";\n" % g)
+            fh.write("chr20\tHAVANA\ttranscript\t1\t9\t.\t+\t.\tgene_id \"%s\"; "
+                     "transcript_id \"%s\"; gene_name \"X\";\n" % (g, tx))
+
     def per_gene(path):
         out = {}
         for gene, kind, name, values, raw in read_group_regions(path):
@@ -1404,6 +1481,13 @@ def _selftest():
     old3, _ = run3("max", fallback="max")
     new3, _ = run3("safe_nomane")
     newm3, _ = run3("safe_mane", mane_path=mane3)
+    gtf_log = os.path.join(tmp, "shared_gtf.log")
+    o = os.path.join(tmp, "shared_gtf.txt")
+    with open(gtf_log, "w") as lg:
+        build(gf3, o, am3c, ["pLoF"], ["missense"], score_name="AM",
+              anno_table_path=anno3, isoforms_path=am3i, prefer_anno_transcript=True,
+              mane_path=mane3, gtf_path=gtf3, log=lg)
+    newg3 = per_gene(o)
     P, Q = "GENEP", "GENEQ"
     check("fallback: LEGACY rule takes GENEQ's 0.95 for GENEP at a shared site",
           abs(old3[P][vid["S1"]] - 0.95) < 5e-5 and abs(old3[P][vid["S2"]] - 0.90) < 5e-5
@@ -1429,6 +1513,14 @@ def _selftest():
     check("fallback: matched rows (S3, M1-M3) bit-identical to the legacy rule",
           all(old3[P][vid[k]] == new3[P][vid[k]] == newm3[P][vid[k]]
               for k in ("S3", "M1", "M2", "M3")))
+    check("gtf: WITHOUT it, GENEZ takes GENEQ's unannotated canonical (0.90)",
+          abs(newm3["GENEZ"][vid["S8"]] - 0.90) < 5e-5)
+    check("gtf: WITH it, that row is excluded; GENEZ has no score -> 0.0 fill",
+          newg3["GENEZ"][vid["S8"]] == 0.0)
+    check("gtf: the log names GENEZ as left with no scored missense",
+          "GENEZ (1 of 1 missense)" in open(gtf_log).read())
+    check("gtf: GENEP/GENEQ unchanged (own rows kept; retired TZ1/TZ2 still averaged)",
+          all(newg3[g][v] == newm3[g][v] for g in (P, Q) for v in newm3[g]))
     check("fallback: no non-imputed score moves UP against the legacy max",
           all(new3[P][vid[k]] <= old3[P][vid[k]] + 5e-5 for k in ("S1", "S3", "S4", "S5")))
 
@@ -1507,6 +1599,10 @@ def main():
                          "found when it is not AlphaMissense's canonical one.")
     ap.add_argument("--chrom", help="only read AlphaMissense rows on this "
                                     "chromosome (large speedup on the 71M-row file)")
+    ap.add_argument("--gtf", help="GENCODE GTF of the release the --anno-table was "
+                    "built on (v39 for AoU v8). With --prefer-anno-transcript, a "
+                    "fallback row whose transcript it puts in another gene is never "
+                    "used -- e.g. a readthrough gene taking its partner's score.")
     ap.add_argument("--provenance", help="write GENE/ID/SOURCE/TRANSCRIPT/AM per "
                     "missense variant: which row each score came from")
     # Reproduces group files built before 2026-10 (fallback = max over every
@@ -1539,7 +1635,7 @@ def main():
                    score_column=a.score_column,
                    score_transform=a.score_transform, zero_is_missing=a.zim,
                    fallback="max" if a.legacy_max_fallback else "safe",
-                   provenance=a.provenance)
+                   provenance=a.provenance, gtf_path=a.gtf)
 
     print("# wrote %s" % a.out)
     print("# %(genes)d regions, %(variants)d variants: %(lof)d lof -> 1.0, "

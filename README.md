@@ -176,7 +176,7 @@ annotation, missense variants their AlphaMissense pathogenicity, a missense vari
 A second weight set goes through the same door: `--annoTable <BRaVa long-form table> --scoreColumn <column> --name <NAME>`
 for a score carried as a column of the annotation table, or `--am <table>` for a score in AlphaMissense's per-variant
 layout. One score line per file, so one file and one step-2 run per weight set. The tool behind it is
-`flexrv_score_from_alphamissense.py` (`--help`, and `--selftest` for its controls). `04_flexrv_groupfile.sh -h` lists the rest of its options (`--lofAnno`, `--missenseAnno`, `--dropAnno`, `--missing`, `--isoforms`, `--mane`).
+`flexrv_score_from_alphamissense.py` (`--help`, and `--selftest` for its controls). `04_flexrv_groupfile.sh -h` lists the rest of its options (`--lofAnno`, `--missenseAnno`, `--dropAnno`, `--missing`, `--isoforms`, `--mane`, `--gtf`).
 
 ### Step 3
 

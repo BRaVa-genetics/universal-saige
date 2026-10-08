@@ -20,7 +20,7 @@
 # mean (--missing); every other variant a placeholder that is never tested.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
-GROUP=""; OUT=""; CHR=""; NAME="AM"; AM="resources/AlphaMissense_hg38.tsv.gz"; ISO=""; ANNO=""; MANE=""; SCORECOL=""
+GROUP=""; OUT=""; CHR=""; NAME="AM"; AM="resources/AlphaMissense_hg38.tsv.gz"; ISO=""; ANNO=""; MANE=""; GTF=""; SCORECOL=""
 LOF="pLoF"; MISSENSE="damaging_missense_or_protein_altering,other_missense_or_protein_altering"; DROP="non_coding"; EXTRA=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -32,6 +32,7 @@ while [[ $# -gt 0 ]]; do
     --isoforms)    ISO="$2"; shift 2 ;;
     --annoTable)   ANNO="$2"; shift 2 ;;
     --mane)        MANE="$2"; shift 2 ;;
+    --gtf)         GTF="$2"; shift 2 ;;
     --scoreColumn) SCORECOL="$2"; shift 2 ;;
     --lofAnno)     LOF="$2"; shift 2 ;;
     --missenseAnno) MISSENSE="$2"; shift 2 ;;
@@ -55,6 +56,8 @@ else
   [[ -n ${ANNO} ]] && args+=(--anno-table "${ANNO}" --prefer-anno-transcript)
   # MANE summary: a fallback row on a transcript MANE puts in another gene is never used
   [[ -n ${MANE} ]] && args+=(--mane "${MANE}")
+  # GENCODE GTF of the annotation's release (v39 for AoU v8): never a row on another gene's transcript
+  [[ -n ${GTF} ]] && args+=(--gtf "${GTF}")
 fi
 # ${EXTRA[@]+...}: an empty array is "unbound" under set -u in bash < 4.4 (macOS ships 3.2)
 python3 "${HERE}/flexrv_score_from_alphamissense.py" "${args[@]}" ${EXTRA[@]+"${EXTRA[@]}"}
