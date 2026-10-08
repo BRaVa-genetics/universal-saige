@@ -610,7 +610,11 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
     # different gene. The GTF is what catches a partner gene's NON-annotated
     # transcript: on AoU chr20, 1,559 fallback rows took one -- readthrough and
     # overlapping genes (AL031681.2 <- L3MBTL1/SRSF6, AL121845.3 <- LIME1/ZGPAT)
-    # -- which neither the annotation nor MANE marks. A gene left with no
+    # -- which neither the annotation nor MANE marks. Genes are compared by
+    # Ensembl ID, not name, deliberately: in v39 ENSG00000105501 and
+    # ENSG00000268500 are both "SIGLEC5" and both tested; AlphaMissense only
+    # has the latter's transcripts, so the former is left unscored rather than
+    # duplicating it (decided 2026-10-08). A gene left with no
     # scored missense variant is named in the log. No rule here picks a row by
     # its score.
     pick_stats = dict.fromkeys(
