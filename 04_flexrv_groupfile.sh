@@ -38,6 +38,7 @@ while [[ $# -gt 0 ]]; do
     --missenseAnno) MISSENSE="$2"; shift 2 ;;
     --dropAnno)    DROP="$2"; shift 2 ;;
     --missing)     EXTRA+=(--missing "$2"); shift 2 ;;
+    --nonMissense) EXTRA+=(--nonmissense "$2"); shift 2 ;;
     -h|--help)     sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac

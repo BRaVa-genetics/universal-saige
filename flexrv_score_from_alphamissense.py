@@ -422,7 +422,7 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
           replace_existing=False, anno_table_path=None,
           prefer_anno_transcript=False, drop_anno=(), score_column=None,
           score_transform=None, zero_is_missing=None, fallback="safe",
-          provenance=None, gtf_path=None, log=sys.stderr):
+          provenance=None, gtf_path=None, nonmissense="impute", log=sys.stderr):
     """Write `group_out` = `group_in` with a score line per region.
 
     `fallback` is what --prefer-anno-transcript does when AlphaMissense has no
@@ -430,6 +430,14 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
     before 2026-10, kept only so files built with it can be reproduced.
     `gtf_path`: GENCODE GTF of the annotation's release; a fallback row whose
     transcript it puts in another gene is never used (see pick()).
+    `nonmissense`: what to do with a missense-bin variant whose annotated consequence
+    (--anno-table CSQ) is not missense_variant -- in-frame indels, LOFTEE-LC
+    frameshifts/stop-gains, start/stop-lost, SpliceAI-route splice/intronic/
+    synonymous variants. "impute" (default, as before): AlphaMissense if a row
+    exists on some transcript, else the --missing policy. "drop": remove it from
+    the output, because AlphaMissense scores missense substitutions only, so any
+    value it got would be another transcript's score or a gene-mean placeholder
+    (AoU v8 chr20: 27,911 such entries, 27,421 at the gene mean).
     `provenance`, a path, gets one line per missense (gene, variant): the
     source of its score, the transcript(s) and the value before imputation.
 
@@ -770,11 +778,15 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
     counts = {"genes": len(order), "variants": 0, "lof": 0, "missense": 0,
               "dropped_anno": 0, "emptied_regions": 0,
               "missense_scored": 0, "missense_imputed": 0, "missense_dropped": 0,
-              "other": 0, "unparsed_ids": unparsed, "am_keys_matched": len(hits),
+              "other": 0, "nonmissense_dropped": 0,
+              "unparsed_ids": unparsed, "am_keys_matched": len(hits),
               "am_keys_wanted": len(wanted), "am_collisions": collisions,
               "from_isoform": from_isoform, "mane_hits": mane_hits}
     counts.update({"diag_" + k: v for k, v in counts_diag.items()})
 
+    if nonmissense == "drop" and anno_ctx is None:
+        raise SystemExit("--nonmissense drop needs --anno-table: the consequence lives there")
+    nonmis_csq = {}
     prov = open(provenance, "w") if provenance else None
     if prov is not None:
         # ANNOTATION/CSQ/ANNO_TRANSCRIPT: the bin, the most severe VEP consequence
@@ -791,6 +803,16 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
                 raw_scores.append(1.0)
                 kinds.append("lof")
                 counts["lof"] += 1
+            elif anno in mis and nonmissense == "drop" and (
+                    anno_ctx.get((gene, vid), (None, None, None, None))[2] != "missense_variant"):
+                raw_scores.append(None)
+                kinds.append("nonmissense")
+                csq = anno_ctx.get((gene, vid), (None, None, None, None))[2]
+                nonmis_csq[csq] = nonmis_csq.get(csq, 0) + 1
+                if prov is not None:
+                    actx = anno_ctx.get((gene, vid)) or ("NA",) * 3
+                    prov.write("%s\t%s\t%s\t%s\t%s\tdropped_nonmissense\t.\tNA\n" % (
+                        gene, vid, anno, actx[2], actx[0]))
             elif anno in mis:
                 counts["missense"] += 1
                 key = parse_variant_id(vid, id_format)
@@ -828,6 +850,10 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
 
         keep = [True] * len(raw_scores)
         for i, k in enumerate(kinds):
+            if k == "nonmissense":
+                keep[i] = False
+                counts["nonmissense_dropped"] += 1
+                continue
             if k != "missense_missing":
                 continue
             if fill is None:
@@ -877,6 +903,11 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
 
     if prov is not None:
         prov.close()
+    if nonmissense == "drop":
+        print("# --nonmissense drop: removed %d missense-bin variants whose consequence is not "
+              "missense_variant (%s)" % (counts["nonmissense_dropped"], ", ".join(
+                  "%s %d" % (k, v) for k, v in sorted(nonmis_csq.items(), key=lambda x: -x[1]))),
+              file=log)
     if prefer_tx:
         ps = pick_stats
         fell = (ps["fallback_canonical"] + ps["fallback_isoform"] + ps["fallback_max"]
@@ -1552,6 +1583,63 @@ def _selftest():
           len(prows) - 1 == len(p_ids) + len(q_ids) + 1 and
           pz == [["GENEZ", vid["S8"], "missense", "missense_variant",
                   "ENST000000TZZ", "missing", ".", "NA"]])
+    # ---- NON-MISSENSE CONTROL (--nonmissense drop)
+    # One region, all labelled "missense": n1/n2 missense SNVs matched at 0.20/0.60, n6 a
+    # missense SNV with no AlphaMissense row (gene mean), n3 an in-frame deletion, n5 an LC
+    # frameshift, n4 an intronic SNV whose only row (0.99) is another transcript's canonical.
+    nm = {"n1": "20:7001:A:G", "n2": "20:7002:A:G", "n6": "20:7006:A:G",
+          "n3": "20:7003:AGT:A", "n5": "20:7005:AG:A", "n4": "20:7004:A:G"}
+    nm_csq = {"n1": "missense_variant", "n2": "missense_variant", "n6": "missense_variant",
+              "n3": "inframe_deletion", "n5": "frameshift_variant", "n4": "intron_variant"}
+    order_nm = ["n1", "n2", "n3", "n4", "n5", "n6"]
+    gf4 = os.path.join(tmp, "group_nonmis.txt")
+    with open(gf4, "w") as fh:
+        fh.write("GENEM var %s 20:7010:A:T\n" % " ".join(nm[k] for k in order_nm))
+        fh.write("GENEM anno %s pLoF\n" % " ".join(["missense"] * len(order_nm)))
+    anno4 = os.path.join(tmp, "anno_nonmis.tsv")
+    with open(anno4, "w") as fh:
+        fh.write("\t".join(["ID", "GENE", "LOF", "REVEL_SCORE", "CADD_PHRED", "CSQ",
+                            "TRANSCRIPT", "MANE_SELECT", "CANONICAL", "BIOTYPE", "DS_MAX",
+                            "ANNOTATION"]) + "\n")
+        for k in order_nm:
+            fh.write("\t".join([nm[k], "GENEM", "LC" if k == "n5" else "NA", "0", "0",
+                                nm_csq[k], "ENST00000000TM", "NM_1", "YES", "protein_coding",
+                                "0", "missense"]) + "\n")
+    am4c = os.path.join(tmp, "am_nonmis_canon.tsv.gz")
+    with gzip.open(am4c, "wt") as fh:
+        fh.write("\t".join(AM_CANONICAL_COLS) + "\n")
+        fh.write("\t".join(["chr20", "7004", "A", "G", "hg38", "P7", "ENST00000000TX.1",
+                            "A1B", "0.9900", "pathogenic"]) + "\n")
+    am4i = os.path.join(tmp, "am_nonmis_iso.tsv.gz")
+    with gzip.open(am4i, "wt") as fh:
+        fh.write("\t".join(["#CHROM", "POS", "REF", "ALT", "genome", "transcript_id",
+                            "protein_variant", "am_pathogenicity", "am_class"]) + "\n")
+        for k, sc in (("n1", 0.20), ("n2", 0.60)):
+            fh.write("\t".join(["chr20", nm[k].split(":")[1], "A", "G", "hg38",
+                                "ENST00000000TM.1", "A1B", "%.4f" % sc, "x"]) + "\n")
+
+    def run4(mode):
+        o = os.path.join(tmp, "nonmis_%s.txt" % mode)
+        c = build(gf4, o, am4c, ["pLoF"], ["missense"], score_name="AM",
+                  anno_table_path=anno4, isoforms_path=am4i, prefer_anno_transcript=True,
+                  nonmissense=mode, log=open(os.devnull, "w"))
+        return per_gene(o)["GENEM"], c, list(read_group_regions(o))
+
+    imp, c_imp, _ = run4("impute")
+    drp, c_drp, rg = run4("drop")
+    check("nonmissense: impute (old) gives the intronic SNV another transcript's 0.99",
+          abs(imp[nm["n4"]] - 0.99) < 5e-5)
+    check("nonmissense: impute fills indel and LC frameshift with the gene mean",
+          abs(imp[nm["n3"]] - (0.2 + 0.6 + 0.99) / 3) < 5e-5 and imp[nm["n5"]] == imp[nm["n3"]])
+    check("nonmissense: drop removes the 3 non-missense variants, keeps the rest",
+          c_drp["nonmissense_dropped"] == 3 and
+          set(drp) == {nm["n1"], nm["n2"], nm["n6"], "20:7010:A:T"})
+    check("nonmissense: drop leaves matched missense scores bit-identical",
+          drp[nm["n1"]] == imp[nm["n1"]] and drp[nm["n2"]] == imp[nm["n2"]])
+    check("nonmissense: the gene mean is taken over missense only (0.40, not 0.597)",
+          abs(drp[nm["n6"]] - 0.40) < 5e-5 and abs(imp[nm["n6"]] - (0.2 + 0.6 + 0.99) / 3) < 5e-5)
+    check("nonmissense: var, anno and score lines stay aligned after the drop",
+          all(len(v) == 4 for g, k, n, v, raw in rg if k in ("var", "anno", "score")))
     check("fallback: no non-imputed score moves UP against the legacy max",
           all(new3[P][vid[k]] <= old3[P][vid[k]] + 5e-5 for k in ("S1", "S3", "S4", "S5")))
 
@@ -1634,6 +1722,12 @@ def main():
                     "built on (v39 for AoU v8). With --prefer-anno-transcript, a "
                     "fallback row whose transcript it puts in another gene is never "
                     "used -- e.g. a readthrough gene taking its partner's score.")
+    ap.add_argument("--nonmissense", choices=("impute", "drop"), default="impute",
+                    help="missense-bin variants whose --anno-table CSQ is not "
+                         "missense_variant (in-frame indels, LOFTEE-LC LoF, start/stop "
+                         "lost, SpliceAI-route variants): 'impute' (default; AlphaMissense "
+                         "from any transcript, else --missing) or 'drop' (remove them: "
+                         "AlphaMissense scores missense substitutions only)")
     ap.add_argument("--provenance", help="write one line per missense-bin variant: "
                     "GENE, ID, ANNOTATION, CSQ, ANNO_TRANSCRIPT (from --anno-table) "
                     "and SOURCE, TRANSCRIPT, AM (which AlphaMissense row its score "
@@ -1668,13 +1762,16 @@ def main():
                    score_column=a.score_column,
                    score_transform=a.score_transform, zero_is_missing=a.zim,
                    fallback="max" if a.legacy_max_fallback else "safe",
-                   provenance=a.provenance, gtf_path=a.gtf)
+                   provenance=a.provenance, gtf_path=a.gtf, nonmissense=a.nonmissense)
 
     print("# wrote %s" % a.out)
     print("# %(genes)d regions, %(variants)d variants: %(lof)d lof -> 1.0, "
           "%(missense)d missense (%(missense_scored)d scored, "
           "%(missense_imputed)d imputed, %(missense_dropped)d dropped), "
           "%(other)d other -> --other" % counts)
+    if counts["nonmissense_dropped"]:
+        print("# dropped %d non-missense variants from the missense bins (--nonmissense drop)"
+              % counts["nonmissense_dropped"])
     if counts["dropped_anno"]:
         print("# dropped %d variants by --drop-anno (%d regions emptied and omitted)"
               % (counts["dropped_anno"], counts["emptied_regions"]))
