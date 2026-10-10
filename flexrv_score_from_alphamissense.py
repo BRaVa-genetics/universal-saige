@@ -85,7 +85,9 @@ import tempfile
 #   20:881:A:T      chr20:881:A:T      20:881_A/T      chr20:881_A/T
 #   20-881-A-T      chr20-881-A-T
 # Each yields (chrom, pos, ref, alt) with the chrom's "chr" prefix stripped.
-ID_FORMATS = ("colon", "underscore_slash", "dash")
+# colon_underscore and underscore: BRaVa biobank group files, e.g. GEL/Qatar "chrX:100629994_TAAAG_T",
+# Genes & Health "chr21_41801194_C_G", PMBB "1_169853716_C_A" (2026-10-10 audit).
+ID_FORMATS = ("colon", "underscore_slash", "dash", "colon_underscore", "underscore")
 
 
 def detect_id_format(vid):
@@ -96,6 +98,10 @@ def detect_id_format(vid):
         return "underscore_slash"
     if vid.count("-") >= 3:
         return "dash"
+    if vid.count(":") == 1 and vid.count("_") >= 2 and "/" not in vid:
+        return "colon_underscore"
+    if ":" not in vid and vid.count("_") >= 3:
+        return "underscore"
     return None
 
 
@@ -110,6 +116,11 @@ def parse_variant_id(vid, fmt):
             ref, alt = alleles.split("/", 1)
         elif fmt == "dash":
             chrom, pos, ref, alt = vid.split("-", 3)
+        elif fmt == "colon_underscore":
+            chrom, rest = vid.split(":", 1)
+            pos, ref, alt = rest.split("_", 2)
+        elif fmt == "underscore":
+            chrom, pos, ref, alt = vid.split("_", 3)
         else:
             return None
     except ValueError:
@@ -1642,6 +1653,16 @@ def _selftest():
           all(len(v) == 4 for g, k, n, v, raw in rg if k in ("var", "anno", "score")))
     check("fallback: no non-imputed score moves UP against the legacy max",
           all(new3[P][vid[k]] <= old3[P][vid[k]] + 5e-5 for k in ("S1", "S3", "S4", "S5")))
+
+    # ---- ID FORMATS of the BRaVa biobank group files
+    for vid, fmt, want in (("chr20:881:A:T", "colon", ("20", "881", "A", "T")),
+                           ("chrX:100629994_TAAAG_T", "colon_underscore", ("X", "100629994", "TAAAG", "T")),
+                           ("chr21_41801194_C_G", "underscore", ("21", "41801194", "C", "G")),
+                           ("1_169853716_C_A", "underscore", ("1", "169853716", "C", "A"))):
+        check("id format: %-24s detected %s and parsed" % (vid, fmt),
+              detect_id_format(vid) == fmt and parse_variant_id(vid, fmt) == want)
+    check("id format: an alt-contig name does not parse as a coordinate",
+          parse_variant_id("chr1_KI270706v1_random_100_A", "underscore") is None)
 
     print("\n%s" % ("selftest PASSED" if ok else "selftest FAILED"))
     return 0 if ok else 1
