@@ -146,6 +146,8 @@ for name, text in [
     ("s2_refuse_lof_label", "on no variant in the group file: LoF"),
     ("s2_refuse_no_score", "has 0 for 300 region(s)"),
     ("s2_refuse_partial_score", "has 299 for 300 region(s)"),
+    ("s2_refuse_flex_partial_mask", "the FlexRV mask leaves out variants that carry a score on the score:AM line: other_missense_or_protein_altering ("),
+    ("s2_flex_partial_mask_ok", "DRY RUN"),
     ("s2_refuse_chr_name", "--chr chr7 is not in column 1 of"),
     ("s1_refuse_both_geno", "Pass ONE of --genotypePlink and --genotypePgen"),
     ("s1_sex_mf_ok", "--FemaleOnly=TRUE --sexCol=sex --FemaleCode=F"),

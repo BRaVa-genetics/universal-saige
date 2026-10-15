@@ -200,6 +200,12 @@ EOF
 awk '$2 == "score:AM" && !done { done = 1; next } 1' "${OUT}/group.chr7.flexrv_AM.txt" > "${OUT}/group.chr7.flexrv_AM_partial.txt"
 run s2_refuse_partial_score fail "${S2[@]}" --flexRVscore AM --pgen "${IN}/exome/chr7" --groupFile "${OUT}/group.chr7.flexrv_AM_partial.txt" \
   --modelFile m --varianceRatio v --dryRun
+# a FlexRV mask that leaves out a label carrying scores (other_missense here; in the BRaVa 2026-10 rebuild the
+# SpliceAI category) is refused, naming the label; --flexRVpartialMask lets a deliberate subset through
+run s2_refuse_flex_partial_mask fail "${S2[@]}" --flexRVscore AM --annotations pLoF:damaging_missense_or_protein_altering \
+  --pgen "${IN}/exome/chr7" --groupFile "${OUT}/group.chr7.flexrv_AM.txt" --modelFile m --varianceRatio v --dryRun
+run s2_flex_partial_mask_ok      ok   "${S2[@]}" --flexRVscore AM --annotations pLoF:damaging_missense_or_protein_altering \
+  --flexRVpartialMask --pgen "${IN}/exome/chr7" --groupFile "${OUT}/group.chr7.flexrv_AM.txt" --modelFile m --varianceRatio v --dryRun
 
 echo "== step 2 (${MAXJOBS} at a time)"
 # independent single-threaded runs (the image sets OMP, OpenBLAS and RcppParallel threads to 1), so
@@ -210,7 +216,8 @@ throttle; run s2_Q_pos_variant     ok   "${S2[@]}" $(m Q_pos)  --testType varian
 throttle; run s2_Q_pos_group       ok   "${S2[@]}" $(m Q_pos)  --testType group --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" --annotations "${MASKS}" --outputPrefix "${OUT}/Q_pos.group" &
 throttle; run s2_Q_pos_group_plink ok   "${S2[@]}" $(m Q_pos)  --testType group --plink "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" --annotations "${MASKS}" --outputPrefix "${OUT}/Q_pos.group_plink" &
 throttle; run s2_Q_pos_flexrv      ok   "${S2[@]}" $(m Q_pos)  --flexRVscore AM --pgen "${IN}/exome/chr7" --groupFile "${OUT}/group.chr7.flexrv_AM.txt" --outputPrefix "${OUT}/Q_pos.flexrv_AM" &
-throttle; run s2_Q_pos_flexrv_shuf ok   "${S2[@]}" $(m Q_pos)  --flexRVscore AM --pgen "${IN}/exome/chr7" --groupFile "${OUT}/group.chr7.flexrv_AM_shuffled.txt" --outputPrefix "${OUT}/Q_pos.flexrv_AM_shuffled" &
+# the shuffle moves scores onto variants outside the mask (synonymous) on purpose: declared with --flexRVpartialMask
+throttle; run s2_Q_pos_flexrv_shuf ok   "${S2[@]}" $(m Q_pos)  --flexRVscore AM --flexRVpartialMask --pgen "${IN}/exome/chr7" --groupFile "${OUT}/group.chr7.flexrv_AM_shuffled.txt" --outputPrefix "${OUT}/Q_pos.flexrv_AM_shuffled" &
 throttle; run s2_Q_null_variant    ok   "${S2[@]}" $(m Q_null) --testType variant --pgen "${IN}/exome/chr7" --outputPrefix "${OUT}/Q_null.variant" &
 throttle; run s2_Q_null_group      ok   "${S2[@]}" $(m Q_null) --testType group --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" --annotations "${MASKS}" --outputPrefix "${OUT}/Q_null.group" &
 throttle; run s2_Q_perm_group      ok   "${S2[@]}" $(m Q_perm) --testType group --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" --annotations "${MASKS}" --outputPrefix "${OUT}/Q_perm.group" &

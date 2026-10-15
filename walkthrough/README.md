@@ -225,6 +225,7 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
 The pooled FlexRV p per gene is the `Group == Cauchy` row's `Pvalue_Burden`; the other rows are the transform sets.
+This uses the default mask, `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`. If your group file has other labels whose variants carry scores (`--annotations` to change the mask), step 2 refuses a mask that leaves one out and names it; `--flexRVpartialMask` lets a deliberate subset through.
 
 > [!WARNING]
 > The chromosome name flagged by `--chr` must _exactly_ match the chromosome name in the first column of the `.bim` (or `.pvar`): if it is labelled '11', pass `--chr 11`, not `--chr chr11`. Step 2 refuses a mismatch before SAIGE starts, and the message shows the file's own spelling.

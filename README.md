@@ -165,6 +165,7 @@ optional:
 FlexRV (one run per weight set):
 - `--flexRVscore NAME`: run FlexRV on the group file's `score:NAME` line (built by step 4 below). Every region needs that line; a group file with none, or one per some regions only, is refused. One annotation mask (default `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`), one max MAF (`--flexRVmaxMAF`, default 0.001), burden statistic. The results file carries one row per transform set and the pooled `p_FlexRV` row (`Group == Cauchy`).
 - `--flexRVlofAnno` (default `pLoF`): the label(s) the `lof` transform keys on, the same labels the score line was built with.
+- `--flexRVpartialMask`: allow a mask that leaves out variants carrying a score > 0. Without it, step 2 refuses such a mask before SAIGE starts and names the labels left out: SAIGE drops variants whose label is outside the mask before it reads their scores, so a mask missing one label (for example a SpliceAI category that also holds missense variants) silently tests fewer variants under the same name. Pass it only for a deliberate subset.
 
 ### Step 4: FlexRV weights (once per chromosome per weight set)
 

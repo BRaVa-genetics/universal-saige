@@ -82,7 +82,11 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
 # 04_flexrv_groupfile.sh (AlphaMissense first; a second weight set the same
 # way under another name). One mask, one max MAF (0.001), burden statistic;
 # the run writes every transform set's row and the pooled p_FlexRV row (the
-# Group == Cauchy row's Pvalue_Burden). Built with, once per chromosome:
+# Group == Cauchy row's Pvalue_Burden). The mask (--annotations, default
+# pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering)
+# must hold every label whose variants carry a score > 0; step 2 refuses one
+# that leaves a scored label out, unless --flexRVpartialMask is added for a
+# deliberate subset. Built with, once per chromosome:
 #   bash download_resources.sh --alphamissense      (once)
 #   bash 04_flexrv_groupfile.sh --group ${group_file} --chr <chromosome number> --name AM --out ${flexrv_group_file_AM}
 flexrv_group_file_AM=["path/to/group_file.flexrv_AM.txt"]

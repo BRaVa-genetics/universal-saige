@@ -30,6 +30,7 @@ CONDITION=""
 FLEXRV_SCORE=""
 FLEXRV_MAXMAF="0.001"
 FLEXRV_LOFANNO="pLoF"
+FLEXRV_PARTIAL_MASK="false"
 DRYRUN=false
 
 WD=$(pwd)
@@ -136,6 +137,10 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --flexRVpartialMask)
+      FLEXRV_PARTIAL_MASK="true"
+      shift # past argument
+      ;;
     --dryRun)
       DRYRUN=true
       shift # past argument
@@ -174,6 +179,9 @@ while [[ $# -gt 0 ]]; do
       ONE annotation mask (default 'pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering'),
       ONE max MAF (--flexRVmaxMAF, default 0.001) and r.corr = 1.
     --flexRVlofAnno (default: pLoF): the label(s) the 'lof' score transform keys on; must be the labels used when the score line was built.
+    --flexRVpartialMask: allow a mask that leaves out variants carrying a score > 0 on the score line. Without it such a run is
+      refused, naming the labels left out: SAIGE drops them before reading their scores (e.g. missense variants labelled with
+      the SpliceAI category when the mask lists only pLoF and the missense labels). Pass it only for a deliberate subset.
   a VCF is refused: convert once with plink2 (--vcf FILE --make-pgen --out PREFIX) and pass --pgen.
       "
       exit 0
@@ -315,6 +323,28 @@ if [[ ${TESTTYPE} == "group" ]]; then
       echo "  has ${nscore} for ${nvar} region(s). Build the file with 04_flexrv_groupfile.sh --name ${FLEXRV_SCORE}, or pass the"
       echo "  name of the score line the file does carry."
       exit 1
+    fi
+    # The mask must hold every variant the score line weights: SAIGE drops markers matching no requested
+    # label before reading any score, so a mask that omits a scored label tests fewer variants under the
+    # same name, silently. Scores > 0 mark the variants meant to be tested (04_flexrv_groupfile.sh writes
+    # --other, default 0, for the rest). Found in the BRaVa 2026-10 rebuild: missense variants labelled with
+    # the SpliceAI category carried AlphaMissense scores the mask pLoF:damaging_missense:other_missense
+    # never reached. The score line follows its region's anno line.
+    if [[ ${FLEXRV_PARTIAL_MASK} != "true" ]]; then
+      outside=$(${read_group} "${GROUPFILE}" | awk -v mask="${ANNOTATIONS}" -v score="score:${FLEXRV_SCORE}" '
+        BEGIN { n = split(mask, a, /[:;]/); for (i = 1; i <= n; i++) inmask[a[i]] }
+        $2 == "anno" { split("", lab); for (i = 3; i <= NF; i++) lab[i] = $i }
+        $2 == score { for (i = 3; i <= NF; i++) if ($i + 0 > 0 && !(lab[i] in inmask)) { if (!(lab[i] in cnt)) order[++k] = lab[i]; cnt[lab[i]]++ } }
+        END { for (j = 1; j <= k; j++) printf " %s (%d)", order[j], cnt[order[j]] }')
+      if [[ -n ${outside} ]]; then
+        echo "ERROR: the FlexRV mask leaves out variants that carry a score on the score:${FLEXRV_SCORE} line:${outside}"
+        echo "  (label, number of variants with score > 0). SAIGE drops them before reading their scores."
+        echo "  --annotations:      ${ANNOTATIONS}"
+        echo "  group file:         ${GROUPFILE}"
+        echo "Add the label(s) to the mask (labels joined with ':'), or pass --flexRVpartialMask if leaving them out is"
+        echo "intended (a deliberate subset of the scored variants)."
+        exit 1
+      fi
     fi
   fi
 fi
