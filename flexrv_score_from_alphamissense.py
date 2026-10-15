@@ -359,6 +359,14 @@ def is_snv(vid, fmt):
     return key is not None and len(key[2]) == 1 and len(key[3]) == 1
 
 
+def is_missense_csq(csq):
+    """A CSQ is missense when missense_variant is one of its '&'-joined VEP terms: an annotation that writes
+    every term (e.g. the BRaVa 2026-10 re-annotation: missense_variant&splice_region_variant) is as missense as
+    one that writes only the most severe (AoU v8: missense_variant). Before 2026-10-15 the test was equality,
+    and --nonmissense drop removed every missense variant in a splice region from such annotations."""
+    return csq is not None and "missense_variant" in csq.split("&")
+
+
 SCORE_COLUMNS = {
     # column -> (default transform, whether 0 means "absent", one-line note)
     "REVEL_SCORE": ("none", True,
@@ -736,7 +744,7 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
             hit = pick(gene, vid, key)
             csq = anno_ctx.get((gene, vid), (None, None, None, None))[2] if anno_ctx else None
             snv = is_snv(vid, id_format)
-            eligible = snv and (csq is None or csq == "missense_variant")
+            eligible = snv and (csq is None or is_missense_csq(csq))
             if eligible:
                 diag["eligible"] += 1
                 if hit is not None:
@@ -814,8 +822,8 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
                 raw_scores.append(1.0)
                 kinds.append("lof")
                 counts["lof"] += 1
-            elif anno in mis and nonmissense == "drop" and (
-                    anno_ctx.get((gene, vid), (None, None, None, None))[2] != "missense_variant"):
+            elif anno in mis and nonmissense == "drop" and not is_missense_csq(
+                    anno_ctx.get((gene, vid), (None, None, None, None))[2]):
                 raw_scores.append(None)
                 kinds.append("nonmissense")
                 csq = anno_ctx.get((gene, vid), (None, None, None, None))[2]
@@ -1607,6 +1615,9 @@ def _selftest():
     with open(gf4, "w") as fh:
         fh.write("GENEM var %s 20:7010:A:T\n" % " ".join(nm[k] for k in order_nm))
         fh.write("GENEM anno %s pLoF\n" % " ".join(["missense"] * len(order_nm)))
+        # n7: a missense SNV whose CSQ lists every VEP term (missense_variant&splice_region_variant), in its
+        # own gene so GENEM's numbers stay as they were; it is missense and keeps its AlphaMissense 0.80
+        fh.write("GENEN var 20:7007:A:G 20:7011:A:T\nGENEN anno missense pLoF\n")
     anno4 = os.path.join(tmp, "anno_nonmis.tsv")
     with open(anno4, "w") as fh:
         fh.write("\t".join(["ID", "GENE", "LOF", "REVEL_SCORE", "CADD_PHRED", "CSQ",
@@ -1616,6 +1627,8 @@ def _selftest():
             fh.write("\t".join([nm[k], "GENEM", "LC" if k == "n5" else "NA", "0", "0",
                                 nm_csq[k], "ENST00000000TM", "NM_1", "YES", "protein_coding",
                                 "0", "missense"]) + "\n")
+        fh.write("\t".join(["20:7007:A:G", "GENEN", "NA", "0", "0", "missense_variant&splice_region_variant",
+                            "ENST00000000TN", "NM_2", "YES", "protein_coding", "0", "missense"]) + "\n")
     am4c = os.path.join(tmp, "am_nonmis_canon.tsv.gz")
     with gzip.open(am4c, "wt") as fh:
         fh.write("\t".join(AM_CANONICAL_COLS) + "\n")
@@ -1628,16 +1641,18 @@ def _selftest():
         for k, sc in (("n1", 0.20), ("n2", 0.60)):
             fh.write("\t".join(["chr20", nm[k].split(":")[1], "A", "G", "hg38",
                                 "ENST00000000TM.1", "A1B", "%.4f" % sc, "x"]) + "\n")
+        fh.write("\t".join(["chr20", "7007", "A", "G", "hg38", "ENST00000000TN.1", "A1B", "0.8000", "x"]) + "\n")
 
     def run4(mode):
         o = os.path.join(tmp, "nonmis_%s.txt" % mode)
         c = build(gf4, o, am4c, ["pLoF"], ["missense"], score_name="AM",
                   anno_table_path=anno4, isoforms_path=am4i, prefer_anno_transcript=True,
                   nonmissense=mode, log=open(os.devnull, "w"))
-        return per_gene(o)["GENEM"], c, list(read_group_regions(o))
+        g = per_gene(o)
+        return g["GENEM"], c, list(read_group_regions(o)), g.get("GENEN", {})
 
-    imp, c_imp, _ = run4("impute")
-    drp, c_drp, rg = run4("drop")
+    imp, c_imp, _, _ = run4("impute")
+    drp, c_drp, rg, drp_n = run4("drop")
     check("nonmissense: impute (old) gives the intronic SNV another transcript's 0.99",
           abs(imp[nm["n4"]] - 0.99) < 5e-5)
     check("nonmissense: impute fills indel and LC frameshift with the gene mean",
@@ -1649,8 +1664,13 @@ def _selftest():
           drp[nm["n1"]] == imp[nm["n1"]] and drp[nm["n2"]] == imp[nm["n2"]])
     check("nonmissense: the gene mean is taken over missense only (0.40, not 0.597)",
           abs(drp[nm["n6"]] - 0.40) < 5e-5 and abs(imp[nm["n6"]] - (0.2 + 0.6 + 0.99) / 3) < 5e-5)
+    check("nonmissense: drop keeps a missense SNV whose CSQ lists several terms "
+          "(missense_variant&splice_region_variant) with its own AlphaMissense 0.80",
+          abs(drp_n.get("20:7007:A:G", -1) - 0.80) < 5e-5)
     check("nonmissense: var, anno and score lines stay aligned after the drop",
-          all(len(v) == 4 for g, k, n, v, raw in rg if k in ("var", "anno", "score")))
+          all(len({len(v) for g2, k, n, v, raw in rg if g2 == g and k in ("var", "anno", "score")}) == 1
+              for g in {r[0] for r in rg}) and
+          all(len(v) == 4 for g, k, n, v, raw in rg if g == "GENEM" and k in ("var", "anno", "score")))
     check("fallback: no non-imputed score moves UP against the legacy max",
           all(new3[P][vid[k]] <= old3[P][vid[k]] + 5e-5 for k in ("S1", "S3", "S4", "S5")))
 
