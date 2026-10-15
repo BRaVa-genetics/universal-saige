@@ -39,6 +39,7 @@ while [[ $# -gt 0 ]]; do
     --dropAnno)    DROP="$2"; shift 2 ;;
     --missing)     EXTRA+=(--missing "$2"); shift 2 ;;
     --nonMissense) EXTRA+=(--nonmissense "$2"); shift 2 ;;
+    --provenance)  EXTRA+=(--provenance "$2"); shift 2 ;;   # per-variant score source, e.g. for an AlphaMissense-threshold mask
     -h|--help)     sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
