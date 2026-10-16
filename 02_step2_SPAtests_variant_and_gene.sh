@@ -175,6 +175,8 @@ while [[ $# -gt 0 ]]; do
     -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
     -g,--groupFile: required if group test is selected. Filename of the annotation file used for group tests. This must be relative to, and contained within, the current working directory.
     --annotations: required if group test is selected. Comma separated list of annotation masks to test (':' joins labels INTO one mask, ',' separates masks). Please use
+      'pLoF,damaging_missense,pLoF:damaging_missense,pLoF:damaging_missense:spliceai2_gt040,synonymous,other_missense,pLoF:damaging_missense:spliceai2_gt040:other_missense:synonymous'
+      on the October 2026 BRaVa group files, or on older BRaVa files (other label names)
       'pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous'
       Every label (and every --flexRVlofAnno label) must be on an 'anno' line of the group file, or the run is refused.
     --relatednessCutoff (default: 0.05): MUST equal the cutoff steps 0, 1 and 3 used; nothing in SAIGE checks it.
@@ -188,7 +190,8 @@ while [[ $# -gt 0 ]]; do
   FlexRV (Schwartzentruber et al. 2025; a group test, burden statistic, 16 score x up to 12 MAF transforms per gene):
     --flexRVscore NAME: run FlexRV on the group file's 'score:NAME' line, which every region must have, or the run is
       refused (see 04_flexrv_groupfile.sh). Implies --testType group,
-      ONE annotation mask (default 'pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering'),
+      ONE annotation mask (default 'pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering', the older
+      BRaVa labels; on the October 2026 files pass --annotations pLoF:damaging_missense:other_missense:spliceai2_gt040),
       ONE max MAF (--flexRVmaxMAF, default 0.001) and r.corr = 1.
     --flexRVlofAnno (default: pLoF): the label(s) the 'lof' score transform keys on; must be the labels used when the score line was built.
     --flexRVpartialMask: allow a mask that leaves out variants carrying a score > 0 on the score line. Without it such a run is

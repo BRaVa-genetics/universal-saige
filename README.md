@@ -10,6 +10,22 @@
 >   
 > You'll need to replace filepaths, column names etc in the commands with the corresponding column names in your data. Free text portions of the commands to be changed are placed in square brackets `[like this]`, portions of the commands where you'll need to make a choice between a collection of options are placed in braces `{like this}`.
 
+> [!IMPORTANT]
+> **What's new (October 2026) and what to do**
+> 1. **New SAIGE image** (`1.5.2-dev-b5456dee`; a rare numerical case no longer stops a whole chromosome). Fetch it again:
+>    `bash download_resources.sh --saige-image` (add `--singularity` on a cluster), and record the tag with your results.
+> 2. **New BRaVa group files** (October 2026 rebuild), in your biobank's bucket with a README. Their labels are
+>    `pLoF`, `damaging_missense`, `spliceai2_gt040`, `other_missense`, `synonymous`, `non_coding`, so the masks change:
+>    - SAIGE-GENE+: `--annotations "pLoF,damaging_missense,pLoF:damaging_missense,pLoF:damaging_missense:spliceai2_gt040,synonymous,other_missense,pLoF:damaging_missense:spliceai2_gt040:other_missense:synonymous"`
+>    - FlexRV (file `*.flexrv_AM.txt.gz`, ready to use): `--flexRVscore AM --annotations "pLoF:damaging_missense:other_missense:spliceai2_gt040"`
+>    - AlphaMissense >= 0.906 (file `*.am_moderate.saige_group.txt.gz`): `--annotations am_moderate`
+>
+>    The [step 2 template](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh) has all four runs written out.
+> 3. **Results gain log10 p-value columns** (`log10_Pvalue`, ...) right after `SE_Burden`; they stay exact where `Pvalue` reads 0.
+>    If your own scripts read result columns by position rather than by name, add `--log10P FALSE`.
+> 4. **Step 2 checks your masks before it runs**: a label that is not in the group file (e.g. a typo, or the old label names on the new
+>    files) is refused, and so is a FlexRV mask that leaves out variants carrying a score. The message lists what the file has.
+
 <p align="center">
   <img src="universal-saige.png" alt="VroomAI"/>
 </p>
@@ -156,7 +172,7 @@ optional:
   - `.spaRegionNA.txt` (image `b5456dee`): burden cells whose variance-rescale saddlepoint did not converge or returned a non-finite value. Each takes the normal-approximation p instead, and the log ends with `Region saddlepoint NA: N ...`. Before this image a non-finite value killed the whole chromosome (saige-slim LEDGER #181).
 - `-s`,`--isSingularity` (default: false).
 - `-g`,`--groupFile`: required for a group test. The annotation file.
-- `--annotations`: required for a group test. `':'` joins labels into one mask, `','` separates masks. For SAIGE-GENE+ use `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`.
+- `--annotations`: required for a group test. `':'` joins labels into one mask, `','` separates masks. For SAIGE-GENE+ on the October 2026 BRaVa group files use `pLoF,damaging_missense,pLoF:damaging_missense,pLoF:damaging_missense:spliceai2_gt040,synonymous,other_missense,pLoF:damaging_missense:spliceai2_gt040:other_missense:synonymous` (on older BRaVa files, whose labels differ: `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`).
   Every label must be on an `anno` line of the group file (for FlexRV, the `--flexRVlofAnno` labels too); otherwise the run
   is refused before SAIGE starts, naming the missing labels and the ones the file has. SAIGE itself would quietly test a
   smaller or empty mask under the name asked for.
@@ -165,7 +181,7 @@ optional:
 - `--condition`, `--subSampleFile`, `--dryRun` (prints the SAIGE command).
 
 FlexRV (one run per weight set):
-- `--flexRVscore NAME`: run FlexRV on the group file's `score:NAME` line (built by step 4 below). Every region needs that line; a group file with none, or one per some regions only, is refused. One annotation mask (default `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`), one max MAF (`--flexRVmaxMAF`, default 0.001), burden statistic. The results file carries one row per transform set and the pooled `p_FlexRV` row (`Group == Cauchy`).
+- `--flexRVscore NAME`: run FlexRV on the group file's `score:NAME` line (the October 2026 BRaVa release ships `*.flexrv_AM.txt.gz` with it already; otherwise built by step 4 below). On the release files pass `--annotations pLoF:damaging_missense:other_missense:spliceai2_gt040`: the default mask below uses the older label names. Every region needs that line; a group file with none, or one per some regions only, is refused. One annotation mask (default `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`), one max MAF (`--flexRVmaxMAF`, default 0.001), burden statistic. The results file carries one row per transform set and the pooled `p_FlexRV` row (`Group == Cauchy`).
 - `--flexRVlofAnno` (default `pLoF`): the label(s) the `lof` transform keys on, the same labels the score line was built with.
 - `--flexRVpartialMask`: allow a mask that leaves out variants carrying a score > 0. Without it, step 2 refuses such a mask before SAIGE starts and names the labels left out: SAIGE drops variants whose label is outside the mask before it reads their scores, so a mask missing one label (for example a SpliceAI category that also holds missense variants) silently tests fewer variants under the same name. Pass it only for a deliberate subset.
 

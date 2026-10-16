@@ -179,6 +179,9 @@ The labels in the `anno` lines are what `--annotations` refers to. Step 2 checks
 
 The top of the file looks like this:
 
+> [!NOTE]
+> This walkthrough's example group file predates the October 2026 BRaVa rebuild and uses the older labels (`damaging_missense_or_protein_altering`, ...). With the October 2026 files from your bucket, use their labels and masks: the [README](../README.md) (top box) and the [step 2 template](../templates/step_2_template.sh) give them.
+
 `head in/ukb_brava_annotations.txt`
 
 ```
