@@ -179,6 +179,9 @@ The labels in the `anno` lines are what `--annotations` refers to. Step 2 checks
 
 The top of the file looks like this:
 
+> [!NOTE]
+> This walkthrough's example group file predates the October 2026 BRaVa rebuild and uses the older labels (`damaging_missense_or_protein_altering`, ...). With the October 2026 files from your bucket, use their labels and masks: the [README](../README.md) (top box) and the [step 2 template](../templates/step_2_template.sh) give them.
+
 `head in/ukb_brava_annotations.txt`
 
 ```
@@ -225,6 +228,8 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
 The pooled FlexRV p per gene is the `Group == Cauchy` row's `Pvalue_Burden`; the other rows are the transform sets.
+Group-test results also carry log10 p-value columns (`log10_Pvalue`, `log10_Pvalue_Burden`, ...) right after `SE_Burden`; they stay exact far below the smallest p a double can print, where `Pvalue` reads 0. `--log10P FALSE` leaves them out.
+This uses the default mask, `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`. If your group file has other labels whose variants carry scores (`--annotations` to change the mask), step 2 refuses a mask that leaves one out and names it; `--flexRVpartialMask` lets a deliberate subset through.
 
 > [!WARNING]
 > The chromosome name flagged by `--chr` must _exactly_ match the chromosome name in the first column of the `.bim` (or `.pvar`): if it is labelled '11', pass `--chr 11`, not `--chr chr11`. Step 2 refuses a mismatch before SAIGE starts, and the message shows the file's own spelling.

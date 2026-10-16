@@ -142,10 +142,15 @@ for name, text in [
     ("s2_refuse_flex_mafs", "FlexRV tests ONE max MAF"),
     ("s2_refuse_flex_variant", "contradicts"),
     ("s2_dryrun", "DRY RUN"),
+    ("s2_dryrun", "--is_output_log10P=TRUE"),
+    ("s2_log10p_off", "--is_output_log10P=FALSE"),
+    ("s2_refuse_log10p_value", "--log10P takes TRUE or FALSE, not 'yes'"),
     ("s2_refuse_anno_labels", "on no variant in the group file: damaging_missense other_missense"),
     ("s2_refuse_lof_label", "on no variant in the group file: LoF"),
     ("s2_refuse_no_score", "has 0 for 300 region(s)"),
     ("s2_refuse_partial_score", "has 299 for 300 region(s)"),
+    ("s2_refuse_flex_partial_mask", "the FlexRV mask leaves out variants that carry a score on the score:AM line: other_missense_or_protein_altering ("),
+    ("s2_flex_partial_mask_ok", "DRY RUN"),
     ("s2_refuse_chr_name", "--chr chr7 is not in column 1 of"),
     ("s1_refuse_both_geno", "Pass ONE of --genotypePlink and --genotypePgen"),
     ("s1_sex_mf_ok", "--FemaleOnly=TRUE --sexCol=sex --FemaleCode=F"),
@@ -446,8 +451,27 @@ for suffix in (".txt", ".txt.singleAssoc.txt"):
     a, b = out("Q_pos.group" + suffix), out("Q_pos.group_plink" + suffix)
     check("step2: group%s from --pgen == --plink (bytes)" % suffix, same_bytes(a, b), "", "identical")
 
+# log10 p-value columns (--log10P, default TRUE from 2026-10-16): present on both group paths, and equal to log10 of
+# the printed p wherever that p is above the floor (it is printed to a few significant digits: within 0.01)
+def log10_agree(rows, pcol, lcol):
+    pairs = [(fnum(r[pcol]), fnum(r[lcol])) for r in rows if lcol in r]
+    pairs = [(p, l) for p, l in pairs if not math.isnan(p) and not math.isnan(l) and p > 1e-300]
+    worst = max((abs(math.log10(p) - l) for p, l in pairs), default=float("nan"))
+    return pairs, worst
+
+
+section("s2_Q_pos_group")
+qg = group_rows("Q_pos.group")
+for lcol, pcol in (("log10_Pvalue", "Pvalue"), ("log10_Pvalue_Burden", "Pvalue_Burden"), ("log10_Pvalue_SKAT", "Pvalue_SKAT")):
+    pairs, worst = log10_agree(qg, pcol, lcol)
+    check("step2 Q_pos group: %s = log10(%s)" % (lcol, pcol), bool(pairs) and worst < 0.01,
+          "%d rows, max |diff| %.4f" % (len(pairs), worst), "column present, |diff| < 0.01")
+
 section("s2_Q_pos_flexrv")
 flex = group_rows("Q_pos.flexrv_AM")
+pairs, worst = log10_agree(flex, "Pvalue_Burden", "log10_Pvalue_Burden")
+check("step2 Q_pos FlexRV: log10_Pvalue_Burden = log10(Pvalue_Burden)", bool(pairs) and worst < 0.01,
+      "%d rows, max |diff| %.4f" % (len(pairs), worst), "column present, |diff| < 0.01")
 p_flex, _ = gene_p(flex, "GENE_FLEX", "Cauchy", 0.001) if flex else (float("nan"), 0)
 if math.isnan(p_flex):          # the pooled row's max_MAF may not be the run's max MAF
     p_flex = next((fnum(r["Pvalue_Burden"]) for r in flex if r["Region"] == "GENE_FLEX" and r["Group"] == "Cauchy"),

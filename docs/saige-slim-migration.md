@@ -146,6 +146,12 @@ checks; it also passes on a SLURM cluster under Apptainer.
 - **Step 2**: refused before SAIGE runs: mask labels absent from the group file,
   a FlexRV score line missing from any region, a `--chr` spelled unlike the
   `.pvar`/`.bim`. The four new sidecars of `152ffd8c` are documented.
+- **Image `1.5.2-dev-b5456dee`** (2026-10-16, replacing `928f95ad`): LEDGER #181,
+  a non-finite saddlepoint in a burden cell's variance rescale killed the chromosome
+  (AoU HTN); the cell now takes the normal-approximation p, disclosed in the log and in
+  `.spaRegionNA.txt`. Also LEDGER #179 (faster burden / single-in-group runs, output
+  byte-identical) and SAIGE's `--is_output_log10P`, which step 2 passes on group tests by default
+  (`--log10P`, default TRUE, from 2026-10-16): log10 p-value columns after `SE_Burden`.
 - **Step 3**: Nglmm at the same cutoff as the fit (default 0.05; it was
   `extractNglmm.R`'s own 0.125, which every earlier BRaVa submission used).
 - **Docs**: templates use 20 PCs, as AoU did; walkthrough and templates checked
