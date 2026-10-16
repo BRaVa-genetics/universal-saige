@@ -153,6 +153,7 @@ optional:
   - `.exactByWeightAboveCap.txt`: cells concentrated the same way but with more than 13 material carriers, too many to enumerate, so their p-value is still the saddlepoint, in the regime where it is least trusted (LEDGER #176). Observation only: the first place to look if a result is surprising.
   - `.spaPinned.txt` (binary traits): tests whose saddlepoint left out samples the null model holds near-certain (flip probability at or below 1e-8), or would have but for the budget (LEDGER #174).
   - `.stretchGate.txt` (binary traits, weighted cells): cells the variance ratio stretches far relative to the rest of their score; the most stretched report the exact convolution at the unstretched score in place of the saddlepoint (LEDGER #176). From image `928f95ad` it always has the same columns, so per-chromosome files stack under one header.
+  - `.spaRegionNA.txt` (image `b5456dee`): burden cells whose variance-rescale saddlepoint did not converge or returned a non-finite value. Each takes the normal-approximation p instead, and the log ends with `Region saddlepoint NA: N ...`. Before this image a non-finite value killed the whole chromosome (saige-slim LEDGER #181).
 - `-s`,`--isSingularity` (default: false).
 - `-g`,`--groupFile`: required for a group test. The annotation file.
 - `--annotations`: required for a group test. `':'` joins labels into one mask, `','` separates masks. For SAIGE-GENE+ use `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`.
@@ -160,6 +161,7 @@ optional:
   is refused before SAIGE starts, naming the missing labels and the ones the file has. SAIGE itself would quietly test a
   smaller or empty mask under the name asked for.
 - `--relatednessCutoff` (default 0.05): must equal the cutoff steps 0, 1 and 3 used; nothing in SAIGE checks it.
+- `--log10P` (default `TRUE`): group tests also write log10 p-value columns (`log10_Pvalue`, `log10_Pvalue_Burden`, `log10_Pvalue_SKAT`; FlexRV `log10_Pvalue_Burden`), computed in log space so p-values below the double-precision floor (1e-308) are still estimated, and the pooled Cauchy row is combined in log space. They come right after `SE_Burden`, so every later column moves one or more places: pass `--log10P FALSE` if your downstream code reads columns by position rather than by name. Needs image `b5456dee` or later.
 - `--condition`, `--subSampleFile`, `--dryRun` (prints the SAIGE command).
 
 FlexRV (one run per weight set):

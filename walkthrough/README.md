@@ -225,6 +225,7 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
 The pooled FlexRV p per gene is the `Group == Cauchy` row's `Pvalue_Burden`; the other rows are the transform sets.
+Group-test results also carry log10 p-value columns (`log10_Pvalue`, `log10_Pvalue_Burden`, ...) right after `SE_Burden`; they stay exact far below the smallest p a double can print, where `Pvalue` reads 0. `--log10P FALSE` leaves them out.
 This uses the default mask, `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`. If your group file has other labels whose variants carry scores (`--annotations` to change the mask), step 2 refuses a mask that leaves one out and names it; `--flexRVpartialMask` lets a deliberate subset through.
 
 > [!WARNING]

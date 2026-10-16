@@ -32,6 +32,7 @@ FLEXRV_MAXMAF="0.001"
 FLEXRV_LOFANNO="pLoF"
 FLEXRV_PARTIAL_MASK="false"
 DRYRUN=false
+LOG10P="TRUE"
 
 WD=$(pwd)
 HOME=$WD
@@ -141,6 +142,11 @@ while [[ $# -gt 0 ]]; do
       FLEXRV_PARTIAL_MASK="true"
       shift # past argument
       ;;
+    --log10P)
+      LOG10P="$2"
+      shift # past argument
+      shift # past value
+      ;;
     --dryRun)
       DRYRUN=true
       shift # past argument
@@ -163,7 +169,9 @@ while [[ $# -gt 0 ]]; do
       cells one variant carries, given the exact test instead of the saddlepoint), .exactByWeightAboveCap.txt (such cells
       with too many carriers to enumerate, left on the saddlepoint), .spaPinned.txt (binary: tests whose saddlepoint left
       out samples the model holds certain) and .stretchGate.txt (binary weighted cells the variance ratio stretches; the
-      most stretched report the exact convolution). Each only when there is something to report; see the README.
+      most stretched report the exact convolution) and, from image b5456dee, .spaRegionNA.txt (burden cells whose
+      variance-rescale saddlepoint did not converge or was non-finite, given the normal-approximation p; LEDGER #181).
+      Each only when there is something to report; see the README.
     -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
     -g,--groupFile: required if group test is selected. Filename of the annotation file used for group tests. This must be relative to, and contained within, the current working directory.
     --annotations: required if group test is selected. Comma separated list of annotation masks to test (':' joins labels INTO one mask, ',' separates masks). Please use
@@ -172,6 +180,10 @@ while [[ $# -gt 0 ]]; do
     --relatednessCutoff (default: 0.05): MUST equal the cutoff steps 0, 1 and 3 used; nothing in SAIGE checks it.
     --condition: comma separated list of SNPs to condition on. This must be in order of the SNP occurrence in the dosage file.
     --subSampleFile: single-column file of sample IDs to restrict the test to.
+    --log10P (default: TRUE): group tests also write log10 p-value columns (log10_Pvalue, log10_Pvalue_Burden,
+      log10_Pvalue_SKAT; on FlexRV log10_Pvalue_Burden), computed in log space, so p-values below the double-precision
+      floor (1e-308) are still estimated; the pooled Cauchy row is combined in log space too. They sit right after
+      SE_Burden, so every later column moves: pass FALSE if downstream code reads columns by position.
     --dryRun: print the SAIGE command instead of running it.
   FlexRV (Schwartzentruber et al. 2025; a group test, burden statistic, 16 score x up to 12 MAF transforms per gene):
     --flexRVscore NAME: run FlexRV on the group file's 'score:NAME' line, which every region must have, or the run is
@@ -209,6 +221,10 @@ if [[ ${VCF} != "" ]]; then
   exit 1
 fi
 
+if [[ ${LOG10P} != "TRUE" && ${LOG10P} != "FALSE" ]]; then
+  echo "--log10P takes TRUE or FALSE, not '${LOG10P}'"
+  exit 1
+fi
 if [[ ${FLEXRV_SCORE} != "" ]]; then
   if [[ ${TESTTYPE} != "" && ${TESTTYPE} != "group" ]]; then
     echo "--flexRVscore is a group test; --testType ${TESTTYPE} contradicts it"
@@ -386,6 +402,7 @@ echo "SPARSEGRMID       = ${SPARSEGRMID}"
 echo "RELCUTOFF         = ${RELCUTOFF}"
 echo "CONDITION         = ${CONDITION}"
 echo "FLEXRV            = ${FLEXRV_SCORE:-off}${FLEXRV_SCORE:+ (maxMAF ${FLEXRV_MAXMAF}, lof labels ${FLEXRV_LOFANNO})}"
+echo "LOG10P            = ${LOG10P}"
 
 # For debugging
 set -eo pipefail
@@ -402,7 +419,10 @@ else
   echo "gene testing"
   min_mac="0.5"
   GROUPFILE="${HOME}/${GROUPFILE}"
-  GROUP_ARGS="--groupFile=${GROUPFILE} --annotation_in_groupTest=${ANNOTATIONS} --is_output_markerList_in_groupTest=TRUE --is_single_in_groupTest=TRUE"
+  # log10 p-value columns (saige-slim image b5456dee and later; on by default since 2026-10-16, as in the AoU runs):
+  # p-values past the double floor are estimated, not printed as 0 (AoU: GPT for ALT, ~1e-146 on its own and
+  # beyond the floor in the pooled row)
+  GROUP_ARGS="--groupFile=${GROUPFILE} --annotation_in_groupTest=${ANNOTATIONS} --is_output_markerList_in_groupTest=TRUE --is_single_in_groupTest=TRUE --is_output_log10P=${LOG10P}"
   if [[ ${FLEXRV_SCORE} != "" ]]; then
     GROUP_ARGS="${GROUP_ARGS} --maxMAF_in_groupTest=${FLEXRV_MAXMAF} --flexRV_score=${FLEXRV_SCORE} --flexRV_maxMAF=${FLEXRV_MAXMAF} --flexRV_lofAnno=${FLEXRV_LOFANNO} --r.corr=1"
   else

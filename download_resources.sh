@@ -14,7 +14,13 @@
 set -euo pipefail
 
 SAIGE_IMAGE="${SAIGE_IMAGE:-astheeggeggs/saige-slim}"        # Docker Hub namespace/repository
-SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-928f95ad}"          # the tag; pin it, and record it with your results
+SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-b5456dee}"          # the tag; pin it, and record it with your results
+# b5456dee (built 2026-10-16; Docker Hub digest sha256:0a900342b6cb899ba5b4ed6bf5b7becba5b59e1fc90bc14ec6c32c7cee0d4729):
+# LEDGER #181 -- a non-finite saddlepoint in a burden cell's variance rescale no longer
+# kills the chromosome (it did on AoU HTN): the cell takes the normal-approximation p,
+# the log says 'Region saddlepoint NA: N ...' and <prefix>.txt.spaRegionNA.txt names
+# each such cell. Also since 928f95ad: LEDGER #179 (burden and single-in-group runs
+# faster, output byte-identical) and SAIGE's --is_output_log10P (step 2 --log10P, on by default).
 # 928f95ad (built 2026-10-07): saige-slim with the LEDGER #172 fix the AoU FlexRV
 # reruns used (a weighted cell one variant carries takes the exact test), #176 (a
 # cell the variance ratio stretches takes the exact convolution), and, since

@@ -77,6 +77,9 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRMID ${GRM_samples} \
     --relatednessCutoff ${relatedness_cutoff}
 
+# Group tests write log10 p-value columns after SE_Burden by default (--log10P TRUE):
+# add '--log10P FALSE' to a call if your downstream code reads columns by position.
+
 # ---- 3. FlexRV (one run per weight set) -------------------------------------
 # The group file for a weight set is built ONCE per chromosome by
 # 04_flexrv_groupfile.sh (AlphaMissense first; a second weight set the same

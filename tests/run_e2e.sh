@@ -92,6 +92,9 @@ run s2_refuse_flex_masks   fail "${S2[@]}" --flexRVscore AM --annotations pLoF,s
 run s2_refuse_flex_mafs    fail "${S2[@]}" --flexRVscore AM --flexRVmaxMAF 0.001,0.01 --pgen "${IN}/exome/chr7" --groupFile g --modelFile m --varianceRatio v
 run s2_refuse_flex_variant fail "${S2[@]}" --flexRVscore AM --testType variant --pgen "${IN}/exome/chr7" --groupFile g --modelFile m --varianceRatio v
 run s2_dryrun              ok   "${S2[@]}" --testType group --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" --annotations pLoF --modelFile m --varianceRatio v --dryRun
+# log10 p-value columns: on by default (the dry run above passes TRUE), off with --log10P FALSE, any other value refused
+run s2_log10p_off          ok   "${S2[@]}" --testType group --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" --annotations pLoF --modelFile m --varianceRatio v --dryRun --log10P FALSE
+run s2_refuse_log10p_value fail "${S2[@]}" --testType group --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" --annotations pLoF --modelFile m --varianceRatio v --dryRun --log10P yes
 # masks in AoU's labels against the BRaVa-labelled group file: refused before SAIGE runs
 run s2_refuse_anno_labels fail "${S2[@]}" --testType group --pgen "${IN}/exome/chr7" --groupFile "${IN}/group.chr7.txt" --modelFile m --varianceRatio v \
   --annotations pLoF,damaging_missense,pLoF:damaging_missense:other_missense --dryRun
