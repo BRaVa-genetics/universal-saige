@@ -143,6 +143,10 @@ for name, text in [
     ("s2_refuse_flex_variant", "contradicts"),
     ("s2_dryrun", "DRY RUN"),
     ("s2_dryrun", "--is_output_log10P=TRUE"),
+    ("s2_dryrun", "--is_output_nEff=TRUE"),
+    ("s2_dryrun", "--is_single_in_groupTest=TRUE"),
+    ("s2_flex_partial_mask_ok", "--is_single_in_groupTest=FALSE"),
+    ("s2_refuse_neff_value", "--nEff takes TRUE or FALSE, not 'maybe'"),
     ("s2_log10p_off", "--is_output_log10P=FALSE"),
     ("s2_refuse_log10p_value", "--log10P takes TRUE or FALSE, not 'yes'"),
     ("s2_refuse_anno_labels", "on no variant in the group file: damaging_missense other_missense"),
@@ -467,8 +471,29 @@ for lcol, pcol in (("log10_Pvalue", "Pvalue"), ("log10_Pvalue_Burden", "Pvalue_B
     check("step2 Q_pos group: %s = log10(%s)" % (lcol, pcol), bool(pairs) and worst < 0.01,
           "%d rows, max |diff| %.4f" % (len(pairs), worst), "column present, |diff| < 0.01")
 
+# nEff_Burden (--nEff, default TRUE from 2026-10-17): Kish's effective carrier count of each cell's burden vector. On
+# an unweighted set it lies in [MAC/2, MAC] (MAC when every carrier is one het); on any set it is at most MAC
+def neff_rows(rows):
+    return [(fnum(r["nEff_Burden"]), fnum(r["MAC"]), r["Group"]) for r in rows if "nEff_Burden" in r and "MAC" in r]
+
+
+nq = [(e, m) for e, m, g in neff_rows(qg) if not math.isnan(e) and not math.isnan(m) and m > 0]
+check("step2 Q_pos group: nEff_Burden within [MAC/2, MAC] (unweighted masks)",
+      bool(nq) and all(m / 2 - 1e-6 <= e <= m + 1e-6 for e, m in nq),
+      "%d cells; outside: %d" % (len(nq), sum(not (m / 2 - 1e-6 <= e <= m + 1e-6) for e, m in nq)), "column present, all within")
+
 section("s2_Q_pos_flexrv")
 flex = group_rows("Q_pos.flexrv_AM")
+nf = neff_rows(flex)
+cells = [(e, m) for e, m, g in nf if g != "Cauchy" and not math.isnan(e) and not math.isnan(m)]
+pooled = [e for e, m, g in nf if g == "Cauchy"]
+check("step2 Q_pos FlexRV: nEff_Burden in (0, MAC] on every cell, NA on the pooled row",
+      bool(cells) and all(0 < e <= m + 1e-6 for e, m in cells) and bool(pooled) and all(math.isnan(e) for e in pooled),
+      "%d cells, %d pooled rows" % (len(cells), len(pooled)), "column present, bounds hold, pooled NA")
+check("step2 Q_pos FlexRV: no per-variant file (--singleInGroup defaults to FALSE for FlexRV)",
+      not os.path.exists(out("Q_pos.flexrv_AM.txt.singleAssoc.txt")), "absent" if not os.path.exists(out("Q_pos.flexrv_AM.txt.singleAssoc.txt")) else "present", "absent")
+check("step2 Q_pos group: per-variant file written (--singleInGroup defaults to TRUE for SAIGE-GENE+)",
+      os.path.exists(out("Q_pos.group.txt.singleAssoc.txt")), "present" if os.path.exists(out("Q_pos.group.txt.singleAssoc.txt")) else "absent", "present")
 pairs, worst = log10_agree(flex, "Pvalue_Burden", "log10_Pvalue_Burden")
 check("step2 Q_pos FlexRV: log10_Pvalue_Burden = log10(Pvalue_Burden)", bool(pairs) and worst < 0.01,
       "%d rows, max |diff| %.4f" % (len(pairs), worst), "column present, |diff| < 0.01")

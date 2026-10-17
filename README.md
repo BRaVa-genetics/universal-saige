@@ -12,19 +12,23 @@
 
 > [!IMPORTANT]
 > **What's new (October 2026) and what to do**
-> 1. **New SAIGE image** (`1.5.2-dev-b5456dee`; a rare numerical case no longer stops a whole chromosome). Fetch it again:
->    `bash download_resources.sh --saige-image` (add `--singularity` on a cluster), and record the tag with your results.
-> 2. **New BRaVa group files** (October 2026 rebuild), in your biobank's bucket with a README. Their labels are
->    `pLoF`, `damaging_missense`, `spliceai2_gt040`, `other_missense`, `synonymous`, `non_coding`, so the masks change:
->    - SAIGE-GENE+: `--annotations "pLoF,damaging_missense,pLoF:damaging_missense,pLoF:damaging_missense:spliceai2_gt040,synonymous,other_missense,pLoF:damaging_missense:spliceai2_gt040:other_missense:synonymous"`
->    - FlexRV (file `*.flexrv_AM.txt.gz`, ready to use): `--flexRVscore AM --annotations "pLoF:damaging_missense:other_missense:spliceai2_gt040"`
->    - AlphaMissense >= 0.906 (file `*.am_moderate.saige_group.txt.gz`): `--annotations am_moderate`
+> 1. **New SAIGE image** (`1.5.2-dev-49178058`). Fetch it again: `bash download_resources.sh --saige-image` (add `--singularity`
+>    on a cluster), and record the tag with your results.
+> 2. **New BRaVa group files** (October 2026 rebuild), in your biobank's bucket with a README: three files per chromosome,
+>    one per run. Labels: `pLoF`, `damaging_missense`, `spliceai2_gt040`, `other_missense`, `synonymous`, `non_coding`.
+> 3. **Three runs per chromosome and phenotype** (all written out in the
+>    [step 2 template](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh)):
 >
->    The [step 2 template](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh) has all four runs written out.
-> 3. **Results gain log10 p-value columns** (`log10_Pvalue`, ...) right after `SE_Burden`; they stay exact where `Pvalue` reads 0.
->    If your own scripts read result columns by position rather than by name, add `--log10P FALSE`.
-> 4. **Step 2 checks your masks before it runs**: a label that is not in the group file (e.g. a typo, or the old label names on the new
->    files) is refused, and so is a FlexRV mask that leaves out variants carrying a score. The message lists what the file has.
+>    | run | group file | mask (`--annotations`) |
+>    |---|---|---|
+>    | 1. SAIGE-GENE+ (SKAT-O) | `*.new_rules.saige_group.txt.gz` | `pLoF,damaging_missense,pLoF:damaging_missense,pLoF:damaging_missense:spliceai2_gt040,synonymous,other_missense,pLoF:damaging_missense:spliceai2_gt040:other_missense:synonymous` |
+>    | 2. SAIGE-GENE+ (SKAT-O), AlphaMissense >= 0.906 | `*.am_moderate.saige_group.txt.gz` | `am_moderate`, with `--singleInGroup FALSE` |
+>    | 3. FlexRV, AlphaMissense weights | `*.flexrv_AM.txt.gz` (ready to use), with `--flexRVscore AM` | `pLoF:damaging_missense:other_missense:spliceai2_gt040` |
+> 4. **New result columns** right after `SE_Burden`: log10 p-values (`log10_Pvalue`, ...; exact where `Pvalue` reads 0) and
+>    `nEff_Burden` (the effective number of carriers behind each burden test; a FlexRV hit with a small value rests on a few
+>    people). If your own scripts read result columns by position rather than by name, add `--log10P FALSE --nEff FALSE`.
+> 5. **Step 2 checks your masks before it runs**: a label that is not in the group file (a typo, or the old label names on the
+>    new files) is refused, and so is a FlexRV mask that leaves out variants carrying a score. The message lists what the file has.
 
 <p align="center">
   <img src="universal-saige.png" alt="VroomAI"/>
@@ -164,7 +168,7 @@ required:
 - `--sparseGRM`, `--sparseGRMID`: the step-0 GRM and its sample IDs. Relative to the current working directory.
 
 optional:
-- `-o`,`--outputPrefix`: output prefix (step 2). Group tests also write `<prefix>.txt.singleAssoc.txt`, `.markerList.txt`, `.skatoMethod.txt` (which p-value method each SKAT-O cell used) and, when there is something to report, the sidecars `.pooledTests.txt`, `.skatFailures.txt`, `.spaFallbacks.txt`, and four that name cells whose p-value came by an unusual route (image `152ffd8c`; each written only when non-empty, one row per cell with its region, mask, max MAF and weight set):
+- `-o`,`--outputPrefix`: output prefix (step 2). Group tests also write `<prefix>.txt.singleAssoc.txt` (unless `--singleInGroup FALSE`, the FlexRV default), `.markerList.txt`, `.skatoMethod.txt` (which p-value method each SKAT-O cell used) and, when there is something to report, the sidecars `.pooledTests.txt`, `.skatFailures.txt`, `.spaFallbacks.txt`, and four that name cells whose p-value came by an unusual route (image `152ffd8c`; each written only when non-empty, one row per cell with its region, mask, max MAF and weight set):
   - `.exactByWeight.txt`: weighted cells (a FlexRV transform or a weight line) whose weight one variant effectively carries. They take the exact test on their carriers instead of the saddlepoint, which converged to confident wrong answers there (saige-slim LEDGER #172). The exact test carries no relatedness correction (LEDGER #177).
   - `.exactByWeightAboveCap.txt`: cells concentrated the same way but with more than 13 material carriers, too many to enumerate, so their p-value is still the saddlepoint, in the regime where it is least trusted (LEDGER #176). Observation only: the first place to look if a result is surprising.
   - `.spaPinned.txt` (binary traits): tests whose saddlepoint left out samples the null model holds near-certain (flip probability at or below 1e-8), or would have but for the budget (LEDGER #174).
@@ -178,6 +182,8 @@ optional:
   smaller or empty mask under the name asked for.
 - `--relatednessCutoff` (default 0.05): must equal the cutoff steps 0, 1 and 3 used; nothing in SAIGE checks it.
 - `--log10P` (default `TRUE`): group tests also write log10 p-value columns (`log10_Pvalue`, `log10_Pvalue_Burden`, `log10_Pvalue_SKAT`; FlexRV `log10_Pvalue_Burden`), computed in log space so p-values below the double-precision floor (1e-308) are still estimated, and the pooled Cauchy row is combined in log space. They come right after `SE_Burden`, so every later column moves one or more places: pass `--log10P FALSE` if your downstream code reads columns by position rather than by name. Needs image `b5456dee` or later.
+- `--nEff` (default `TRUE`): group tests also write `nEff_Burden`, after the log10 columns: the effective number of carriers behind each cell's burden test (Kish's count over the carriers' burden weights; at most the number of carriers, and close to MAC on an unweighted mask), NA on the pooled Cauchy row. On FlexRV, a hit whose `nEff_Burden` is small (below about 10) rests on a handful of people; the meta-analysis can filter on it. Needs image `49178058` or later.
+- `--singleInGroup` (default `TRUE` for SAIGE-GENE+, `FALSE` for FlexRV): write the per-variant results, `<prefix>.txt.singleAssoc.txt`. As in All of Us, they are written once, by the main SAIGE-GENE+ run: the FlexRV and `am_moderate` runs' variants are in it already (pass `--singleInGroup FALSE` on the `am_moderate` run), and on FlexRV the file was most of the run time.
 - `--condition`, `--subSampleFile`, `--dryRun` (prints the SAIGE command).
 
 FlexRV (one run per weight set):

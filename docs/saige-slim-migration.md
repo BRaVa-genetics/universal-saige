@@ -152,6 +152,11 @@ checks; it also passes on a SLURM cluster under Apptainer.
   `.spaRegionNA.txt`. Also LEDGER #179 (faster burden / single-in-group runs, output
   byte-identical) and SAIGE's `--is_output_log10P`, which step 2 passes on group tests by default
   (`--log10P`, default TRUE, from 2026-10-16): log10 p-value columns after `SE_Burden`.
+- **Image `1.5.2-dev-49178058`** (2026-10-16, replacing `b5456dee`): SAIGE's `--is_output_nEff`, passed
+  by default (`--nEff`): `nEff_Burden`, Kish's effective carrier count of each cell's burden vector, after
+  the log10 columns; added after FlexRV height hits in All of Us rested on fewer than five effective
+  carriers. Step 2 also writes per-variant results only on SAIGE-GENE+ runs by default (`--singleInGroup`,
+  FALSE for FlexRV), as the All of Us runs did from 2026-10-08.
 - **Step 3**: Nglmm at the same cutoff as the fit (default 0.05; it was
   `extractNglmm.R`'s own 0.125, which every earlier BRaVa submission used).
 - **Docs**: templates use 20 PCs, as AoU did; walkthrough and templates checked
