@@ -33,6 +33,8 @@ FLEXRV_LOFANNO="pLoF"
 FLEXRV_PARTIAL_MASK="false"
 DRYRUN=false
 LOG10P="TRUE"
+NEFF="TRUE"
+SINGLE_IN_GROUP=""
 
 WD=$(pwd)
 HOME=$WD
@@ -147,6 +149,16 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --nEff)
+      NEFF="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --singleInGroup)
+      SINGLE_IN_GROUP="$2"
+      shift # past argument
+      shift # past value
+      ;;
     --dryRun)
       DRYRUN=true
       shift # past argument
@@ -186,6 +198,12 @@ while [[ $# -gt 0 ]]; do
       log10_Pvalue_SKAT; on FlexRV log10_Pvalue_Burden), computed in log space, so p-values below the double-precision
       floor (1e-308) are still estimated; the pooled Cauchy row is combined in log space too. They sit right after
       SE_Burden, so every later column moves: pass FALSE if downstream code reads columns by position.
+    --nEff (default: TRUE): group tests also write nEff_Burden (after the log10 columns), the effective number of
+      carriers behind each cell's burden test; a FlexRV hit with a small value (below ~10) rests on a few people.
+      NA on the pooled Cauchy row. Image 49178058 or later.
+    --singleInGroup (default: TRUE for SAIGE-GENE+, FALSE for FlexRV): write the per-variant results file
+      <prefix>.txt.singleAssoc.txt. Off for FlexRV and for the am_moderate run, as in All of Us: their variants are in
+      the main SAIGE-GENE+ run's file already, and on FlexRV it is most of the run time.
     --dryRun: print the SAIGE command instead of running it.
   FlexRV (Schwartzentruber et al. 2025; a group test, burden statistic, 16 score x up to 12 MAF transforms per gene):
     --flexRVscore NAME: run FlexRV on the group file's 'score:NAME' line, which every region must have, or the run is
@@ -224,10 +242,15 @@ if [[ ${VCF} != "" ]]; then
   exit 1
 fi
 
-if [[ ${LOG10P} != "TRUE" && ${LOG10P} != "FALSE" ]]; then
-  echo "--log10P takes TRUE or FALSE, not '${LOG10P}'"
-  exit 1
-fi
+for f in "--log10P:${LOG10P}" "--nEff:${NEFF}" "--singleInGroup:${SINGLE_IN_GROUP:-TRUE}"; do
+  if [[ ${f#*:} != "TRUE" && ${f#*:} != "FALSE" ]]; then
+    echo "${f%%:*} takes TRUE or FALSE, not '${f#*:}'"
+    exit 1
+  fi
+done
+# Per-variant results of a group test: on for SAIGE-GENE+, off for FlexRV, as in the All of Us runs (2026-10-08): on a
+# FlexRV run the file was 80% of the time and repeats the SAIGE-GENE+ run's per-variant results.
+[[ -z ${SINGLE_IN_GROUP} ]] && { [[ ${FLEXRV_SCORE} != "" ]] && SINGLE_IN_GROUP="FALSE" || SINGLE_IN_GROUP="TRUE"; }
 if [[ ${FLEXRV_SCORE} != "" ]]; then
   if [[ ${TESTTYPE} != "" && ${TESTTYPE} != "group" ]]; then
     echo "--flexRVscore is a group test; --testType ${TESTTYPE} contradicts it"
@@ -406,6 +429,8 @@ echo "RELCUTOFF         = ${RELCUTOFF}"
 echo "CONDITION         = ${CONDITION}"
 echo "FLEXRV            = ${FLEXRV_SCORE:-off}${FLEXRV_SCORE:+ (maxMAF ${FLEXRV_MAXMAF}, lof labels ${FLEXRV_LOFANNO})}"
 echo "LOG10P            = ${LOG10P}"
+echo "NEFF              = ${NEFF}"
+echo "SINGLE_IN_GROUP   = ${SINGLE_IN_GROUP}"
 
 # For debugging
 set -eo pipefail
@@ -425,7 +450,7 @@ else
   # log10 p-value columns (saige-slim image b5456dee and later; on by default since 2026-10-16, as in the AoU runs):
   # p-values past the double floor are estimated, not printed as 0 (AoU: GPT for ALT, ~1e-146 on its own and
   # beyond the floor in the pooled row)
-  GROUP_ARGS="--groupFile=${GROUPFILE} --annotation_in_groupTest=${ANNOTATIONS} --is_output_markerList_in_groupTest=TRUE --is_single_in_groupTest=TRUE --is_output_log10P=${LOG10P}"
+  GROUP_ARGS="--groupFile=${GROUPFILE} --annotation_in_groupTest=${ANNOTATIONS} --is_output_markerList_in_groupTest=TRUE --is_single_in_groupTest=${SINGLE_IN_GROUP} --is_output_log10P=${LOG10P} --is_output_nEff=${NEFF}"
   if [[ ${FLEXRV_SCORE} != "" ]]; then
     GROUP_ARGS="${GROUP_ARGS} --maxMAF_in_groupTest=${FLEXRV_MAXMAF} --flexRV_score=${FLEXRV_SCORE} --flexRV_maxMAF=${FLEXRV_MAXMAF} --flexRV_lofAnno=${FLEXRV_LOFANNO} --r.corr=1"
   else

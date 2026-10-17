@@ -29,11 +29,11 @@ variance_ratio=["path/to/varianceratio"]
 # biobank's bucket (see its README.md). Each chromosome has three files; use the
 # ones in biobank_ids/ if your genotype files use the variant IDs shown there,
 # otherwise the ones in chr_pos_ref_alt/:
-#   <biobank>.chrN.new_rules.saige_group.txt.gz    SAIGE-GENE+ (section 2)
-#   <biobank>.chrN.flexrv_AM.txt.gz                FlexRV (section 3), ready to use
-#   <biobank>.chrN.am_moderate.saige_group.txt.gz  AlphaMissense >= 0.906 (section 4)
+#   <biobank>.chrN.new_rules.saige_group.txt.gz    run 1: SAIGE-GENE+, seven masks
+#   <biobank>.chrN.am_moderate.saige_group.txt.gz  run 2: SAIGE-GENE+, AlphaMissense >= 0.906
+#   <biobank>.chrN.flexrv_AM.txt.gz                run 3: FlexRV, ready to use
 group_file=["path/to/<biobank>.chrN.new_rules.saige_group.txt.gz"]
-# The masks for the SAIGE-GENE+ run: ':' joins labels into ONE mask, ',' separates
+# The masks for run 1: ':' joins labels into ONE mask, ',' separates
 # masks. The labels of the October 2026 files are pLoF, damaging_missense,
 # spliceai2_gt040, other_missense, synonymous and non_coding; spell them exactly
 # (step 2 refuses a label the file does not have, and lists the ones it has).
@@ -58,20 +58,19 @@ GRM_samples=["path/to/GRM/sampleID/file"]
 # checks it).
 relatedness_cutoff=0.05
 
-# ---- 1. single-variant tests ------------------------------------------------
-bash 02_step2_SPAtests_variant_and_gene.sh \
-    --chr $chrom \
-    --testType variant \
-    --pgen ${pgen} \
-    --modelFile ${model_file} \
-    --varianceRatio ${variance_ratio} \
-    --outputPrefix ${out_step2}.variant \
-    --isSingularity $IS_SINGULARITY \
-    --sparseGRM ${GRM} \
-    --sparseGRMID ${GRM_samples} \
-    --relatednessCutoff ${relatedness_cutoff}
+# THREE RUNS per chromosome and phenotype, all on the October 2026 BRaVa files:
+#   run 1  SAIGE-GENE+ (SKAT-O), seven masks, with the SpliceAI2 >= 0.40 category
+#   run 2  SAIGE-GENE+ (SKAT-O), the AlphaMissense >= 0.906 mask
+#   run 3  FlexRV, AlphaMissense weights
+# Results: <prefix>.txt, one row per gene, mask and max MAF. Columns include log10
+# p-values (log10_Pvalue, ... : exact even where Pvalue reads 0) and nEff_Burden (the
+# effective number of carriers behind each burden test), right after SE_Burden. Add
+# '--log10P FALSE --nEff FALSE' to a call only if your downstream code reads columns
+# by position rather than by name.
 
-# ---- 2. SAIGE-GENE+ group tests (seven masks x three max MAFs, SKAT-O) ------
+# ---- run 1. SAIGE-GENE+ (SKAT-O): seven masks x three max MAFs ---------------
+# Also writes the per-variant results of every variant in the masks,
+# ${out_step2}.skato.txt.singleAssoc.txt.
 bash 02_step2_SPAtests_variant_and_gene.sh \
     --chr $chrom \
     --testType group \
@@ -86,23 +85,35 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRMID ${GRM_samples} \
     --relatednessCutoff ${relatedness_cutoff}
 
-# Results: ${out_step2}.skato.txt, one row per gene, mask and max MAF. Group tests
-# also write log10 p-value columns (log10_Pvalue, ...) right after SE_Burden, exact
-# even where Pvalue reads 0; add '--log10P FALSE' to a call if your downstream code
-# reads columns by position rather than by name.
+# ---- run 2. SAIGE-GENE+ (SKAT-O): AlphaMissense >= 0.906 (ACMG PP3 Moderate) --
+# Its own group file, one label (am_moderate): missense variants whose AlphaMissense
+# score reaches 0.906. No per-variant file (--singleInGroup FALSE): its variants are
+# in run 1's already.
+am_group_file=["path/to/<biobank>.chrN.am_moderate.saige_group.txt.gz"]
+bash 02_step2_SPAtests_variant_and_gene.sh \
+    --chr $chrom \
+    --testType group \
+    --pgen ${pgen} \
+    --modelFile ${model_file} \
+    --varianceRatio ${variance_ratio} \
+    --groupFile ${am_group_file} \
+    --annotations am_moderate \
+    --singleInGroup FALSE \
+    --outputPrefix ${out_step2}.am_moderate \
+    --isSingularity $IS_SINGULARITY \
+    --sparseGRM ${GRM} \
+    --sparseGRMID ${GRM_samples} \
+    --relatednessCutoff ${relatedness_cutoff}
 
-# ---- 3. FlexRV (AlphaMissense weights; one mask, burden statistic) ----------
-# The October 2026 release ships the FlexRV file ready to use (the score:AM line
-# is already in it). ONE mask, which must include the SpliceAI label: that
-# category holds missense variants with a splice call, and they carry
-# AlphaMissense scores (step 2 refuses a mask that leaves scored variants out).
-# The pooled FlexRV p per gene is the row with Group == Cauchy.
+# ---- run 3. FlexRV with AlphaMissense weights (one mask, burden statistic) ----
+# The release's FlexRV file is ready to use (its score:AM line is built in). ONE
+# mask, which must include the SpliceAI label: that category holds missense variants
+# with a splice call, which carry AlphaMissense scores (step 2 refuses a mask that
+# leaves scored variants out). The pooled FlexRV p per gene is the row with
+# Group == Cauchy; a hit whose nEff_Burden is small (below ~10) rests on a few people.
+# FlexRV writes no per-variant file by default (their variants are in run 1's).
 flexrv_group_file_AM=["path/to/<biobank>.chrN.flexrv_AM.txt.gz"]
 flexrv_mask="pLoF:damaging_missense:other_missense:spliceai2_gt040"
-# (To build a FlexRV file yourself from another group file:
-#   bash download_resources.sh --alphamissense      (once)
-#   bash 04_flexrv_groupfile.sh --group ${group_file} --chr <chromosome number> --name AM --out <file>.flexrv_AM.txt
-# and use a mask of that file's labels.)
 bash 02_step2_SPAtests_variant_and_gene.sh \
     --chr $chrom \
     --pgen ${pgen} \
@@ -117,22 +128,10 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRMID ${GRM_samples} \
     --relatednessCutoff ${relatedness_cutoff}
 
-# ---- 4. AlphaMissense >= 0.906 mask (ACMG/AMP PP3 Moderate), SKAT-O ---------
-# A group file of its own, with one label, am_moderate: missense variants whose
-# AlphaMissense score reaches 0.906.
-am_group_file=["path/to/<biobank>.chrN.am_moderate.saige_group.txt.gz"]
-bash 02_step2_SPAtests_variant_and_gene.sh \
-    --chr $chrom \
-    --testType group \
-    --pgen ${pgen} \
-    --modelFile ${model_file} \
-    --varianceRatio ${variance_ratio} \
-    --groupFile ${am_group_file} \
-    --annotations am_moderate \
-    --outputPrefix ${out_step2}.am_moderate \
-    --isSingularity $IS_SINGULARITY \
-    --sparseGRM ${GRM} \
-    --sparseGRMID ${GRM_samples} \
-    --relatednessCutoff ${relatedness_cutoff}
-
 # With --plink instead of --pgen for PLINK 1 genotypes.
+#
+# (Building a FlexRV file yourself from another group file:
+#   bash download_resources.sh --alphamissense      (once)
+#   bash 04_flexrv_groupfile.sh --group <group file> --chr <chromosome number> --name AM --out <file>.flexrv_AM.txt
+# and use a mask of that file's labels. Single-variant tests on their own, if you
+# need them: --testType variant without --groupFile/--annotations.)
