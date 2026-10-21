@@ -40,6 +40,9 @@ up next. The parameter record it implements is
    missense the gene mean), a second consortium weight set through the same door
    as a column of the BRaVa long-form table (`--scoreColumn`) or an
    AlphaMissense-shaped per-variant table (`--am`).
+   Since 2026-10-21 `--amScale percentile` gives the FlexRV paper's score (a missense
+   variant's percentile among all possible missense variants of its gene; README,
+   step 4), which the BRaVa release ships as `flexrv_AMPCT` and `flexrv_SCALLION`.
 
 ## Other fixes made on the way
 

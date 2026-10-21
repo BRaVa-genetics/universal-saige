@@ -26,12 +26,14 @@ model_file=["path/to/model/file"]
 variance_ratio=["path/to/varianceratio"]
 
 # The BRaVa group files: the October 2026 rebuild, one set per biobank, in your
-# biobank's bucket (see its README.md). Each chromosome has three files; use the
-# ones in biobank_ids/ if your genotype files use the variant IDs shown there,
-# otherwise the ones in chr_pos_ref_alt/:
+# biobank's bucket (see its README.md). Each chromosome has four files (three on
+# chrY: no scallion scores there); use the ones in biobank_ids/ if your genotype
+# files use the variant IDs shown there, otherwise the ones in chr_pos_ref_alt/:
 #   <biobank>.chrN.new_rules.saige_group.txt.gz    run 1: SAIGE-GENE+, seven masks
 #   <biobank>.chrN.am_moderate.saige_group.txt.gz  run 2: SAIGE-GENE+, AlphaMissense >= 0.906
-#   <biobank>.chrN.flexrv_AM.txt.gz                run 3: FlexRV, ready to use
+#   <biobank>.chrN.flexrv_AMPCT.txt.gz             run 3: FlexRV, AlphaMissense percentile, ready to use
+#   <biobank>.chrN.flexrv_SCALLION.txt.gz          run 4: FlexRV, scallion percentile, ready to use
+# (an earlier <biobank>.chrN.flexrv_AM.txt.gz, raw AlphaMissense, is superseded by flexrv_AMPCT)
 group_file=["path/to/<biobank>.chrN.new_rules.saige_group.txt.gz"]
 # The masks for run 1: ':' joins labels into ONE mask, ',' separates
 # masks. The labels of the October 2026 files are pLoF, damaging_missense,
@@ -58,10 +60,11 @@ GRM_samples=["path/to/GRM/sampleID/file"]
 # checks it).
 relatedness_cutoff=0.05
 
-# THREE RUNS per chromosome and phenotype, all on the October 2026 BRaVa files:
+# FOUR RUNS per chromosome and phenotype, all on the October 2026 BRaVa files:
 #   run 1  SAIGE-GENE+ (SKAT-O), seven masks, with the SpliceAI2 >= 0.40 category
 #   run 2  SAIGE-GENE+ (SKAT-O), the AlphaMissense >= 0.906 mask
-#   run 3  FlexRV, AlphaMissense weights
+#   run 3  FlexRV, AlphaMissense within-gene percentile weights
+#   run 4  FlexRV, scallion within-gene percentile weights (chromosomes 1-22 and X)
 # Results: <prefix>.txt, one row per gene, mask and max MAF. Columns include log10
 # p-values (log10_Pvalue, ... : exact even where Pvalue reads 0) and nEff_Burden (the
 # effective number of carriers behind each burden test), right after SE_Burden. Add
@@ -105,24 +108,44 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRMID ${GRM_samples} \
     --relatednessCutoff ${relatedness_cutoff}
 
-# ---- run 3. FlexRV with AlphaMissense weights (one mask, burden statistic) ----
-# The release's FlexRV file is ready to use (its score:AM line is built in). ONE
-# mask, which must include the SpliceAI label: that category holds missense variants
-# with a splice call, which carry AlphaMissense scores (step 2 refuses a mask that
-# leaves scored variants out). The pooled FlexRV p per gene is the row with
-# Group == Cauchy; a hit whose nEff_Burden is small (below ~10) rests on a few people.
-# FlexRV writes no per-variant file by default (their variants are in run 1's).
-flexrv_group_file_AM=["path/to/<biobank>.chrN.flexrv_AM.txt.gz"]
+# ---- run 3. FlexRV with AlphaMissense percentile weights (one mask, burden statistic)
+# The release's FlexRV file is ready to use (its score:AMPCT line is built in): LoF 1.0,
+# a missense variant its percentile among all possible missense variants of its gene
+# (FlexRV paper; README, step 4). ONE mask, which must include the SpliceAI label: that
+# category holds missense variants with a splice call, which carry scores (step 2
+# refuses a mask that leaves scored variants out). The pooled FlexRV p per gene is the
+# row with Group == Cauchy; a hit whose nEff_Burden is small (below ~10) rests on a few
+# people. FlexRV writes no per-variant file by default (their variants are in run 1's).
+flexrv_group_file_AMPCT=["path/to/<biobank>.chrN.flexrv_AMPCT.txt.gz"]
 flexrv_mask="pLoF:damaging_missense:other_missense:spliceai2_gt040"
 bash 02_step2_SPAtests_variant_and_gene.sh \
     --chr $chrom \
     --pgen ${pgen} \
     --modelFile ${model_file} \
     --varianceRatio ${variance_ratio} \
-    --groupFile ${flexrv_group_file_AM} \
-    --flexRVscore AM \
+    --groupFile ${flexrv_group_file_AMPCT} \
+    --flexRVscore AMPCT \
     --annotations ${flexrv_mask} \
-    --outputPrefix ${out_step2}.flexrv_AM \
+    --outputPrefix ${out_step2}.flexrv_AMPCT \
+    --isSingularity $IS_SINGULARITY \
+    --sparseGRM ${GRM} \
+    --sparseGRMID ${GRM_samples} \
+    --relatednessCutoff ${relatedness_cutoff}
+
+# ---- run 4. FlexRV with scallion percentile weights (chromosomes 1-22 and X) ----
+# The same variants and mask as run 3, scored by scallion's within-gene percentile
+# (score:SCALLION). One score line per file, so a second file and a second run.
+# There is no scallion file for chrY: skip this run there.
+flexrv_group_file_SCALLION=["path/to/<biobank>.chrN.flexrv_SCALLION.txt.gz"]
+bash 02_step2_SPAtests_variant_and_gene.sh \
+    --chr $chrom \
+    --pgen ${pgen} \
+    --modelFile ${model_file} \
+    --varianceRatio ${variance_ratio} \
+    --groupFile ${flexrv_group_file_SCALLION} \
+    --flexRVscore SCALLION \
+    --annotations ${flexrv_mask} \
+    --outputPrefix ${out_step2}.flexrv_SCALLION \
     --isSingularity $IS_SINGULARITY \
     --sparseGRM ${GRM} \
     --sparseGRMID ${GRM_samples} \
@@ -132,6 +155,8 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
 #
 # (Building a FlexRV file yourself from another group file:
 #   bash download_resources.sh --alphamissense      (once)
-#   bash 04_flexrv_groupfile.sh --group <group file> --chr <chromosome number> --name AM --out <file>.flexrv_AM.txt
+#   bash 04_flexrv_groupfile.sh --group <group file> --chr <chromosome number> --name AMPCT --out <file>.flexrv_AMPCT.txt \
+#       --annoTable <long table> --isoforms <AlphaMissense isoforms> --mane <MANE summary> --gtf <GENCODE v39 GTF> \
+#       --amScale percentile --nonMissense gene-mean
 # and use a mask of that file's labels. Single-variant tests on their own, if you
 # need them: --testType variant without --groupFile/--annotations.)
