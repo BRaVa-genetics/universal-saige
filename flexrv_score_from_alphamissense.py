@@ -139,6 +139,51 @@ def smart_open(path, mode="rt"):
     return open(path, mode)
 
 
+# GRCh38 pseudoautosomal regions. AlphaMissense files a PAR gene's rows under chrY (transcript IDs '..._PAR_Y'),
+# sometimes with no chrX copy at all (CRLF2, PLCXD1, ZBED1, CSF2RA, WASH6P), so chrX variants there found no score.
+# PAR1 has the same coordinates on X and Y; PAR2 is X 155,701,383-156,030,895 = Y 56,887,903-57,217,415.
+PAR1_END, PAR2_Y_START, PAR2_Y_END, PAR2_SHIFT = 2781479, 56887903, 57217415, 155701383 - 56887903
+PAR_Y = {}   # AlphaMissense path -> the AlphaMissense file whose chrY '_PAR_Y' rows are read with it, as chrX (build())
+
+
+def par_y_lines(path):
+    """The '_PAR_Y' rows of an AlphaMissense file, rewritten as chrX rows: chrom chrX, PAR2 positions moved to X, the
+    '_PAR_Y' suffix dropped from the transcript ID (so it matches GENCODE's chrX transcript)."""
+    with smart_open(path) as fh:
+        it = None
+        for raw in fh:
+            if raw.startswith("#"):
+                if raw.startswith("#CHROM"):
+                    it = raw.rstrip("\n").split("\t").index("transcript_id")
+                continue
+            f = raw.rstrip("\n").split("\t")
+            if it is None or not f[it].endswith("_PAR_Y"):
+                continue
+            pos = int(f[1])
+            if pos > PAR1_END:
+                if not PAR2_Y_START <= pos <= PAR2_Y_END:
+                    continue
+                pos += PAR2_SHIFT
+            f[0], f[1], f[it] = "chrX", str(pos), f[it][:-len("_PAR_Y")]
+            yield "\t".join(f) + "\n"
+
+
+class am_open(object):
+    """smart_open for AlphaMissense files: the file's lines, then -- when PAR_Y names a source for it -- that
+    source's PAR rows as chrX rows (after the header has been read, so the readers parse them like any other)."""
+    def __init__(self, path):
+        self.path = path
+
+    def __enter__(self):
+        self.fh = smart_open(self.path)
+        src = PAR_Y.get(self.path)
+        import itertools
+        return itertools.chain(self.fh, par_y_lines(src)) if src else self.fh
+
+    def __exit__(self, *a):
+        self.fh.close()
+
+
 def read_group_regions(path):
     """Yield (gene, kind, name, values, raw) per line, preserving file order.
 
@@ -188,7 +233,7 @@ def stream_alphamissense(path, wanted, chrom_filter=None, source="canonical",
     """
     hits, collisions, rows = {}, 0, 0
     allrows = {} if collect_all else None
-    with smart_open(path) as fh:
+    with am_open(path) as fh:
         header = None
         for raw in fh:
             if raw.startswith("#"):
@@ -254,7 +299,7 @@ def read_reference_scores(sources, transcripts, canonical_genes, chrom_filter=No
     """
     got = {}  # stripped -> {(source, full): [scores]}
     for path, source in sources:
-        with smart_open(path) as fh:
+        with am_open(path) as fh:
             header = None
             for raw in fh:
                 if raw.startswith("#"):
@@ -418,7 +463,7 @@ def read_unmapped_in_spans(sources, spans, mapped, chrom_filter=None):
     order = sorted((lo, hi, g) for g, (lo, hi) in spans.items()); starts = [o[0] for o in order]
     got = {}
     for path, source in sources:
-        with smart_open(path) as fh:
+        with am_open(path) as fh:
             for raw in fh:
                 if raw.startswith("#"):
                     if raw.startswith("#CHROM"):
@@ -595,7 +640,7 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
           prefer_anno_transcript=False, drop_anno=(), score_column=None,
           score_transform=None, zero_is_missing=None, fallback="safe",
           provenance=None, gtf_path=None, nonmissense="impute", am_scale="raw",
-          log=sys.stderr):
+          par_y_am=None, par_y_isoforms=None, empty_gene_fill=None, log=sys.stderr):
     """Write `group_out` = `group_in` with a score line per region.
 
     `am_scale`: "raw" writes am_pathogenicity itself. "percentile" (2026-10-21) writes the FlexRV
@@ -636,6 +681,13 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
     "how many missense variants got a real AlphaMissense score" is the number
     that decides whether the run means anything.
     """
+    PAR_Y.clear()
+    if chrom_filter in (None, "X"):
+        if par_y_am and am_path:
+            PAR_Y[am_path] = par_y_am
+        if par_y_isoforms and isoforms_path:
+            PAR_Y[isoforms_path] = par_y_isoforms
+    empty_fill = (0.5 if am_scale == "percentile" else 0.0) if empty_gene_fill is None else float(empty_gene_fill)
     lof = set(lof_anno)
     mis = set(missense_anno)
 
@@ -1134,7 +1186,9 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
         if n_mis and not scored:
             no_scored.append((gene, n_mis))
         if missing == "gene-mean":
-            fill = sum(scored) / len(scored) if scored else 0.0
+            # a gene with no scored missense variant has no mean: --empty-gene-fill (percentile scale: 0.5, the
+            # expected within-gene percentile, so FlexRV still tests its missense variants; raw: 0.0, as released)
+            fill = sum(scored) / len(scored) if scored else empty_fill
         elif missing == "drop":
             fill = None
         else:
@@ -1255,7 +1309,7 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
                   "them%s); %d of these only because every AlphaMissense row "
                   "there is another gene's%s"
                   % (len(no_scored), missing,
-                     " with 0.0" if missing == "gene-mean" else "", len(lost),
+                     " with %g" % empty_fill if missing == "gene-mean" else "", len(lost),
                      (": " + ", ".join("%s (%d of %d missense)" % (
                          g, excluded_by_gene[g], n) for g, n in lost)) if lost else ""),
                   file=log)
@@ -2097,8 +2151,58 @@ def _selftest():
     check("percentile: two versions of the annotation transcript -> the GTF's (lower, listed second) for score "
           "AND scale (0.30 on 0.1 0.3 0.5 0.7 = 2/4; first-in-file or highest would give 1.0)",
           abs(pg["G8"]["20:8501:A:G"] - 0.5) < 5e-5)
-    check("percentile: a gene with no AlphaMissense transcript is filled (0.0)",
-          pg["G3"][pos["r1"]] == 0.0)
+    check("percentile: a gene with no AlphaMissense transcript is filled at 0.5 (the expected within-gene percentile)",
+          pg["G3"][pos["r1"]] == 0.5)
+    check("percentile: --empty-gene-fill overrides that (0.25)",
+          run_pct(am_scale="percentile", nonmissense="gene-mean", empty_gene_fill=0.25)[0]["G3"][pos["r1"]] == 0.25)
+    check("raw: a gene with no AlphaMissense row stays 0.0 (released raw files reproduced)",
+          run_pct(am_scale="raw", nonmissense="gene-mean")[0]["G3"][pos["r1"]] == 0.0)
+
+    # pseudoautosomal genes: AlphaMissense files them under chrY ('_PAR_Y'), with no chrX row. GX (chrX, TX): variants
+    # at PAR1 X:1001 / 1002 (same coordinates on Y) and PAR2 X:155701483 (= Y:56888003); the chrY file also holds a
+    # Y-specific transcript (TY) at Y:1001 and a PAR row of another transcript -- neither may reach GX's scale.
+    gx = os.path.join(tmp, "group_par.txt"); ax = os.path.join(tmp, "anno_par.tsv")
+    xids = ["X:1001:A:G", "X:1002:A:G", "X:155701483:A:G"]
+    with open(gx, "w") as fh:
+        fh.write("GX var %s X:2000:A:T\nGX anno missense missense missense pLoF\n" % " ".join(xids))
+    with open(ax, "w") as fh:
+        fh.write("\t".join(["ID", "GENE", "LOF", "REVEL_SCORE", "CADD_PHRED", "CSQ", "TRANSCRIPT",
+                            "MANE_SELECT", "CANONICAL", "BIOTYPE", "DS_MAX", "ANNOTATION"]) + "\n")
+        for v in xids:
+            fh.write("\t".join([v, "GX", "NA", "0", "0", "missense_variant", "TX", "NM_X", "YES", "protein_coding", "0",
+                                "missense"]) + "\n")
+    amx, amy = os.path.join(tmp, "am_par_x.tsv.gz"), os.path.join(tmp, "am_par_y.tsv.gz")
+    with gzip.open(amx, "wt") as fh:
+        fh.write("\t".join(AM_CANONICAL_COLS) + "\n")
+        fh.write("\t".join(["chrX", "5000000", "A", "G", "hg38", "PO", "TO.1", "A1B", "0.5000", "x"]) + "\n")
+    with gzip.open(amy, "wt") as fh:
+        fh.write("\t".join(AM_CANONICAL_COLS) + "\n")
+        for p_, sc in (("1001", 0.2), ("1002", 0.8), ("1003", 0.4), ("56888003", 0.6)):
+            fh.write("\t".join(["chrY", p_, "A", "G", "hg38", "PX", "TX.1_PAR_Y", "A1B", "%.4f" % sc, "x"]) + "\n")
+        fh.write("\t".join(["chrY", "1001", "A", "G", "hg38", "PY", "TY.1", "A1B", "0.9900", "x"]) + "\n")
+        fh.write("\t".join(["chrY", "20000000", "A", "G", "hg38", "PX", "TX.1_PAR_Y", "A1B", "0.9900", "x"]) + "\n")
+    isx = os.path.join(tmp, "am_par_iso.tsv.gz")
+    with gzip.open(isx, "wt") as fh:
+        fh.write("\t".join(["#CHROM", "POS", "REF", "ALT", "genome", "transcript_id",
+                            "protein_variant", "am_pathogenicity", "am_class"]) + "\n")
+    gtfx = os.path.join(tmp, "par.gtf")
+    with open(gtfx, "w") as fh:
+        fh.write('chrX\tHAVANA\ttranscript\t1000\t155701500\t.\t+\t.\tgene_id "GX.1"; transcript_id "TX.1";\n')
+
+    def run_par(**kw):
+        o = os.path.join(tmp, "par_%d.txt" % len(os.listdir(tmp)))
+        build(gx, o, amx, ["pLoF"], ["missense"], score_name="AM", anno_table_path=ax, prefer_anno_transcript=True,
+              isoforms_path=isx,
+              gtf_path=gtfx, chrom_filter="X", am_scale="percentile", nonmissense="gene-mean",
+              log=open(os.devnull, "w"), **kw)
+        return per_gene(o)["GX"]
+    px = run_par(par_y_am=amy)
+    # scale 0.2 0.4 0.6 0.8 (PAR1 three, PAR2 one; the Y-specific TY row and the out-of-PAR row excluded)
+    check("PAR: chrX variants scored from AlphaMissense's chrY '_PAR_Y' rows (PAR1 same coordinates, PAR2 shifted)",
+          abs(px["X:1001:A:G"] - 0.25) < 5e-5 and abs(px["X:1002:A:G"] - 1.0) < 5e-5
+          and abs(px["X:155701483:A:G"] - 0.75) < 5e-5)
+    check("PAR: without --par-y-am the same gene has no scale (0.5 fill) -- the gap this closes",
+          {v for k, v in run_par().items() if k in xids} == {0.5})
     check("percentile: counts -- 2 non-missense filled, 1 matched (start_lost)",
           cp["nonmissense_filled"] == 2 and cp["nonmissense_matched"] == 1)
     pr = [l.rstrip("\n").split("\t") for l in open(prov_p)]
@@ -2213,6 +2317,13 @@ def main():
     ap.add_argument("--missing", default="gene-mean",
                     help="missense with no AlphaMissense row: 'gene-mean' "
                          "(default), 'drop', or a literal value in [0, 1]")
+    ap.add_argument("--empty-gene-fill", type=float, default=None,
+                    help="with --missing gene-mean, the value for missense variants of a gene with NO scored missense "
+                         "variant (no mean to take): default 0.5 with --am-scale percentile (the expected within-gene "
+                         "percentile), else 0.0")
+    ap.add_argument("--par-y-am", help="with --chrom X: an AlphaMissense canonical file holding chrY; its '_PAR_Y' "
+                    "rows (pseudoautosomal genes, which AlphaMissense files under chrY) are read as chrX rows")
+    ap.add_argument("--par-y-isoforms", help="the same for the isoforms file")
     ap.add_argument("--other", type=float, default=0.0,
                     help="score for every other annotation (synonymous, "
                          "non_coding, ...); these are dropped by "
@@ -2302,6 +2413,7 @@ def main():
                    [s for s in a.missense_anno.split(",") if s],
                    score_name=a.name, missing=a.missing, other=a.other,
                    id_format=a.id_format, chrom_filter=a.chrom,
+                   par_y_am=a.par_y_am, par_y_isoforms=a.par_y_isoforms, empty_gene_fill=a.empty_gene_fill,
                    isoforms_path=a.isoforms, mane_path=a.mane,
                    replace_existing=a.replace_existing,
                    anno_table_path=a.anno_table,

@@ -216,6 +216,10 @@ adds a `score:NAME` line to every gene of the BRaVa group file from the AlphaMis
   AlphaMissense does not score is ranked on its canonical-file transcript, else its isoform scoring the most variants, else
   the largest AlphaMissense transcript inside the gene that GENCODE no longer holds -- chosen from AlphaMissense and
   GENCODE only, so a gene has the same scale in every cohort.
+  A gene AlphaMissense does not score at all (about 150 genes, mostly paralogs, readthrough and recently added genes)
+  gets 0.5 for its missense variants, the expected within-gene percentile (`--empty-gene-fill`), so FlexRV still tests
+  them rather than dropping to pLoF only. On chrX the builder also reads AlphaMissense's chrY `_PAR_Y` rows: it files
+  pseudoautosomal genes under chrY, some (CRLF2, CSF2RA, PLCXD1, ZBED1) with no chrX copy.
 - in-frame indels, LOFTEE low-confidence LoF and start/stop-lost variants in the missense labels (`--nonMissense
   gene-mean`): an AlphaMissense row on their own transcript if there is one, else the mean score of the gene's scored
   missense variants in this file, taken after ranking. Missense-label variants with no protein change (e.g. a SpliceAI
