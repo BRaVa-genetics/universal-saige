@@ -69,6 +69,12 @@ else
   # chrX on the percentile scale: AlphaMissense files pseudoautosomal genes under chrY ('_PAR_Y' rows), some with no
   # chrX copy (CRLF2, PLCXD1, ZBED1, ...), so the chrY rows are read too -- from the per-chromosome chrY file next to
   # a chrX one, else from the genome-wide file itself (raw scale unchanged: released files stay reproducible)
+  # paralog copies AlphaMissense does not score (alphamissense_paralogs.py; bash download_resources.sh --alphamissense):
+  # its protein-level scores on copies with the identical protein, next to the per-chromosome AlphaMissense file
+  if [[ ${AMSCALE} == percentile && -n ${ISO} && -n ${CHR} ]]; then
+    px=$(dirname "${AM}")/AlphaMissense_paralogs_hg38.chr${CHR}.tsv.gz
+    [[ -s ${px} ]] && args+=(--extra-isoforms "${px}")
+  fi
   if [[ ${CHR} == X && ${AMSCALE} == percentile ]]; then
     py=${AM/chrX/chrY}; [[ ${py} != "${AM}" && -s ${py} ]] || py=${AM}
     args+=(--par-y-am "${py}")

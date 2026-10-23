@@ -144,6 +144,7 @@ def smart_open(path, mode="rt"):
 # PAR1 has the same coordinates on X and Y; PAR2 is X 155,701,383-156,030,895 = Y 56,887,903-57,217,415.
 PAR1_END, PAR2_Y_START, PAR2_Y_END, PAR2_SHIFT = 2781479, 56887903, 57217415, 155701383 - 56887903
 PAR_Y = {}   # AlphaMissense path -> the AlphaMissense file whose chrY '_PAR_Y' rows are read with it, as chrX (build())
+EXTRA_ROWS = {}   # AlphaMissense path -> further files in its layout read after it (--extra-isoforms: paralog copies)
 
 
 def par_y_lines(path):
@@ -168,6 +169,12 @@ def par_y_lines(path):
             yield "\t".join(f) + "\n"
 
 
+def smart_lines(path):
+    with smart_open(path) as fh:
+        for raw in fh:
+            yield raw
+
+
 class am_open(object):
     """smart_open for AlphaMissense files: the file's lines, then -- when PAR_Y names a source for it -- that
     source's PAR rows as chrX rows (after the header has been read, so the readers parse them like any other)."""
@@ -178,7 +185,10 @@ class am_open(object):
         self.fh = smart_open(self.path)
         src = PAR_Y.get(self.path)
         import itertools
-        return itertools.chain(self.fh, par_y_lines(src)) if src else self.fh
+        parts = [self.fh] + ([par_y_lines(src)] if src else [])
+        for x in EXTRA_ROWS.get(self.path, ()):
+            parts.append(smart_lines(x))
+        return itertools.chain(*parts) if len(parts) > 1 else self.fh
 
     def __exit__(self, *a):
         self.fh.close()
@@ -640,7 +650,7 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
           prefer_anno_transcript=False, drop_anno=(), score_column=None,
           score_transform=None, zero_is_missing=None, fallback="safe",
           provenance=None, gtf_path=None, nonmissense="impute", am_scale="raw",
-          par_y_am=None, par_y_isoforms=None, empty_gene_fill=None, log=sys.stderr):
+          par_y_am=None, par_y_isoforms=None, empty_gene_fill=None, extra_isoforms=(), log=sys.stderr):
     """Write `group_out` = `group_in` with a score line per region.
 
     `am_scale`: "raw" writes am_pathogenicity itself. "percentile" (2026-10-21) writes the FlexRV
@@ -681,7 +691,12 @@ def build(group_in, group_out, am_path, lof_anno, missense_anno,
     "how many missense variants got a real AlphaMissense score" is the number
     that decides whether the run means anything.
     """
-    PAR_Y.clear()
+    PAR_Y.clear(); EXTRA_ROWS.clear()
+    extra_isoforms = [x for x in (extra_isoforms or ()) if x]
+    if extra_isoforms:
+        if not isoforms_path:
+            raise SystemExit("--extra-isoforms needs --isoforms: its rows are read as isoform rows")
+        EXTRA_ROWS[isoforms_path] = extra_isoforms
     if chrom_filter in (None, "X"):
         if par_y_am and am_path:
             PAR_Y[am_path] = par_y_am
@@ -2155,6 +2170,16 @@ def _selftest():
           pg["G3"][pos["r1"]] == 0.5)
     check("percentile: --empty-gene-fill overrides that (0.25)",
           run_pct(am_scale="percentile", nonmissense="gene-mean", empty_gene_fill=0.25)[0]["G3"][pos["r1"]] == 0.25)
+    # paralog rows (alphamissense_paralogs.py): G3's own transcript T3 (no AlphaMissense row) gets rows from a further
+    # file in the isoforms layout -- 8201 = 0.9 on 0.2 0.6 0.9 -> (2 + 1) / 3 = 1.0 (not the 0.5 fill)
+    exi = os.path.join(tmp, "am_paralogs.tsv.gz")
+    with gzip.open(exi, "wt") as fh:
+        fh.write("#CHROM\tPOS\tREF\tALT\tgenome\ttranscript_id\tprotein_variant\tam_pathogenicity\tam_class\n")
+        for p_, sc in (("8201", 0.9), ("8202", 0.2), ("8203", 0.6)):
+            fh.write("\t".join(["chr20", p_, "A", "G", "hg38", "T3.1", "A1B", "%.4f" % sc, "x"]) + "\n")
+    pe, _ = run_pct(am_scale="percentile", nonmissense="gene-mean", extra_isoforms=[exi])
+    check("paralogs: --extra-isoforms rows score a gene AlphaMissense lacks, on its own transcript's scale (1.0, not 0.5)",
+          abs(pe["G3"][pos["r1"]] - 1.0) < 5e-5 and pe["G1"] == pg["G1"] and pe["G2"] == pg["G2"])
     check("raw: a gene with no AlphaMissense row stays 0.0 (released raw files reproduced)",
           run_pct(am_scale="raw", nonmissense="gene-mean")[0]["G3"][pos["r1"]] == 0.0)
 
@@ -2324,6 +2349,10 @@ def main():
     ap.add_argument("--par-y-am", help="with --chrom X: an AlphaMissense canonical file holding chrY; its '_PAR_Y' "
                     "rows (pseudoautosomal genes, which AlphaMissense files under chrY) are read as chrX rows")
     ap.add_argument("--par-y-isoforms", help="the same for the isoforms file")
+    ap.add_argument("--extra-isoforms", action="append", default=[],
+                    help="a further file in the AlphaMissense isoforms layout read as isoform rows (repeatable): "
+                         "alphamissense_paralogs.py output, AlphaMissense's protein-level scores placed on paralog "
+                         "copies it does not score")
     ap.add_argument("--other", type=float, default=0.0,
                     help="score for every other annotation (synonymous, "
                          "non_coding, ...); these are dropped by "
@@ -2414,6 +2443,7 @@ def main():
                    score_name=a.name, missing=a.missing, other=a.other,
                    id_format=a.id_format, chrom_filter=a.chrom,
                    par_y_am=a.par_y_am, par_y_isoforms=a.par_y_isoforms, empty_gene_fill=a.empty_gene_fill,
+                   extra_isoforms=a.extra_isoforms,
                    isoforms_path=a.isoforms, mane_path=a.mane,
                    replace_existing=a.replace_existing,
                    anno_table_path=a.anno_table,

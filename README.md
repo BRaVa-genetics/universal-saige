@@ -216,7 +216,18 @@ adds a `score:NAME` line to every gene of the BRaVa group file from the AlphaMis
   AlphaMissense does not score is ranked on its canonical-file transcript, else its isoform scoring the most variants, else
   the largest AlphaMissense transcript inside the gene that GENCODE no longer holds -- chosen from AlphaMissense and
   GENCODE only, so a gene has the same scale in every cohort.
-  A gene AlphaMissense does not score at all (about 150 genes, mostly paralogs, readthrough and recently added genes)
+  AlphaMissense scores each protein on one transcript only, so paralog copies encoding the identical protein (histone
+  clusters, CT45A/CT47A, SPDYE, USP17L, AMY1A, ...) have no rows of their own. `alphamissense_paralogs.py` places
+  AlphaMissense's protein-level scores (`AlphaMissense_aa_substitutions.tsv.gz`) on every missense SNV of such a copy
+  (113 transcripts in about 90 genes), and the builder reads them with `--extra-isoforms` (04_flexrv_groupfile.sh passes
+  them on the percentile scale when the file sits next to the per-chromosome AlphaMissense file). A copy is used only if
+  the generator reproduces its scored twin's AlphaMissense rows exactly. Run once after `download_resources.sh
+  --alphamissense` and the per-chromosome split:
+  `python3 alphamissense_paralogs.py --gtf resources/gencode.v39.annotation.gtf.gz --translations
+  resources/gencode.v39.pc_translations.fa.gz --transcripts resources/gencode.v39.pc_transcripts.fa.gz --am
+  resources/AlphaMissense_hg38.tsv.gz --isoforms resources/AlphaMissense_isoforms_hg38.tsv.gz --aa
+  resources/AlphaMissense_aa_substitutions.tsv.gz --out-dir resources/am_by_chrom`.
+  A gene AlphaMissense still does not score at all (readthrough and recently added genes, selenoproteins, ...)
   gets 0.5 for its missense variants, the expected within-gene percentile (`--empty-gene-fill`), so FlexRV still tests
   them rather than dropping to pLoF only. On chrX the builder also reads AlphaMissense's chrY `_PAR_Y` rows: it files
   pseudoautosomal genes under chrY, some (CRLF2, CSF2RA, PLCXD1, ZBED1) with no chrX copy.
