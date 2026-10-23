@@ -227,7 +227,10 @@ adds a `score:NAME` line to every gene of the BRaVa group file from the AlphaMis
   resources/gencode.v39.pc_translations.fa.gz --transcripts resources/gencode.v39.pc_transcripts.fa.gz --am
   resources/AlphaMissense_hg38.tsv.gz --isoforms resources/AlphaMissense_isoforms_hg38.tsv.gz --aa
   resources/AlphaMissense_aa_substitutions.tsv.gz --out-dir resources/am_by_chrom`.
-  A gene AlphaMissense still does not score at all (readthrough and recently added genes, selenoproteins, ...)
+  The same script also covers readthrough and recently added genes that overlap a scored gene: on the gene's canonical
+  transcript, an SNV takes the overlapping gene's AlphaMissense score only where the amino-acid change is identical (same
+  reading frame), and only if at least half its possible missense SNVs qualify; out-of-frame overlaps never borrow.
+  A gene AlphaMissense still does not score at all (out-of-frame overlaps, selenoproteins, ...)
   gets 0.5 for its missense variants, the expected within-gene percentile (`--empty-gene-fill`), so FlexRV still tests
   them rather than dropping to pLoF only. On chrX the builder also reads AlphaMissense's chrY `_PAR_Y` rows: it files
   pseudoautosomal genes under chrY, some (CRLF2, CSF2RA, PLCXD1, ZBED1) with no chrX copy.
