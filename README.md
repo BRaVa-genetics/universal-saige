@@ -14,16 +14,21 @@
 > **What's new (October 2026) and what to do**
 > 1. **New SAIGE image** (`1.5.2-dev-49178058`). Fetch it again: `bash download_resources.sh --saige-image` (add `--singularity`
 >    on a cluster), and record the tag with your results.
-> 2. **New BRaVa group files** (October 2026 rebuild), in your biobank's bucket with a README: three files per chromosome,
->    one per run. Labels: `pLoF`, `damaging_missense`, `spliceai2_gt040`, `other_missense`, `synonymous`, `non_coding`.
-> 3. **Three runs per chromosome and phenotype** (all written out in the
+> 2. **New BRaVa group files** (October 2026 rebuild), in your biobank's bucket with a README: four files per chromosome,
+>    one per run (no scallion file on chrY). Labels: `pLoF`, `damaging_missense`, `spliceai2_gt040`, `other_missense`,
+>    `synonymous`, `non_coding`.
+> 3. **Four runs per chromosome and phenotype** (all written out in the
 >    [step 2 template](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh)):
 >
 >    | run | group file | mask (`--annotations`) |
 >    |---|---|---|
 >    | 1. SAIGE-GENE+ (SKAT-O) | `*.new_rules.saige_group.txt.gz` | `pLoF,damaging_missense,pLoF:damaging_missense,pLoF:damaging_missense:spliceai2_gt040,synonymous,other_missense,pLoF:damaging_missense:spliceai2_gt040:other_missense:synonymous` |
 >    | 2. SAIGE-GENE+ (SKAT-O), AlphaMissense >= 0.906 | `*.am_moderate.saige_group.txt.gz` | `am_moderate`, with `--singleInGroup FALSE` |
->    | 3. FlexRV, AlphaMissense weights | `*.flexrv_AM.txt.gz` (ready to use), with `--flexRVscore AM` | `pLoF:damaging_missense:other_missense:spliceai2_gt040` |
+>    | 3. FlexRV, AlphaMissense percentile | `*.flexrv_AMPCT.txt.gz` (ready to use), with `--flexRVscore AMPCT` | `pLoF:damaging_missense:other_missense:spliceai2_gt040` |
+>    | 4. FlexRV, scallion percentile (chr1-22, X) | `*.flexrv_SCALLION.txt.gz` (ready to use), with `--flexRVscore SCALLION` | `pLoF:damaging_missense:other_missense:spliceai2_gt040` |
+>
+>    FlexRV's missense scores are within-gene percentiles, as in the FlexRV paper; see [step 4](#step-4-flexrv-weights-once-per-chromosome-per-weight-set).
+>    An earlier `*.flexrv_AM.txt.gz` (raw AlphaMissense) is superseded by `*.flexrv_AMPCT.txt.gz`.
 > 4. **New result columns** right after `SE_Burden`: log10 p-values (`log10_Pvalue`, ...; exact where `Pvalue` reads 0) and
 >    `nEff_Burden` (the effective number of carriers behind each burden test; a FlexRV hit with a small value rests on a few
 >    people). If your own scripts read result columns by position rather than by name, add `--log10P FALSE --nEff FALSE`.
@@ -187,21 +192,57 @@ optional:
 - `--condition`, `--subSampleFile`, `--dryRun` (prints the SAIGE command).
 
 FlexRV (one run per weight set):
-- `--flexRVscore NAME`: run FlexRV on the group file's `score:NAME` line (the October 2026 BRaVa release ships `*.flexrv_AM.txt.gz` with it already; otherwise built by step 4 below). On the release files pass `--annotations pLoF:damaging_missense:other_missense:spliceai2_gt040`: the default mask below uses the older label names. Every region needs that line; a group file with none, or one per some regions only, is refused. One annotation mask (default `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`), one max MAF (`--flexRVmaxMAF`, default 0.001), burden statistic. The results file carries one row per transform set and the pooled `p_FlexRV` row (`Group == Cauchy`).
+- `--flexRVscore NAME`: run FlexRV on the group file's `score:NAME` line (the October 2026 BRaVa release ships `*.flexrv_AMPCT.txt.gz` and `*.flexrv_SCALLION.txt.gz` with it already; otherwise built by step 4 below). On the release files pass `--annotations pLoF:damaging_missense:other_missense:spliceai2_gt040`: the default mask below uses the older label names. Every region needs that line; a group file with none, or one per some regions only, is refused. One annotation mask (default `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`), one max MAF (`--flexRVmaxMAF`, default 0.001), burden statistic. The results file carries one row per transform set and the pooled `p_FlexRV` row (`Group == Cauchy`).
 - `--flexRVlofAnno` (default `pLoF`): the label(s) the `lof` transform keys on, the same labels the score line was built with.
 - `--flexRVpartialMask`: allow a mask that leaves out variants carrying a score > 0. Without it, step 2 refuses such a mask before SAIGE starts and names the labels left out: SAIGE drops variants whose label is outside the mask before it reads their scores, so a mask missing one label (for example a SpliceAI category that also holds missense variants) silently tests fewer variants under the same name. Pass it only for a deliberate subset.
 
 ### Step 4: FlexRV weights (once per chromosome per weight set)
 
 ```
-usage: 04_flexrv_groupfile.sh --group <BRaVa group file> --chr <c> --name AM --out <group file>.flexrv_AM.txt
+usage: 04_flexrv_groupfile.sh --group <BRaVa group file> --chr <c> --name AMPCT --out <group file>.flexrv_AMPCT.txt \
+         --annoTable <long table> --isoforms <AlphaMissense isoforms> --mane <MANE summary> --gtf <GENCODE v39 GTF> \
+         --amScale percentile --nonMissense gene-mean
 ```
-adds a `score:AM` line to every gene of the BRaVa group file from the AlphaMissense release (LoF variants 1.0 by
-annotation, missense variants their AlphaMissense pathogenicity, a missense variant with no score its gene's mean).
+adds a `score:NAME` line to every gene of the BRaVa group file from the AlphaMissense release. With `--amScale percentile`
+(what the BRaVa release uses) the score is the FlexRV paper's (Schwartzentruber et al., bioRxiv 2025.11.04.686320):
+- LoF variants (`--lofAnno`): 1.0.
+- missense variants: the variant's percentile among **all possible missense variants of its gene** -- every AlphaMissense
+  score on the gene's annotation transcript (MANE Select, else canonical), whichever AlphaMissense file holds it. The
+  variant's own score is AlphaMissense on that transcript; where AlphaMissense does not score it there, the canonical
+  file's row (averaged over one protein's transcripts), else the gene's other isoforms (averaged) -- never a maximum, which
+  is biased upward. Where AlphaMissense lists two versions of a transcript (e.g. ENST00000354772.8 and .10, with
+  different scores), the version GENCODE v39 holds is used for both score and scale, else the canonical file's, else
+  the highest. Percentile = (scores below + (scores equal + 1) / 2) / N, at most 1. A gene whose annotation transcript
+  AlphaMissense does not score is ranked on its canonical-file transcript, else its isoform scoring the most variants, else
+  the largest AlphaMissense transcript inside the gene that GENCODE no longer holds -- chosen from AlphaMissense and
+  GENCODE only, so a gene has the same scale in every cohort.
+  AlphaMissense scores each protein on one transcript only, so paralog copies encoding the identical protein (histone
+  clusters, CT45A/CT47A, SPDYE, USP17L, AMY1A, ...) have no rows of their own. `alphamissense_paralogs.py` places
+  AlphaMissense's protein-level scores (`AlphaMissense_aa_substitutions.tsv.gz`) on every missense SNV of such a copy
+  (113 transcripts in about 90 genes), and the builder reads them with `--extra-isoforms` (04_flexrv_groupfile.sh passes
+  them on the percentile scale when the file sits next to the per-chromosome AlphaMissense file). A copy is used only if
+  the generator reproduces its scored twin's AlphaMissense rows exactly. Run once after `download_resources.sh
+  --alphamissense` and the per-chromosome split:
+  `python3 alphamissense_paralogs.py --gtf resources/gencode.v39.annotation.gtf.gz --translations
+  resources/gencode.v39.pc_translations.fa.gz --transcripts resources/gencode.v39.pc_transcripts.fa.gz --am
+  resources/AlphaMissense_hg38.tsv.gz --isoforms resources/AlphaMissense_isoforms_hg38.tsv.gz --aa
+  resources/AlphaMissense_aa_substitutions.tsv.gz --out-dir resources/am_by_chrom`.
+  A gene AlphaMissense still does not score at all (readthrough and recently added genes, selenoproteins, ...)
+  gets 0.5 for its missense variants, the expected within-gene percentile (`--empty-gene-fill`), so FlexRV still tests
+  them rather than dropping to pLoF only. On chrX the builder also reads AlphaMissense's chrY `_PAR_Y` rows: it files
+  pseudoautosomal genes under chrY, some (CRLF2, CSF2RA, PLCXD1, ZBED1) with no chrX copy.
+- in-frame indels, LOFTEE low-confidence LoF and start/stop-lost variants in the missense labels (`--nonMissense
+  gene-mean`): an AlphaMissense row on their own transcript if there is one, else the mean score of the gene's scored
+  missense variants in this file, taken after ranking. Missense-label variants with no protein change (e.g. a SpliceAI
+  call in an intron) are dropped.
+
+`--amScale raw` (the default) writes the raw AlphaMissense pathogenicity instead, with the same row choice except
+between versions of one transcript (raw takes the first in the file, so that files built that way before October 2026,
+including the release's `am_moderate` masks, are reproduced byte for byte).
 A second weight set goes through the same door: `--annoTable <BRaVa long-form table> --scoreColumn <column> --name <NAME>`
 for a score carried as a column of the annotation table, or `--am <table>` for a score in AlphaMissense's per-variant
 layout. One score line per file, so one file and one step-2 run per weight set. The tool behind it is
-`flexrv_score_from_alphamissense.py` (`--help`, and `--selftest` for its controls). `04_flexrv_groupfile.sh -h` lists the rest of its options (`--lofAnno`, `--missenseAnno`, `--dropAnno`, `--missing`, `--isoforms`, `--mane`, `--gtf`, `--nonMissense`, `--provenance`).
+`flexrv_score_from_alphamissense.py` (`--help`, and `--selftest` for its controls). `04_flexrv_groupfile.sh -h` lists the rest of its options (`--lofAnno`, `--missenseAnno`, `--dropAnno`, `--missing`, `--isoforms`, `--mane`, `--gtf`, `--nonMissense`, `--amScale`, `--provenance`). With `--scoreColumn`, `--nonMissense gene-mean` keeps exactly the variants the AlphaMissense percentile file keeps (the BRaVa scallion file is built this way from a percentile column).
 
 ### Step 3
 

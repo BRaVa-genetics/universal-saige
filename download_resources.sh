@@ -111,5 +111,11 @@ if [[ ${GET_AM} = true ]]; then
   # which the release marks as less evaluated -- only 04_flexrv_groupfile.sh --isoforms uses it
   wget -nc "${AM_RECORD}/AlphaMissense_hg38.tsv.gz" -P resources/
   [[ ${GET_ISO} = true ]] && wget -nc "${AM_RECORD}/AlphaMissense_isoforms_hg38.tsv.gz" -P resources/
+  # protein-level scores and GENCODE v39 proteins: AlphaMissense rows for paralog copies it does not score
+  # (identical protein, same amino-acid change), written next to the per-chromosome files by alphamissense_paralogs.py
+  wget -nc "${AM_RECORD}/AlphaMissense_aa_substitutions.tsv.gz" -P resources/
+  for f in pc_translations pc_transcripts; do
+    wget -nc "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_39/gencode.v39.${f}.fa.gz" -P resources/
+  done
   echo "AlphaMissense in resources/"
 fi

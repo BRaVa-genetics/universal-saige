@@ -5,6 +5,11 @@
 #
 #   AlphaMissense (the first weight set; Cheng et al. 2023):
 #     bash 04_flexrv_groupfile.sh --group in/brava.chr20.txt --chr 20 --name AM --out in/brava.chr20.flexrv_AM.txt
+#   on the FlexRV paper's scale, as the BRaVa release does: each missense score the variant's percentile among all
+#   possible missense variants of its gene (README, step 4); needs the annotation table, isoforms, MANE and GTF:
+#     bash 04_flexrv_groupfile.sh --group in/brava.chr20.txt.gz --chr 20 --name AMPCT --out in/brava.chr20.flexrv_AMPCT.txt \
+#          --annoTable in/brava.chr20.long.tsv.gz --isoforms <AlphaMissense isoforms> --mane <MANE summary> \
+#          --gtf <GENCODE v39 GTF> --amScale percentile --nonMissense gene-mean
 #   a score carried as a column of the BRaVa long-form annotation table
 #   (the consortium's second weight set arrives this way, or as an
 #   AlphaMissense-shaped per-variant table passed to --am):
@@ -20,7 +25,7 @@
 # mean (--missing); every other variant a placeholder that is never tested.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
-GROUP=""; OUT=""; CHR=""; NAME="AM"; AM="resources/AlphaMissense_hg38.tsv.gz"; ISO=""; ANNO=""; MANE=""; GTF=""; SCORECOL=""
+GROUP=""; OUT=""; CHR=""; AMSCALE="raw"; NAME="AM"; AM="resources/AlphaMissense_hg38.tsv.gz"; ISO=""; ANNO=""; MANE=""; GTF=""; SCORECOL=""
 LOF="pLoF"; MISSENSE="damaging_missense_or_protein_altering,other_missense_or_protein_altering"; DROP="non_coding"; EXTRA=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -39,8 +44,9 @@ while [[ $# -gt 0 ]]; do
     --dropAnno)    DROP="$2"; shift 2 ;;
     --missing)     EXTRA+=(--missing "$2"); shift 2 ;;
     --nonMissense) EXTRA+=(--nonmissense "$2"); shift 2 ;;
+    --amScale)     EXTRA+=(--am-scale "$2"); AMSCALE="$2"; shift 2 ;;     # raw (default) | percentile (FlexRV paper: within-gene percentile)
     --provenance)  EXTRA+=(--provenance "$2"); shift 2 ;;   # per-variant score source, e.g. for an AlphaMissense-threshold mask
-    -h|--help)     sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help)     sed -n '2,25p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -60,6 +66,23 @@ else
   [[ -n ${MANE} ]] && args+=(--mane "${MANE}")
   # GENCODE GTF of the annotation's release (v39 for AoU v8): never a row on another gene's transcript
   [[ -n ${GTF} ]] && args+=(--gtf "${GTF}")
+  # chrX on the percentile scale: AlphaMissense files pseudoautosomal genes under chrY ('_PAR_Y' rows), some with no
+  # chrX copy (CRLF2, PLCXD1, ZBED1, ...), so the chrY rows are read too -- from the per-chromosome chrY file next to
+  # a chrX one, else from the genome-wide file itself (raw scale unchanged: released files stay reproducible)
+  # paralog copies AlphaMissense does not score (alphamissense_paralogs.py; bash download_resources.sh --alphamissense):
+  # its protein-level scores on copies with the identical protein, next to the per-chromosome AlphaMissense file
+  if [[ ${AMSCALE} == percentile && -n ${ISO} && -n ${CHR} ]]; then
+    px=$(dirname "${AM}")/AlphaMissense_paralogs_hg38.chr${CHR}.tsv.gz
+    [[ -s ${px} ]] && args+=(--extra-isoforms "${px}")
+  fi
+  if [[ ${CHR} == X && ${AMSCALE} == percentile ]]; then
+    py=${AM/chrX/chrY}; [[ ${py} != "${AM}" && -s ${py} ]] || py=${AM}
+    args+=(--par-y-am "${py}")
+    if [[ -n ${ISO} ]]; then
+      py=${ISO/chrX/chrY}; [[ ${py} != "${ISO}" && -s ${py} ]] || py=${ISO}
+      args+=(--par-y-isoforms "${py}")
+    fi
+  fi
 fi
 # ${EXTRA[@]+...}: an empty array is "unbound" under set -u in bash < 4.4 (macOS ships 3.2)
 python3 "${HERE}/flexrv_score_from_alphamissense.py" "${args[@]}" ${EXTRA[@]+"${EXTRA[@]}"}
