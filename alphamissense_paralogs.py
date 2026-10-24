@@ -11,6 +11,10 @@ possible missense SNV of that transcript with AlphaMissense's score for that pro
 chromosome, read by flexrv_score_from_alphamissense.py --extra-isoforms; a transcript is never a near match (one
 residue different: not used).
 
+Also (--overlap-min-share, 2026-10-23): genes with no AlphaMissense row and no identical twin that overlap other genes
+(readthrough, recently added) borrow the overlapping gene's score where the amino-acid change is identical (same frame);
+out-of-frame overlaps never borrow.
+
 Controls: (1) the generator on a random sample of transcripts AlphaMissense DOES score must reproduce AlphaMissense's
 own canonical rows exactly for >= 95% (2026-10-22: 288 of 297; the rest are UniProt sequences that differ from
 GENCODE's protein); (2) a copy is borrowed from only if the generator reproduces ITS AlphaMissense rows exactly -- the (pos, ref, alt) set and every score -- which tests the
@@ -87,6 +91,65 @@ def snvs(tx_full, gtf, translations, transcripts):
             ref_g, alt_g = (b, a) if strand == "+" else (b.translate(COMP), a.translate(COMP))
             out.append((chrom, gpos[i], ref_g, alt_g, "%s%d%s" % (ref_aa, ci // 3 + 1, alt_aa)))
     return out
+
+
+def overlap(a, gtf, translations, transcripts, stripped, genes_scored, paralog_genes, by_chrom, report):
+    """Genes with no AlphaMissense row and no identical-protein twin that overlap other genes (readthrough and recently
+    added genes): an SNV of the gene's transcript takes the overlapping gene's AlphaMissense score at the same
+    (chrom, pos, ref, alt) only when the amino-acid change is IDENTICAL (same reference and alternative residue: the
+    codon is read in the same frame), canonical-file rows first, several averaged (never a maximum). Out-of-frame
+    overlaps (a different amino-acid change) are never borrowed. A transcript is written only if at least
+    --overlap-min-share of its possible missense SNVs can be borrowed, so its scale is not a fragment; only the
+    gene's Ensembl canonical transcript is considered."""
+    tx2g = {t.split(".")[0]: e[2] for t, e in gtf.items()}
+    # only each gene's Ensembl canonical transcript (MANE Select where there is one): the transcript its variants are
+    # annotated on, so a borrowed scale never enters through the builder's other-isoform fallback
+    canonical = set()
+    with gzip.open(a.gtf, "rt") as fh:
+        for l in fh:
+            if l[0] != "#" and '"Ensembl_canonical"' in l and "\ttranscript\t" in l:
+                canonical.add(re.search(r'transcript_id "([^"]+)"', l).group(1))
+    cand = {}
+    for t, (chrom, strand, g, segs) in gtf.items():
+        if g in genes_scored or g in paralog_genes or t not in translations or t not in canonical: continue
+        rows = snvs(t, gtf, translations, transcripts)
+        if rows: cand[t] = rows
+    keys = {(c, p, r, al) for rows in cand.values() for c, p, r, al, _ in rows}
+    am = defaultdict(lambda: ([], []))   # key -> (canonical [(gene, pv, score)], isoform [...])
+    retired = set()   # keys with a row on a transcript GENCODE no longer holds: the builder already scores that gene
+                      # from it (its retired-transcript fallback), so it must not borrow (ARHGAP11B: ENST00000622744)
+    for path, it, k_ in ((a.am, 6, 0), (a.isoforms, 5, 1)):
+        with gzip.open(path, "rt") as fh:
+            for l in fh:
+                if l[0] == "#": continue
+                f = l.rstrip("\n").split("\t"); key = (f[0], int(f[1]), f[2], f[3])
+                if key in keys:
+                    g = tx2g.get(f[it].replace("_PAR_Y", "").split(".")[0])
+                    if g: am[key][k_].append((g, f[it + 1], float(f[it + 2])))
+                    else: retired.add(key)
+    n_tx = 0
+    for t, rows in sorted(cand.items()):
+        g = gtf[t][2]; out = []; donors = set(); other_frame = 0
+        if any((c, p, r, al) in retired for c, p, r, al, _ in rows):
+            report.append((t, g, "-", "overlap skipped: AlphaMissense rows on a retired transcript here", 0)); continue
+        for c, p, r, al, pv in rows:
+            hits = am.get((c, p, r, al))
+            if not hits: continue
+            for src in hits:   # canonical rows first
+                same = [h for h in src if h[0] != g and h[1][0] == pv[0] and h[1][-1] == pv[-1]]
+                if same:
+                    out.append((p, r, al, t, pv, "%.4f" % (sum(h[2] for h in same) / len(same)), "borrowed"))
+                    donors.update(h[0] for h in same); break
+            else:
+                if any(h[0] != g for src in hits for h in src): other_frame += 1
+        if not out and not other_frame: continue
+        share = len(out) / float(len(rows))
+        if share >= a.overlap_min_share:
+            for x in out: by_chrom[gtf[t][0]].append(x)
+            report.append((t, g, "-", "overlap from " + ",".join(sorted(donors)), len(out))); n_tx += 1
+        else:
+            report.append((t, g, "-", "overlap refused: %d same / %d other-frame of %d SNVs" % (len(out), other_frame, len(rows)), 0))
+    print("# overlap (same amino-acid change): %d transcripts written" % n_tx, file=sys.stderr)
 
 
 def main(a):
@@ -178,6 +241,9 @@ def main(a):
             if pv in aa[up]:
                 s, cl = aa[up][pv]; by_chrom[c].append((p, r, al, t, pv, s, cl)); n += 1
         report.append((t, gtf[t][2], up, "ok from " + st, n))
+    if a.overlap_min_share <= 1:
+        overlap(a, gtf, translations, transcripts, stripped, genes_scored,
+                {gtf[t][2] for t, s in targets.items() if any(good_src.get(st) for _, st in s)}, by_chrom, report)
     os.makedirs(a.out_dir, exist_ok=True)
     for c, rows in by_chrom.items():
         with gzip.open(os.path.join(a.out_dir, "AlphaMissense_paralogs_hg38.%s.tsv.gz" % c), "wt") as fh:
@@ -200,6 +266,10 @@ if __name__ == "__main__":
         ap.add_argument("--" + k, required=(k != "out-dir"))
     ap.add_argument("--check-n", type=int, default=300)
     ap.add_argument("--check-only", action="store_true")
+    ap.add_argument("--overlap-min-share", type=float, default=0.5,
+                    help="readthrough/overlapping genes: borrow another gene's score where the amino-acid change is "
+                         "identical, for transcripts where at least this share of possible missense SNVs qualifies "
+                         "(default 0.5; > 1 turns the step off)")
     a = ap.parse_args()
     a.out_dir = a.out_dir or "resources/am_by_chrom"
     sys.exit(main(a))
