@@ -116,6 +116,8 @@ def overlap(a, gtf, translations, transcripts, stripped, genes_scored, paralog_g
         if rows: cand[t] = rows
     keys = {(c, p, r, al) for rows in cand.values() for c, p, r, al, _ in rows}
     am = defaultdict(lambda: ([], []))   # key -> (canonical [(gene, pv, score)], isoform [...])
+    retired = set()   # keys with a row on a transcript GENCODE no longer holds: the builder already scores that gene
+                      # from it (its retired-transcript fallback), so it must not borrow (ARHGAP11B: ENST00000622744)
     for path, it, k_ in ((a.am, 6, 0), (a.isoforms, 5, 1)):
         with gzip.open(path, "rt") as fh:
             for l in fh:
@@ -124,9 +126,12 @@ def overlap(a, gtf, translations, transcripts, stripped, genes_scored, paralog_g
                 if key in keys:
                     g = tx2g.get(f[it].replace("_PAR_Y", "").split(".")[0])
                     if g: am[key][k_].append((g, f[it + 1], float(f[it + 2])))
+                    else: retired.add(key)
     n_tx = 0
     for t, rows in sorted(cand.items()):
         g = gtf[t][2]; out = []; donors = set(); other_frame = 0
+        if any((c, p, r, al) in retired for c, p, r, al, _ in rows):
+            report.append((t, g, "-", "overlap skipped: AlphaMissense rows on a retired transcript here", 0)); continue
         for c, p, r, al, pv in rows:
             hits = am.get((c, p, r, al))
             if not hits: continue
