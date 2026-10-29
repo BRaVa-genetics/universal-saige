@@ -182,7 +182,9 @@ while [[ $# -gt 0 ]]; do
       with too many carriers to enumerate, left on the saddlepoint), .spaPinned.txt (binary: tests whose saddlepoint left
       out samples the model holds certain) and .stretchGate.txt (binary weighted cells the variance ratio stretches; the
       most stretched report the exact convolution) and, from image b5456dee, .spaRegionNA.txt (burden cells whose
-      variance-rescale saddlepoint did not converge or was non-finite, given the normal-approximation p; LEDGER #181).
+      variance-rescale saddlepoint did not converge or was non-finite, given the normal-approximation p; LEDGER #181)
+      and, from image 66b80710, .sigmaGuard.txt (tests on the sparse-GRM band whose variance from the GRM solve was not
+      positive or fell below half the no-GRM variance; they report the no-GRM variance instead; LEDGER #183).
       Each only when there is something to report; see the README.
     -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
     -g,--groupFile: required if group test is selected. Filename of the annotation file used for group tests. This must be relative to, and contained within, the current working directory.

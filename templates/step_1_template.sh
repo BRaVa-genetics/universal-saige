@@ -100,3 +100,15 @@ bash 01_step1_fitNULLGLMM.sh \
 # (the fit can run for hours or never finish): rerun step 0 with a higher
 # relatedness_cutoff. Only if that is not an option, add --forceDenseGRM.
 
+# THEN, BEFORE STEP 2: is the Sigma step 2 will solve against positive
+# definite? Minutes per model; exit 2 and a banner when it is not, in which
+# case rebuild the GRM (README, step 0: KING-robust) and refit -- do not run
+# step 2 on that model. Keep ${out_step1}.sigma.tsv: it is submitted with the
+# results.
+bash 05_sigma_check.sh \
+    --modelFile ${out_step1}.rda \
+    --sparseGRM ${GRM} \
+    --sparseGRMID ${GRM_samples} \
+    --relatednessCutoff ${relatedness_cutoff} \
+    --isSingularity ${IS_SINGULARITY}
+
