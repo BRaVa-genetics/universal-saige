@@ -609,6 +609,22 @@ def sigma_report(path):
     return rows
 
 
+for name, path in (("s5_sigma_grm", "grm.sigma.tsv"), ("s5_sigma_grm_0125", "grm_0125.sigma.tsv")):
+    section(name)
+    rep = sigma_report(out(path))
+    check("step5 %s: the pedigree GRM thinned at the cutoff is positive semidefinite (no model)" % name,
+          rep.get("verdict") == "positive definite", rep.get("verdict", "no report"), "positive definite")
+    check("step5 %s: the report says it ran on the GRM alone" % name, rep.get("mode", "").startswith("grmOnly"),
+          rep.get("mode", "no mode row"), "grmOnly")
+section("s5_sigma_grm_planted")
+rep = sigma_report(out("grm.sigma_planted.tsv"))
+check("step5 GRM-only, planted indefinite block: reported NOT positive definite",
+      rep.get("verdict") == "Sigma is NOT positive definite", rep.get("verdict", "no report"), "Sigma is NOT positive definite")
+check("step5 GRM-only, planted indefinite block: the driver refused it (exit 2)",
+      status.get("s5_sigma_grm_planted", ("", -1, 0))[1] == 2, status.get("s5_sigma_grm_planted", ("", -1, 0))[1], "2")
+section("s5_refuse_no_grm")
+check("step5: no --sparseGRM is refused before the container starts", "are required" in log("s5_refuse_no_grm"),
+      "", "message printed")
 for trait in ("Q_pos", "B_pos"):
     section("s5_sigma_" + trait)
     rep = sigma_report(out(trait + ".sigma.tsv"))

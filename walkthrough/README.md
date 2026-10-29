@@ -12,7 +12,7 @@
   * [Setup (if using Singularity or Apptainer)](#setup-if-using-singularity-or-apptainer)
 * [Step 0](#step-0)
 * [Step 1](#step-1)
-* [Step 2](#step-2) (after the Sigma check, step 5, at the end of step 1)
+* [Step 2](#step-2)
 * [Step 3](#step-3)
 
 ## Introduction
@@ -121,6 +121,23 @@ This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspectin
 
 The last line step 0 prints is the GRM's density, e.g. `sparse GRM: 400000 samples, ... relatives per sample (built at --relatednessCutoff 0.05)`; a loud warning there means the cutoff should be raised before step 1.
 
+Before any step 1, the Sigma check on the GRM (step 5; minutes, once per cohort):
+
+```
+bash 05_sigma_check.sh \
+    --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
+    --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
+```
+
+It asks whether the GRM thinned at the relatedness cutoff, the matrix step 2 will solve against, is positive
+semidefinite (then every model fitted on it has a positive-definite Sigma), and writes
+`out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sigma.tsv`. The last line of the output
+is the verdict: `positive definite` means carry on; `Sigma is NOT positive definite` (exit 2, with a banner) means the
+GRM is wrong for this cohort, which happened in All of Us's admixed amr cohort, where a burden test on it printed
+p 1e-73 where ~1e-3 was right. Then rebuild the GRM from KING-robust kinship (README, step 0) and check again before
+fitting anything on it. Submit the `.sigma.tsv` with the results. Pass `--relatednessCutoff` if step 0 used a value
+other than 0.05.
+
 ## Step 1
 
 In step 1 we will be fitting the null model for the association tests in step 2 (to be performed once per phenotype). For this walkthrough we'll use the continuous trait HDL cholesterol as an example. 
@@ -170,23 +187,6 @@ This command took 10 minutes with 4 cores. Checking the `out/` directory we can 
 │   ├── HDL_cholesterol.rda
 │   ├── HDL_cholesterol.varianceRatio.txt
 ```
-
-Before step 2, the Sigma check on the model (step 5; minutes):
-
-```
-bash 05_sigma_check.sh \
-    --modelFile out/HDL_cholesterol.rda \
-    --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
-    --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
-```
-
-It asks whether the matrix step 2 solves against (the GRM thinned at the relatedness cutoff, plus the model's
-variance components) is positive definite, and writes `out/HDL_cholesterol.sigma.tsv`. The last line of the output is
-the verdict: `positive definite` means carry on; `Sigma is NOT positive definite` (exit 2, with a banner) means the
-GRM is wrong for this cohort, which happened in All of Us's admixed amr cohort, where a burden test on it printed
-p 1e-73 where ~1e-3 was right. Then rebuild the GRM from KING-robust kinship (README, step 0), refit, and check again;
-do not run step 2 on that model. Submit the `.sigma.tsv` with the results. Pass `--relatednessCutoff` if steps 0-1 used
-a value other than 0.05.
 
 ## Step 2
 
