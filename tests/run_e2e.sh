@@ -190,6 +190,8 @@ S5=(bash 05_sigma_check.sh --isSingularity "${SING}" --sparseGRM "${GRM}" --spar
 run s5_sigma_grm        ok   "${S5[@]}" --outputFile "${OUT}/grm.sigma.tsv"
 run s5_sigma_grm_0125   ok   "${S5[@]}" --relatednessCutoff 0.125 --outputFile "${OUT}/grm_0125.sigma.tsv"
 run s5_sigma_grm_planted fail "${S5[@]}" --outputFile "${OUT}/grm.sigma_planted.tsv" --plantIndefinite
+run s5_sigma_grm_planted_models fail "${S5[@]}" --outputFile "${OUT}/grm.sigma_planted_models.tsv" --plantIndefinite --modelDir "${OUT}"
+run s5_sigma_grm_models  ok   "${S5[@]}" --outputFile "${OUT}/grm.sigma_models.tsv" --modelDir "${OUT}"
 run s5_sigma_Q_pos      ok   "${S5[@]}" --modelFile "${OUT}/Q_pos.rda" --outputFile "${OUT}/Q_pos.sigma.tsv"
 run s5_sigma_B_pos      ok   "${S5[@]}" --modelFile "${OUT}/B_pos.rda" --outputFile "${OUT}/B_pos.sigma.tsv"
 run s5_sigma_planted    fail "${S5[@]}" --modelFile "${OUT}/Q_pos.rda" --outputFile "${OUT}/Q_pos.sigma_planted.tsv" --plantIndefinite

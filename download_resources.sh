@@ -14,7 +14,7 @@
 set -euo pipefail
 
 SAIGE_IMAGE="${SAIGE_IMAGE:-astheeggeggs/saige-slim}"        # Docker Hub namespace/repository
-SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-41d78ae3}"          # the tag; pin it, and record it with your results
+SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-10fe4c84}"          # the tag; pin it, and record it with your results
 # 49178058 (built 2026-10-16; Docker Hub digest sha256:f9a25a16f0c7560c99036a41647c4892e4ae5378d8c940b23a6c6b6e412a4336):
 # b5456dee plus SAIGE's --is_output_nEff -- nEff_Burden, the effective number of carriers behind each cell's burden
 # test (Kish), which step 2 writes by default (--nEff), for the meta-analysis to flag FlexRV hits resting on a few people.

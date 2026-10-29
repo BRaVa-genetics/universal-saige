@@ -618,10 +618,26 @@ for name, path in (("s5_sigma_grm", "grm.sigma.tsv"), ("s5_sigma_grm_0125", "grm
           rep.get("mode", "no mode row"), "grmOnly")
 section("s5_sigma_grm_planted")
 rep = sigma_report(out("grm.sigma_planted.tsv"))
-check("step5 GRM-only, planted indefinite block: reported NOT positive definite",
-      rep.get("verdict") == "Sigma is NOT positive definite", rep.get("verdict", "no report"), "Sigma is NOT positive definite")
-check("step5 GRM-only, planted indefinite block: the driver refused it (exit 2)",
-      status.get("s5_sigma_grm_planted", ("", -1, 0))[1] == 2, status.get("s5_sigma_grm_planted", ("", -1, 0))[1], "2")
+check("step5 GRM-only, planted indefinite block, no models: reported indefinite within a tau bound",
+      rep.get("verdict", "").startswith("GRM indefinite: positive definite for every model within the tau bound"),
+      rep.get("verdict", "no report"), "GRM indefinite ... (pass --modelDir)")
+check("step5 GRM-only, planted indefinite block, no models: the driver asks for --modelDir (exit 3)",
+      status.get("s5_sigma_grm_planted", ("", -1, 0))[1] == 3, status.get("s5_sigma_grm_planted", ("", -1, 0))[1], "3")
+check("step5 GRM-only, planted: the tau bound is printed and tiny (K eigenvalue -172)",
+      fnum(rep.get("tau2_over_tau1_bound_quantitative", "nan")) < 0.01, rep.get("tau2_over_tau1_bound_quantitative", "none"), "< 0.01")
+section("s5_sigma_grm_planted_models")
+rep = sigma_report(out("grm.sigma_planted_models.tsv"))
+check("step5 GRM-only, planted block + --modelDir: every e2e model refused",
+      rep.get("verdict") == "Sigma is NOT positive definite for some model in --modelDir"
+      and rep.get("models_checked") == rep.get("models_not_positive_definite") and rep.get("models_checked", "0") != "0",
+      "%s of %s refused" % (rep.get("models_not_positive_definite"), rep.get("models_checked")), "all")
+check("step5 GRM-only, planted block + --modelDir: the driver refused (exit 2) and named a model",
+      status.get("s5_sigma_grm_planted_models", ("", -1, 0))[1] == 2 and "model_Q_pos" in log("s5_sigma_grm_planted_models"),
+      status.get("s5_sigma_grm_planted_models", ("", -1, 0))[1], "2, model_Q_pos in the banner")
+section("s5_sigma_grm_models")
+rep = sigma_report(out("grm.sigma_models.tsv"))
+check("step5 GRM-only + --modelDir on the pedigree GRM: positive definite, models not needed",
+      rep.get("verdict") == "positive definite" and "models_checked" not in rep, rep.get("verdict", "no report"), "positive definite")
 section("s5_refuse_no_grm")
 check("step5: no --sparseGRM is refused before the container starts", "are required" in log("s5_refuse_no_grm"),
       "", "message printed")
@@ -642,7 +658,7 @@ check("step5 planted indefinite block: reported NOT positive definite", rep.get(
 check("step5 planted indefinite block: the driver refused it (exit 2)", status.get("s5_sigma_planted", ("", -1, 0))[1] == 2,
       status.get("s5_sigma_planted", ("", -1, 0))[1], "2")
 check("step5 planted indefinite block: the banner names the GRM as the fix",
-      "Rebuild the GRM" in log("s5_sigma_planted"), "", "banner printed")
+      "rebuild the grm" in log("s5_sigma_planted").lower(), "", "banner printed")
 section("s5_refuse_no_model")
 check("step5: a missing model is refused before the container starts", "not found or empty" in log("s5_refuse_no_model"),
       "", "message printed")
