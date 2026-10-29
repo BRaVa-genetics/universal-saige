@@ -11,13 +11,33 @@
 > You'll need to replace filepaths, column names etc in the commands with the corresponding column names in your data. Free text portions of the commands to be changed are placed in square brackets `[like this]`, portions of the commands where you'll need to make a choice between a collection of options are placed in braces `{like this}`.
 
 > [!IMPORTANT]
-> **What's new (October 2026) and what to do**
-> 1. **New SAIGE image** (`1.5.2-dev-49178058`). Fetch it again: `bash download_resources.sh --saige-image` (add `--singularity`
->    on a cluster), and record the tag with your results.
-> 2. **New BRaVa group files** (October 2026 rebuild), in your biobank's bucket with a README: four files per chromosome,
->    one per run (no scallion file on chrY). Labels: `pLoF`, `damaging_missense`, `spliceai2_gt040`, `other_missense`,
->    `synonymous`, `non_coding`.
-> 3. **Four runs per chromosome and phenotype** (all written out in the
+> **What a biobank does differently from the last release (October 2026, image `1.5.2-dev-d95426da`).** Four things:
+>
+> 1. **Fetch the new image**: `bash download_resources.sh --saige-image` (add `--singularity` on a cluster). Record the tag with your results.
+> 2. **After every step-1 fit, before step 2, run the Sigma check** and stop if it fails:
+>    `bash 05_sigma_check.sh --modelFile <model>.rda --sparseGRM <GRM>.mtx --sparseGRMID <GRM>.mtx.sampleIDs.txt --relatednessCutoff <the cutoff you use>`
+>    (minutes per model; the last line of the step 1 template). `positive definite` means carry on. `NOT positive definite`
+>    (exit 2, a banner) means your GRM is not a covariance matrix at that cutoff and step 2's results on it would be wrong:
+>    rebuild the GRM from KING-robust kinship (the recipe under [step 0](#step-0-once-per-cohortbiobank)), refit, check again.
+> 3. **Add a fifth step-2 run per chromosome and phenotype**: FlexRV on the random-score twin (`rand/*.flexrv_RAND.txt.gz`,
+>    already in your bucket), `--flexRVscore RAND --annotations synonymous --flexRVpartialMask`, on EVERY phenotype you
+>    submit (run 5 in the [step 2 template](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh)).
+> 4. **Ship three more files with the results**: each model's `<model>.sigma.tsv` (the Sigma check's report), every step-2
+>    run's `<prefix>.txt.sigmaGuard.txt` where one was written, and the run-5 (`flexrv_RAND`) results files.
+>
+> Nothing else changes: the group files, masks, runs 1-4 and the result columns are as in the October release below.
+
+> [!NOTE]
+> **What's in the October 2026 release, in full**
+> 1. **SAIGE image `1.5.2-dev-d95426da`.** Every step-2 run now compares each sparse-GRM variance against the no-GRM
+>    variance of the same test and, when the GRM's value is not positive or below half of it, reports the no-GRM variance
+>    instead and names the test in `<prefix>.txt.sigmaGuard.txt` (saige-slim LEDGER #183). On a GRM that passes the Sigma
+>    check this touches a few cells per cohort, nowhere near a hit; on one that fails it is where p 1e-73 cells went. The image
+>    also carries the check itself (`aou_sigma_pd_check.R`, run by `05_sigma_check.sh`).
+> 2. **BRaVa group files** (October 2026 rebuild), in your biobank's bucket with a README: four files per chromosome,
+>    one per run (no scallion file on chrY), plus the `rand/` twins. Labels: `pLoF`, `damaging_missense`, `spliceai2_gt040`,
+>    `other_missense`, `synonymous`, `non_coding`.
+> 3. **Five runs per chromosome and phenotype** (all written out in the
 >    [step 2 template](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh)):
 >
 >    | run | group file | mask (`--annotations`) |
@@ -26,14 +46,23 @@
 >    | 2. SAIGE-GENE+ (SKAT-O), AlphaMissense >= 0.906 | `*.am_moderate.saige_group.txt.gz` | `am_moderate`, with `--singleInGroup FALSE` |
 >    | 3. FlexRV, AlphaMissense percentile | `*.flexrv_AMPCT.txt.gz` (ready to use), with `--flexRVscore AMPCT` | `pLoF:damaging_missense:other_missense:spliceai2_gt040` |
 >    | 4. FlexRV, scallion percentile (chr1-22, X) | `*.flexrv_SCALLION.txt.gz` (ready to use), with `--flexRVscore SCALLION` | `pLoF:damaging_missense:other_missense:spliceai2_gt040` |
+>    | 5. FlexRV, random-score twin (the control) | `rand/*.flexrv_RAND.txt.gz` (ready to use), with `--flexRVscore RAND --flexRVpartialMask` | `synonymous` |
 >
 >    FlexRV's missense scores are within-gene percentiles, as in the FlexRV paper; see [step 4](#step-4-flexrv-weights-once-per-chromosome-per-weight-set).
->    An earlier `*.flexrv_AM.txt.gz` (raw AlphaMissense) is superseded by `*.flexrv_AMPCT.txt.gz`.
-> 4. **New result columns** right after `SE_Burden`: log10 p-values (`log10_Pvalue`, ...; exact where `Pvalue` reads 0) and
+>    An earlier `*.flexrv_AM.txt.gz` (raw AlphaMissense) is superseded by `*.flexrv_AMPCT.txt.gz`. Run 5 is FlexRV's
+>    file-level null (it has no synonymous null of its own): the twin's scores are random, identical across biobanks, and
+>    its p-values on synonymous variants must be uniform. It is read PER PHENOTYPE, because a strongly polygenic trait
+>    (Height in All of Us) carries real signal through it, and a pooled null would hide which trait.
+> 4. **Result columns** right after `SE_Burden`: log10 p-values (`log10_Pvalue`, ...; exact where `Pvalue` reads 0) and
 >    `nEff_Burden` (the effective number of carriers behind each burden test; a FlexRV hit with a small value rests on a few
 >    people). If your own scripts read result columns by position rather than by name, add `--log10P FALSE --nEff FALSE`.
 > 5. **Step 2 checks your masks before it runs**: a label that is not in the group file (a typo, or the old label names on the
 >    new files) is refused, and so is a FlexRV mask that leaves out variants carrying a score. The message lists what the file has.
+> 6. **The Sigma check** ([step 5](#step-5-the-sigma-check-once-per-phenotype-before-step-2)) asks whether the matrix step 2
+>    solves against, the GRM thinned at your relatedness cutoff, is positive definite. In All of Us the admixed amr cohort's
+>    was not: ~90 % of what its GRM kept at 0.125 was shared ancestry rather than family, and a burden test on it printed
+>    p 1e-73 where ~1e-3 was right. That GRM was rebuilt from KING-robust kinship (`king_to_mtx.py`, the recipe under step 0)
+>    and its step 1 and 2 rerun. A `NOT positive definite` verdict means rebuild the GRM and refit, not filter the results.
 
 <p align="center">
   <img src="universal-saige.png" alt="VroomAI"/>
@@ -53,6 +82,7 @@
   * [Step 1 (once per phenotype)](#step-1-once-per-phenotype)
   * [Step 2 (once per chromosome per phenotype)](#step-2-once-per-chromosome-per-phenotype)
   * [Step 4: FlexRV weights](#step-4-flexrv-weights-once-per-chromosome-per-weight-set)
+  * [Step 5: the Sigma check (once per phenotype, before step 2)](#step-5-the-sigma-check-once-per-phenotype-before-step-2)
   * [Step 3](#step-3)
 
 ## Overview
@@ -134,6 +164,26 @@ optional:
 > [!IMPORTANT]
 > Every file in `--geneticDataDirectory` of the type flagged by `--geneticDataFormat` is globbed and **merged**, so give step 0 a directory of its own holding all of the autosomes for _just one biobank/cohort_, and not the exome files step 2 reads.
 
+**An admixed cohort: a GRM that is a kinship estimate, not an ancestry background.** `createSparseGRM.R` standardises
+genotypes with cohort-wide allele frequencies, so in an admixed cohort shared ancestry reads as relatedness: All of Us amr
+kept 23 million pairs at 0.05 (~644 relatives per sample) and, at the 0.125 it had to use, ~90 % of what it kept was still
+background while real second-degree relatives fell below the line. A GRM thinned like that is not positive definite
+(step 5 below says so), and step 2's variances on it are the thinning's artefact. The fix is the GRM, not the cutoff:
+estimate kinship with KING-robust, which is ancestry-aware by construction, and convert it to SAIGE's format:
+
+```
+resources/plink2 --bfile <out_step0>.plink_for_grm --make-king-table --king-table-filter 0.025 --out <out_step0>.king
+python3 king_to_mtx.py convert --king <out_step0>.king.kin0 --samples <out_step0>.plink_for_grm.fam --cutoff 0.05 \
+    --out <out_step0>_king   # writes <out_step0>_king.mtx and .sampleIDs.txt (2 x kinship off the diagonal, 1 on it)
+python3 king_to_mtx.py compare --new <out_step0>_king.mtx --old <out_step0>_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx
+```
+
+`compare` prints the positive control first (the old matrix's first-degree pairs must be in the new one at the same value)
+and then the pair counts at each cutoff: the difference is the background. Pass the `_king` files to steps 1, 2 and 3 as
+`--sparseGRM`/`--sparseGRMID`, at a cutoff of 0.125 (KING-robust is itself biased on pairs of differing ancestry at the
+third-degree band, so 0.05 on it can join tens of thousands of people into one indefinite component; All of Us amr: positive
+definite at 0.125, not at 0.05), and run step 5 on the first model. `king_to_mtx.py` needs numpy; `python3 king_to_mtx.py selftest` checks it.
+
 ### Step 1 (once per phenotype)
 
 ```
@@ -179,6 +229,7 @@ optional:
   - `.spaPinned.txt` (binary traits): tests whose saddlepoint left out samples the null model holds near-certain (flip probability at or below 1e-8), or would have but for the budget (LEDGER #174).
   - `.stretchGate.txt` (binary traits, weighted cells): cells the variance ratio stretches far relative to the rest of their score; the most stretched report the exact convolution at the unstretched score in place of the saddlepoint (LEDGER #176). From image `928f95ad` it always has the same columns, so per-chromosome files stack under one header.
   - `.spaRegionNA.txt` (image `b5456dee`): burden cells whose variance-rescale saddlepoint did not converge or returned a non-finite value. Each takes the normal-approximation p instead, and the log ends with `Region saddlepoint NA: N ...`. Before this image a non-finite value killed the whole chromosome (saige-slim LEDGER #181).
+  - `.sigmaGuard.txt` (image `66b80710`): tests on the sparse-GRM band (rare cells and pseudo-markers) whose variance from the GRM solve was not positive, or below half the no-GRM variance of the same vector. They report the no-GRM variance instead (`reported = diagonal`), and the log ends with `Sigma variance: N test(s) ...; K flagged`. On a GRM whose Sigma is positive definite (step 5) this names a few cells per fleet at most, in the 0.4-0.5 band, nowhere near a hit; on an indefinite one it is where the p 1e-73 cells went (saige-slim LEDGER #183). Many rows, or any with `negative = TRUE`, means step 5 was skipped or failed: rebuild the GRM.
 - `-s`,`--isSingularity` (default: false).
 - `-g`,`--groupFile`: required for a group test. The annotation file.
 - `--annotations`: required for a group test. `':'` joins labels into one mask, `','` separates masks. For SAIGE-GENE+ on the October 2026 BRaVa group files use `pLoF,damaging_missense,pLoF:damaging_missense,pLoF:damaging_missense:spliceai2_gt040,synonymous,other_missense,pLoF:damaging_missense:spliceai2_gt040:other_missense:synonymous` (on older BRaVa files, whose labels differ: `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`).
@@ -246,6 +297,30 @@ A second weight set goes through the same door: `--annoTable <BRaVa long-form ta
 for a score carried as a column of the annotation table, or `--am <table>` for a score in AlphaMissense's per-variant
 layout. One score line per file, so one file and one step-2 run per weight set. The tool behind it is
 `flexrv_score_from_alphamissense.py` (`--help`, and `--selftest` for its controls). `04_flexrv_groupfile.sh -h` lists the rest of its options (`--lofAnno`, `--missenseAnno`, `--dropAnno`, `--missing`, `--isoforms`, `--mane`, `--gtf`, `--nonMissense`, `--amScale`, `--provenance`). With `--scoreColumn`, `--nonMissense gene-mean` keeps exactly the variants the AlphaMissense percentile file keeps (the BRaVa scallion file is built this way from a percentile column).
+
+### Step 5: the Sigma check (once per phenotype, before step 2)
+
+```
+usage: 05_sigma_check.sh
+```
+required:
+- `--modelFile`: the step-1 model (`<out_step1>.rda`).
+- `--sparseGRM`, `--sparseGRMID`: the GRM the model was fitted on and its sample IDs.
+
+optional:
+- `--relatednessCutoff` (default 0.05): the cutoff steps 1 and 2 use. The check describes the Sigma step 2 will build, so pass the same value.
+- `-o`,`--outputFile` (default `<modelFile without .rda>.sigma.tsv`): the report, `label key value` rows: `tau1`, `tau2`, the pairs kept at the cutoff, the family components evaluated and how many are indefinite, the smallest eigenvalue of Sigma (and over the diagonal it sits on), and the `verdict`. The log is `<outputFile>.log`.
+- `--label`, `--maxDenseComponent` (default 2000: larger family blocks are judged by the Cholesky of the whole Sigma alone), `-s`,`--isSingularity`, `--dryRun`, `--plantIndefinite` (the positive control: a planted indefinite block, which must be refused).
+
+Step 2's sparse-GRM variances are `g' Sigma^-1 g` with `Sigma = tau1 I + tau2 K`, `K` the GRM thinned to the cutoff, from a
+conjugate-gradient solve that checks only its residual. Thinning does not keep a matrix positive definite, and on an
+indefinite Sigma a test's variance can be negative (printed as p 1, BETA NA) or tiny (an inflated Z printed as valid: p 1e-73
+on an All of Us random-score control where ~1e-3 was right; saige-slim LEDGER #183). The check cuts the thinned GRM into
+families, eigendecomposes each block and hands the whole sparse Sigma to a Cholesky once, in minutes and with nothing N x N
+formed. Exit 0 when positive definite (a warning when a block has a near-null direction), **exit 2 and a banner when it is
+NOT: rebuild the GRM (step 0, the KING-robust recipe), refit, and check again. Do not run step 2 on that model.** The
+step-2 guard (`.sigmaGuard.txt`) is the net for whatever reaches it, not a substitute. Submit the `.sigma.tsv` of every
+model with the results.
 
 ### Step 3
 
