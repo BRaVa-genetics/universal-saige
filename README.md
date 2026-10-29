@@ -11,15 +11,19 @@
 > You'll need to replace filepaths, column names etc in the commands with the corresponding column names in your data. Free text portions of the commands to be changed are placed in square brackets `[like this]`, portions of the commands where you'll need to make a choice between a collection of options are placed in braces `{like this}`.
 
 > [!IMPORTANT]
-> **What a biobank does differently from the last release (October 2026, image `1.5.2-dev-41d78ae3`).** Four things:
+> **What a biobank does differently from the last release (October 2026, image `1.5.2-dev-10fe4c84`).** Four things:
 >
 > 1. **Fetch the new image**: `bash download_resources.sh --saige-image` (add `--singularity` on a cluster). Record the tag with your results.
-> 2. **Once per GRM, after step 0 and before any step 1, run the Sigma check** and stop if it fails:
+> 2. **Once per GRM, after step 0, run the Sigma check**:
 >    `bash 05_sigma_check.sh --sparseGRM <GRM>.mtx --sparseGRMID <GRM>.mtx.sampleIDs.txt --relatednessCutoff <the cutoff you use>`
 >    (minutes, once per cohort; the last line of the step 0 template). `positive definite` means every model you fit on
->    this GRM is fine: carry on. `NOT positive definite` (exit 2, a banner) means the GRM is not a covariance matrix at
->    that cutoff and step 2's results on it would be wrong: rebuild it from KING-robust kinship (the recipe under
->    [step 0](#step-0-once-per-cohortbiobank)), check again, then fit.
+>    this GRM is fine: nothing more to do. `GRM indefinite ... (pass --modelDir)` (exit 3) is common and usually harmless:
+>    fit your models, then run it once more with `--modelDir <directory of your .rda files>`, which judges every model in
+>    seconds. `NOT positive definite` (exit 2, a banner naming the models): the recommended fix is to rebuild the GRM
+>    from KING-robust kinship (the recipe under [step 0](#step-0-once-per-cohortbiobank)) and refit, which is what All of
+>    Us did for its admixed amr cohort. **If you cannot, you are not blocked**: the image repairs the affected tests and
+>    names them in `.sigmaGuard.txt`, and on All of Us amr the results with and without the rebuild agree gene for gene
+>    (Spearman 0.996, 31 of 684k cells moved). Say which route you took when you submit.
 > 3. **Add a fifth step-2 run per chromosome and phenotype**: FlexRV on the random-score twin (`rand/*.flexrv_RAND.txt.gz`,
 >    already in your bucket), `--flexRVscore RAND --annotations synonymous --flexRVpartialMask`, on EVERY phenotype you
 >    submit (run 5 in the [step 2 template](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh)).
@@ -30,7 +34,7 @@
 
 > [!NOTE]
 > **What's in the October 2026 release, in full**
-> 1. **SAIGE image `1.5.2-dev-41d78ae3`.** Every step-2 run now compares each sparse-GRM variance against the no-GRM
+> 1. **SAIGE image `1.5.2-dev-10fe4c84`.** Every step-2 run now compares each sparse-GRM variance against the no-GRM
 >    variance of the same test and, when the GRM's value is not positive or below half of it, reports the no-GRM variance
 >    instead and names the test in `<prefix>.txt.sigmaGuard.txt` (saige-slim LEDGER #183). On a GRM that passes the Sigma
 >    check this touches a few cells per cohort, nowhere near a hit; on one that fails it is where p 1e-73 cells went. The image
@@ -316,13 +320,26 @@ optional:
 Step 2's sparse-GRM variances are `g' Sigma^-1 g` with `Sigma = tau1 I + tau2 K`, `K` the GRM thinned to the cutoff, from a
 conjugate-gradient solve that checks only its residual. Thinning does not keep a matrix positive definite, and on an
 indefinite Sigma a test's variance can be negative (printed as p 1, BETA NA) or tiny (an inflated Z printed as valid: p 1e-73
-on an All of Us random-score control where ~1e-3 was right; saige-slim LEDGER #183). **If the thinned GRM itself is positive
-semidefinite, Sigma is positive definite for every model fitted on it, whatever its variance components**, so the check
-runs ONCE per GRM and cutoff, not per phenotype. It cuts the thinned GRM into families, eigendecomposes each block and hands
-the whole sparse matrix to a Cholesky once, in minutes and with nothing N x N formed. Exit 0 when positive definite (a
-warning when a block has a near-null direction), **exit 2 and a banner when it is NOT: rebuild the GRM (step 0, the
-KING-robust recipe) and check again before fitting anything on it.** The step-2 guard (`.sigmaGuard.txt`) is the net for
-whatever reaches it, not a substitute. Submit the GRM's `.sigma.tsv` with the results.
+on an All of Us random-score control where ~1e-3 was right; saige-slim LEDGER #183). The check cuts the thinned GRM into
+families, eigendecomposes each block and hands the whole sparse matrix to a Cholesky once, in minutes and with nothing N x N
+formed. Three outcomes:
+- **`positive definite`** (exit 0): the thinned GRM is positive semidefinite, so Sigma is positive definite for every model
+  fitted on it, whatever its variance components. Nothing per phenotype.
+- **`GRM indefinite ... (pass --modelDir)`** (exit 3): a thinned GRM often has a slightly negative eigenvalue, and that is
+  harmless for a model whose `tau2 |lambda_min|` is below `tau1` (binary: below the 1/W diagonal, at least 4). The report
+  prints the bound (`tau2_over_tau1_bound_quantitative`, `tau2_bound_binary`). After step 1, run once more with
+  `--modelDir <directory of .rda models>`: every model is judged against the family blocks' eigenvalues in seconds (exact
+  for a quantitative model, Weyl's bound for a binary one), one `model_<name>` row each, exit 0 if all pass. (`bound
+  unknown`, also exit 3: the negative direction sits in a family block above `--maxDenseComponent`; raise it, or run
+  `--modelFile` per model, which decides by a Cholesky of that model's own Sigma.)
+- **`NOT positive definite`** (exit 2, a banner naming any refused model): the recommended fix is to rebuild the GRM
+  (step 0, the KING-robust recipe), refit, and check again; All of Us did that for amr. A biobank that cannot rebuild may
+  proceed: every step-2 run repairs a test whose GRM variance is not positive or below half the no-GRM value and names it
+  in `.sigmaGuard.txt`, which is how the amr p 1e-73 cell became 1.8e-4 before the rebuild, and the rebuilt amr run agreed
+  with it gene for gene (Spearman 0.996, 31 of 684k cells moved). What the guard leaves is the band just above its 0.5
+  line, about 1 % of sparse-GRM-band tests with Z inflated by up to 1.4 on the amr matrix. State which route you took.
+
+Submit the GRM's `.sigma.tsv` (and the `--modelDir` one, if it was needed) with the results.
 
 ### Step 3
 

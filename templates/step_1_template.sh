@@ -100,6 +100,17 @@ bash 01_step1_fitNULLGLMM.sh \
 # (the fit can run for hours or never finish): rerun step 0 with a higher
 # relatedness_cutoff. Only if that is not an option, add --forceDenseGRM.
 
-# The GRM must have passed the Sigma check (step 5, the last call of the step 0
-# template) before any model is fitted on it; nothing per phenotype is needed.
+# IF the step 0 Sigma check said 'GRM indefinite ... (pass --modelDir)': once
+# all models are fitted, run it again with the directory holding them. It judges
+# every model in seconds; exit 0 means step 2 can run on all of them, exit 2
+# names the models whose Sigma is not positive definite (recommended: rebuild
+# the GRM from KING-robust kinship and refit; if you cannot, proceed and say
+# so -- the image repairs and names the affected tests in .sigmaGuard.txt).
+# Not needed when the step 0 run said 'positive definite'.
+bash 05_sigma_check.sh \
+    --sparseGRM ${GRM} \
+    --sparseGRMID ${GRM_samples} \
+    --relatednessCutoff ${relatedness_cutoff} \
+    --modelDir ["directory holding every <out_step1>.rda"] \
+    --isSingularity ${IS_SINGULARITY}
 

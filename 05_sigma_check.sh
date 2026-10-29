@@ -26,6 +26,7 @@ source ./run_container.sh
 POSITIONAL_ARGS=()
 
 MODEL_FILE=""
+MODEL_DIR=""
 SPARSE_GRM_FILE=""
 SPARSE_GRM_ID_FILE=""
 OUT_FILE=""
@@ -42,6 +43,11 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --modelFile)
       MODEL_FILE="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    --modelDir)
+      MODEL_DIR="$2"
       shift # past argument
       shift # past value
       ;;
@@ -98,8 +104,11 @@ while [[ $# -gt 0 ]]; do
   optional:
     --relatednessCutoff (default: 0.05): the cutoff steps 1 and 2 use (the GRM is thinned to entries above it). Pass
       the value steps 0-2 used; the check describes the Sigma step 2 will build, so it must be the same.
-    --modelFile: OPTIONAL, one step-1 model (<out_step1>.rda): check that model's own Sigma (tau1 I + tau2 K, or the
-      binary diagonal) instead of the GRM alone. Not needed for the submission: the GRM-only check covers every model.
+    --modelDir: a directory of step-1 models (every .rda in it). Needed only when the GRM-only run said 'GRM
+      indefinite': each model is then judged against the GRM's block eigenvalues in seconds (no further eigen work),
+      and the verdict is per model. Run it once, after step 1, with every model you will test.
+    --modelFile: one step-1 model (<out_step1>.rda): check that model's own Sigma directly (tau1 I + tau2 K, or the
+      binary diagonal) by a Cholesky. A diagnosis of one fit, and the route when the GRM-only run says 'bound unknown'.
     -o,--outputFile (default: <sparseGRM>.sigma.tsv, or <modelFile without .rda>.sigma.tsv): the report, one
       'label key value' row per line (pairs kept, components evaluated / indefinite, the smallest eigenvalue over the
       diagonal, and the verdict; with a model also tau1, tau2). The log is <outputFile>.log.
@@ -109,8 +118,12 @@ while [[ $# -gt 0 ]]; do
     -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
     --dryRun: print the command instead of running it.
     --plantIndefinite: the positive control -- a planted indefinite block, which must be reported as NOT positive definite.
-  Exit 0 when Sigma is positive definite (a warning when it has near-null directions), 2 when it is NOT, with the
-  rows of the report on stdout. Run it ONCE per GRM and cutoff, after step 0 and before any step 1. A NOT verdict means the GRM, thinned at this cutoff, is not a covariance matrix: rebuild
+  Exit 0 when Sigma is positive definite (a warning when it has near-null directions), 2 when it is NOT, 3 when the
+  GRM-only run cannot decide alone (indefinite: pass --modelDir after step 1; or the negative direction sits in a family
+  block above --maxDenseComponent: pass --modelFile per model), with the rows of the report on stdout. Run it ONCE per
+  GRM and cutoff after step 0; 'positive definite' then covers every model. An indefinite thinned GRM is common and
+  usually harmless (Sigma = tau1 I + tau2 K is positive definite whenever tau2 |lambda_min| < tau1): the run prints the
+  tau bound, and --modelDir settles it for your models in one more run after step 1. A NOT verdict means the GRM, thinned at this cutoff, is not a covariance matrix: rebuild
   it (raise the cutoff only if the dropped pairs are background, not relatives; in an admixed cohort build the GRM
   from KING-robust kinship instead -- see the README), refit step 1 on it, and run this check again. Do not run
   step 2 on a model whose Sigma failed this check.
@@ -139,6 +152,11 @@ for f in ${MODEL_FILE} "${SPARSE_GRM_FILE}" "${SPARSE_GRM_ID_FILE}"; do
 done
 if [[ ${MODEL_FILE} == "" ]]; then
   MODE_ARGS="--grmOnly"; WHAT="the GRM ${SPARSE_GRM_FILE}"
+  if [[ ${MODEL_DIR} != "" ]]; then
+    [[ -d ${MODEL_DIR} ]] || { echo "--modelDir ${MODEL_DIR} is not a directory" >&2; exit 1; }
+    MODE_ARGS="${MODE_ARGS} --modelDir=$( [[ ${MODEL_DIR} == /* ]] && echo "${MODEL_DIR}" || echo "${HOME}/${MODEL_DIR}" )"
+    WHAT="the GRM ${SPARSE_GRM_FILE} and every model in ${MODEL_DIR}"
+  fi
   [[ ${OUT_FILE} == "" ]] && OUT_FILE="${SPARSE_GRM_FILE}.sigma.tsv"
   [[ ${LABEL} == "" ]] && LABEL=$(basename "${SPARSE_GRM_FILE%.mtx}")
 else
@@ -194,19 +212,44 @@ case "${verdict}" in
   "tau2 = 0: Sigma is diagonal, positive definite by construction")
     echo "Sigma is diagonal (no random effect was fitted): positive definite by construction."
     ;;
+  "GRM indefinite: Sigma positive definite for every model in --modelDir")
+    echo "The GRM thinned at ${RELCUTOFF} is indefinite, but every model in ${MODEL_DIR} sits inside the tau bound:"
+    echo "  Sigma is positive definite for each of them (the model_* rows above). Step 2 can run on them."
+    ;;
+  "GRM indefinite: positive definite for every model within the tau bound (pass --modelDir)")
+    {
+      echo "NOT DECIDED YET: the GRM thinned at ${RELCUTOFF} is indefinite (a thinned GRM often is; this is harmless"
+      echo "  for a model whose tau2/tau1 is below the bound printed above, tau2_over_tau1_bound_quantitative /"
+      echo "  tau2_bound_binary). After step 1, run this once more with --modelDir <directory of your .rda models>:"
+      echo "  it judges every model against the bound in seconds. If any model is refused, rebuild the GRM"
+      echo "  (README, step 0: KING-robust) and refit."
+    } >&2
+    exit 3
+    ;;
+  "GRM indefinite in a block above --maxDenseComponent: bound unknown, run per model")
+    {
+      echo "NOT DECIDED: the GRM's negative direction sits in a family block larger than --maxDenseComponent, so no"
+      echo "  bound can be stated. Either raise --maxDenseComponent (the block is eigendecomposed densely: memory"
+      echo "  grows with its square) or, after step 1, run this with --modelFile for each model (a Cholesky of the"
+      echo "  model's own Sigma decides directly)."
+    } >&2
+    exit 3
+    ;;
   *)
     {
       echo "################################################################################"
       echo "REFUSED: Sigma is NOT positive definite for ${WHAT} at --relatednessCutoff ${RELCUTOFF}"
+      [[ ${MODEL_DIR} != "" ]] && grep -P "^\S+\tmodel_\S+\t.*NOT positive definite" "${OUT_FILE}" | sed 's/^/  /'
+
       echo "  (verdict: '${verdict}'). The GRM thinned at this cutoff is not a covariance matrix, and"
       echo "  step 2's sparse-GRM variances on it are the thinning's artefact: negative (p 1, BETA NA)"
-      echo "  or tiny (an inflated Z printed as a valid p). Rebuild the GRM -- in an admixed cohort from"
-      echo "  KING-robust kinship (README, step 0) -- and run this check on the new one before fitting"
-      if [[ ${MODEL_FILE} == "" ]]; then
-        echo "  anything on it. Fit NO model on this GRM, and run NO step 2 on a model fitted on it."
-      else
-        echo "  anything on it. Refit this model on the new GRM; do NOT run step 2 on this one."
-      fi
+      echo "  or tiny (an inflated Z printed as a valid p). RECOMMENDED: rebuild the GRM -- in an admixed"
+      echo "  cohort from KING-robust kinship (README, step 0) -- run this check on the new one, and"
+      echo "  refit on it, as All of Us did for amr. IF YOU CANNOT REBUILD: you may proceed. Every step-2"
+      echo "  run repairs a test whose GRM variance is not positive or below half the no-GRM value and"
+      echo "  names it in <prefix>.txt.sigmaGuard.txt; on All of Us amr the rebuilt and the repaired runs"
+      echo "  agreed gene for gene (Spearman 0.996). Submit this report and the .sigmaGuard.txt files, and"
+      echo "  say which route you took."
       echo "################################################################################"
     } >&2
     exit 2

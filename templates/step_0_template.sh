@@ -54,11 +54,15 @@ bash 00_step0_VR_and_GRM.sh \
     --generate_plink_for_vr \
     --generate_GRM
 
-# THEN, BEFORE ANY STEP 1: is the GRM, thinned at this cutoff, positive
-# semidefinite? Once per GRM, minutes. 'positive definite' means every model
-# fitted on it is fine; exit 2 and a banner means rebuild the GRM (README,
-# step 0: KING-robust) and check again -- do not fit on it. Keep the
-# .sigma.tsv: it is submitted with the results.
+# THEN: is the GRM, thinned at this cutoff, positive semidefinite? Once per
+# GRM, minutes. 'positive definite' (exit 0) means every model fitted on it is
+# fine. 'GRM indefinite ... (pass --modelDir)' (exit 3) is common and usually
+# harmless: fit your models, then run this again with --modelDir <dir of .rda>
+# (the step 1 template's last call). Exit 2 and a banner: the recommended fix
+# is to rebuild the GRM (README, step 0: KING-robust) and check again; if you
+# cannot, proceed -- the image repairs and names the affected tests
+# (.sigmaGuard.txt) -- and say so when you submit. Keep the .sigma.tsv: it is
+# submitted with the results.
 bash 05_sigma_check.sh \
     --sparseGRM ${out_step0}_relatednessCutoff_${relatedness_cutoff}_5000_randomMarkersUsed.sparseGRM.mtx \
     --sparseGRMID ${out_step0}_relatednessCutoff_${relatedness_cutoff}_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt \
