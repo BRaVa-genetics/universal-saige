@@ -11,25 +11,26 @@
 > You'll need to replace filepaths, column names etc in the commands with the corresponding column names in your data. Free text portions of the commands to be changed are placed in square brackets `[like this]`, portions of the commands where you'll need to make a choice between a collection of options are placed in braces `{like this}`.
 
 > [!IMPORTANT]
-> **What a biobank does differently from the last release (October 2026, image `1.5.2-dev-d95426da`).** Four things:
+> **What a biobank does differently from the last release (October 2026, image `1.5.2-dev-41d78ae3`).** Four things:
 >
 > 1. **Fetch the new image**: `bash download_resources.sh --saige-image` (add `--singularity` on a cluster). Record the tag with your results.
-> 2. **After every step-1 fit, before step 2, run the Sigma check** and stop if it fails:
->    `bash 05_sigma_check.sh --modelFile <model>.rda --sparseGRM <GRM>.mtx --sparseGRMID <GRM>.mtx.sampleIDs.txt --relatednessCutoff <the cutoff you use>`
->    (minutes per model; the last line of the step 1 template). `positive definite` means carry on. `NOT positive definite`
->    (exit 2, a banner) means your GRM is not a covariance matrix at that cutoff and step 2's results on it would be wrong:
->    rebuild the GRM from KING-robust kinship (the recipe under [step 0](#step-0-once-per-cohortbiobank)), refit, check again.
+> 2. **Once per GRM, after step 0 and before any step 1, run the Sigma check** and stop if it fails:
+>    `bash 05_sigma_check.sh --sparseGRM <GRM>.mtx --sparseGRMID <GRM>.mtx.sampleIDs.txt --relatednessCutoff <the cutoff you use>`
+>    (minutes, once per cohort; the last line of the step 0 template). `positive definite` means every model you fit on
+>    this GRM is fine: carry on. `NOT positive definite` (exit 2, a banner) means the GRM is not a covariance matrix at
+>    that cutoff and step 2's results on it would be wrong: rebuild it from KING-robust kinship (the recipe under
+>    [step 0](#step-0-once-per-cohortbiobank)), check again, then fit.
 > 3. **Add a fifth step-2 run per chromosome and phenotype**: FlexRV on the random-score twin (`rand/*.flexrv_RAND.txt.gz`,
 >    already in your bucket), `--flexRVscore RAND --annotations synonymous --flexRVpartialMask`, on EVERY phenotype you
 >    submit (run 5 in the [step 2 template](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh)).
-> 4. **Ship three more files with the results**: each model's `<model>.sigma.tsv` (the Sigma check's report), every step-2
+> 4. **Ship three more files with the results**: the GRM's `<GRM>.mtx.sigma.tsv` (the Sigma check's report), every step-2
 >    run's `<prefix>.txt.sigmaGuard.txt` where one was written, and the run-5 (`flexrv_RAND`) results files.
 >
 > Nothing else changes: the group files, masks, runs 1-4 and the result columns are as in the October release below.
 
 > [!NOTE]
 > **What's in the October 2026 release, in full**
-> 1. **SAIGE image `1.5.2-dev-d95426da`.** Every step-2 run now compares each sparse-GRM variance against the no-GRM
+> 1. **SAIGE image `1.5.2-dev-41d78ae3`.** Every step-2 run now compares each sparse-GRM variance against the no-GRM
 >    variance of the same test and, when the GRM's value is not positive or below half of it, reports the no-GRM variance
 >    instead and names the test in `<prefix>.txt.sigmaGuard.txt` (saige-slim LEDGER #183). On a GRM that passes the Sigma
 >    check this touches a few cells per cohort, nowhere near a hit; on one that fails it is where p 1e-73 cells went. The image
@@ -58,7 +59,7 @@
 >    people). If your own scripts read result columns by position rather than by name, add `--log10P FALSE --nEff FALSE`.
 > 5. **Step 2 checks your masks before it runs**: a label that is not in the group file (a typo, or the old label names on the
 >    new files) is refused, and so is a FlexRV mask that leaves out variants carrying a score. The message lists what the file has.
-> 6. **The Sigma check** ([step 5](#step-5-the-sigma-check-once-per-phenotype-before-step-2)) asks whether the matrix step 2
+> 6. **The Sigma check** ([step 5](#step-5-the-sigma-check-once-per-grm-before-step-1)) asks whether the matrix step 2
 >    solves against, the GRM thinned at your relatedness cutoff, is positive definite. In All of Us the admixed amr cohort's
 >    was not: ~90 % of what its GRM kept at 0.125 was shared ancestry rather than family, and a burden test on it printed
 >    p 1e-73 where ~1e-3 was right. That GRM was rebuilt from KING-robust kinship (`king_to_mtx.py`, the recipe under step 0)
@@ -82,7 +83,7 @@
   * [Step 1 (once per phenotype)](#step-1-once-per-phenotype)
   * [Step 2 (once per chromosome per phenotype)](#step-2-once-per-chromosome-per-phenotype)
   * [Step 4: FlexRV weights](#step-4-flexrv-weights-once-per-chromosome-per-weight-set)
-  * [Step 5: the Sigma check (once per phenotype, before step 2)](#step-5-the-sigma-check-once-per-phenotype-before-step-2)
+  * [Step 5: the Sigma check (once per GRM, before step 1)](#step-5-the-sigma-check-once-per-grm-before-step-1)
   * [Step 3](#step-3)
 
 ## Overview
@@ -298,29 +299,30 @@ for a score carried as a column of the annotation table, or `--am <table>` for a
 layout. One score line per file, so one file and one step-2 run per weight set. The tool behind it is
 `flexrv_score_from_alphamissense.py` (`--help`, and `--selftest` for its controls). `04_flexrv_groupfile.sh -h` lists the rest of its options (`--lofAnno`, `--missenseAnno`, `--dropAnno`, `--missing`, `--isoforms`, `--mane`, `--gtf`, `--nonMissense`, `--amScale`, `--provenance`). With `--scoreColumn`, `--nonMissense gene-mean` keeps exactly the variants the AlphaMissense percentile file keeps (the BRaVa scallion file is built this way from a percentile column).
 
-### Step 5: the Sigma check (once per phenotype, before step 2)
+### Step 5: the Sigma check (once per GRM, before step 1)
 
 ```
 usage: 05_sigma_check.sh
 ```
 required:
-- `--modelFile`: the step-1 model (`<out_step1>.rda`).
-- `--sparseGRM`, `--sparseGRMID`: the GRM the model was fitted on and its sample IDs.
+- `--sparseGRM`, `--sparseGRMID`: the GRM (step 0's, or the KING-robust one) and its sample IDs.
 
 optional:
-- `--relatednessCutoff` (default 0.05): the cutoff steps 1 and 2 use. The check describes the Sigma step 2 will build, so pass the same value.
-- `-o`,`--outputFile` (default `<modelFile without .rda>.sigma.tsv`): the report, `label key value` rows: `tau1`, `tau2`, the pairs kept at the cutoff, the family components evaluated and how many are indefinite, the smallest eigenvalue of Sigma (and over the diagonal it sits on), and the `verdict`. The log is `<outputFile>.log`.
-- `--label`, `--maxDenseComponent` (default 2000: larger family blocks are judged by the Cholesky of the whole Sigma alone), `-s`,`--isSingularity`, `--dryRun`, `--plantIndefinite` (the positive control: a planted indefinite block, which must be refused).
+- `--relatednessCutoff` (default 0.05): the cutoff steps 1 and 2 use. The check describes the matrix step 2 will build, so pass the same value.
+- `--modelFile`: one step-1 model (`<out_step1>.rda`), to check that model's own Sigma (`tau1 I + tau2 K`, or the binary diagonal) instead of the GRM alone. A diagnosis of one fit; not needed for the submission.
+- `-o`,`--outputFile` (default `<sparseGRM>.sigma.tsv`, or `<modelFile without .rda>.sigma.tsv`): the report, `label key value` rows: the pairs kept at the cutoff, the family components evaluated and how many are indefinite, the smallest eigenvalue over the diagonal, and the `verdict` (with a model also `tau1`, `tau2`). The log is `<outputFile>.log`.
+- `--label`, `--maxDenseComponent` (default 2000: larger family blocks are judged by the Cholesky of the whole matrix alone), `-s`,`--isSingularity`, `--dryRun`, `--plantIndefinite` (the positive control: a planted indefinite block, which must be refused).
 
 Step 2's sparse-GRM variances are `g' Sigma^-1 g` with `Sigma = tau1 I + tau2 K`, `K` the GRM thinned to the cutoff, from a
 conjugate-gradient solve that checks only its residual. Thinning does not keep a matrix positive definite, and on an
 indefinite Sigma a test's variance can be negative (printed as p 1, BETA NA) or tiny (an inflated Z printed as valid: p 1e-73
-on an All of Us random-score control where ~1e-3 was right; saige-slim LEDGER #183). The check cuts the thinned GRM into
-families, eigendecomposes each block and hands the whole sparse Sigma to a Cholesky once, in minutes and with nothing N x N
-formed. Exit 0 when positive definite (a warning when a block has a near-null direction), **exit 2 and a banner when it is
-NOT: rebuild the GRM (step 0, the KING-robust recipe), refit, and check again. Do not run step 2 on that model.** The
-step-2 guard (`.sigmaGuard.txt`) is the net for whatever reaches it, not a substitute. Submit the `.sigma.tsv` of every
-model with the results.
+on an All of Us random-score control where ~1e-3 was right; saige-slim LEDGER #183). **If the thinned GRM itself is positive
+semidefinite, Sigma is positive definite for every model fitted on it, whatever its variance components**, so the check
+runs ONCE per GRM and cutoff, not per phenotype. It cuts the thinned GRM into families, eigendecomposes each block and hands
+the whole sparse matrix to a Cholesky once, in minutes and with nothing N x N formed. Exit 0 when positive definite (a
+warning when a block has a near-null direction), **exit 2 and a banner when it is NOT: rebuild the GRM (step 0, the
+KING-robust recipe) and check again before fitting anything on it.** The step-2 guard (`.sigmaGuard.txt`) is the net for
+whatever reaches it, not a substitute. Submit the GRM's `.sigma.tsv` with the results.
 
 ### Step 3
 

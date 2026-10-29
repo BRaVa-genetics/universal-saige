@@ -67,7 +67,7 @@ relatedness_cutoff=0.05
 #   run 3  FlexRV, AlphaMissense within-gene percentile weights
 #   run 4  FlexRV, scallion within-gene percentile weights (chromosomes 1-22 and X)
 #   run 5  FlexRV on the random-score twin, synonymous variants: the control
-# Before any of them: bash 05_sigma_check.sh on the model (the step 1 template's
+# Before any of them: bash 05_sigma_check.sh on the GRM (the step 0 template's
 # last call) must have said 'positive definite'.
 # Results: <prefix>.txt, one row per gene, mask and max MAF. Columns include log10
 # p-values (log10_Pvalue, ... : exact even where Pvalue reads 0) and nEff_Burden (the

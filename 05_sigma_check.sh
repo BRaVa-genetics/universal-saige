@@ -1,7 +1,10 @@
 #!/bin/bash
-# Is the Sigma step 2 will solve against positive definite? One null model and
-# the GRM it was fitted on, at the cutoff steps 1 and 2 use. Run it on EVERY
-# null model before step 2 (saige-slim LEDGER #183, 2026-10-28).
+# Is the Sigma step 2 will solve against positive definite? ONCE PER GRM AND
+# CUTOFF, before any step 1: with no --modelFile the check is on the GRM thinned
+# at the cutoff itself, and if that is positive semidefinite then
+# tau1 I + tau2 K is positive definite for EVERY model fitted on it (saige-slim
+# LEDGER #183, 2026-10-28/29). With --modelFile it checks that one model's
+# Sigma, the diagnosis of a single fit.
 #
 # Why: on the sparse-GRM band step 2 takes the variance of a test from a
 # conjugate-gradient solve against Sigma = tau1 I + tau2 K, where K is the GRM
@@ -88,25 +91,26 @@ while [[ $# -gt 0 ]]; do
     -h|--help)
       echo "usage: 05_sigma_check.sh
   required:
-    --modelFile: the step-1 model (<out_step1>.rda).
-    --sparseGRM: filename of the sparseGRM .mtx file the model was fitted on.
+    --sparseGRM: filename of the sparseGRM .mtx file (step 0's, or the KING-robust one).
     --sparseGRMID: filename of the sparseGRM ID file.
     Each is relative to the current working directory, or an absolute path under it or under a directory listed,
     colon-separated, in SAIGE_EXTRA_MOUNTS (bound read-only).
   optional:
     --relatednessCutoff (default: 0.05): the cutoff steps 1 and 2 use (the GRM is thinned to entries above it). Pass
       the value steps 0-2 used; the check describes the Sigma step 2 will build, so it must be the same.
-    -o,--outputFile (default: <modelFile without .rda>.sigma.tsv): the report, one 'label key value' row per line
-      (tau1, tau2, pairs kept, components evaluated / indefinite, the smallest eigenvalue of Sigma and of the diagonal it
-      sits on, and the verdict). The log is <outputFile>.log.
-    --label (default: the model file's name): the report's label column.
+    --modelFile: OPTIONAL, one step-1 model (<out_step1>.rda): check that model's own Sigma (tau1 I + tau2 K, or the
+      binary diagonal) instead of the GRM alone. Not needed for the submission: the GRM-only check covers every model.
+    -o,--outputFile (default: <sparseGRM>.sigma.tsv, or <modelFile without .rda>.sigma.tsv): the report, one
+      'label key value' row per line (pairs kept, components evaluated / indefinite, the smallest eigenvalue over the
+      diagonal, and the verdict; with a model also tau1, tau2). The log is <outputFile>.log.
+    --label (default: the GRM or model file's name): the report's label column.
     --maxDenseComponent (default: 2000): the largest family block eigendecomposed; larger blocks are judged by the
       Cholesky of the whole Sigma alone.
     -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
     --dryRun: print the command instead of running it.
     --plantIndefinite: the positive control -- a planted indefinite block, which must be reported as NOT positive definite.
   Exit 0 when Sigma is positive definite (a warning when it has near-null directions), 2 when it is NOT, with the
-  rows of the report on stdout. A NOT verdict means the GRM, thinned at this cutoff, is not a covariance matrix: rebuild
+  rows of the report on stdout. Run it ONCE per GRM and cutoff, after step 0 and before any step 1. A NOT verdict means the GRM, thinned at this cutoff, is not a covariance matrix: rebuild
   it (raise the cutoff only if the dropped pairs are background, not relatives; in an admixed cohort build the GRM
   from KING-robust kinship instead -- see the README), refit step 1 on it, and run this check again. Do not run
   step 2 on a model whose Sigma failed this check.
@@ -126,15 +130,23 @@ done
 
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
-if [[ ${MODEL_FILE} == "" || ${SPARSE_GRM_FILE} == "" || ${SPARSE_GRM_ID_FILE} == "" ]]; then
-  echo "--modelFile, --sparseGRM and --sparseGRMID are required"
+if [[ ${SPARSE_GRM_FILE} == "" || ${SPARSE_GRM_ID_FILE} == "" ]]; then
+  echo "--sparseGRM and --sparseGRMID are required"
   exit 1
 fi
-for f in "${MODEL_FILE}" "${SPARSE_GRM_FILE}" "${SPARSE_GRM_ID_FILE}"; do
+for f in ${MODEL_FILE} "${SPARSE_GRM_FILE}" "${SPARSE_GRM_ID_FILE}"; do
   [[ -s ${f} ]] || { echo "not found or empty: ${f}" >&2; exit 1; }
 done
-[[ ${OUT_FILE} == "" ]] && OUT_FILE="${MODEL_FILE%.rda}.sigma.tsv"
-[[ ${LABEL} == "" ]] && LABEL=$(basename "${MODEL_FILE%.rda}")
+if [[ ${MODEL_FILE} == "" ]]; then
+  MODE_ARGS="--grmOnly"; WHAT="the GRM ${SPARSE_GRM_FILE}"
+  [[ ${OUT_FILE} == "" ]] && OUT_FILE="${SPARSE_GRM_FILE}.sigma.tsv"
+  [[ ${LABEL} == "" ]] && LABEL=$(basename "${SPARSE_GRM_FILE%.mtx}")
+else
+  MODE_ARGS="--modelFile=$( [[ ${MODEL_FILE} == /* ]] && echo "${MODEL_FILE}" || echo "${HOME}/${MODEL_FILE}" )"
+  WHAT="${MODEL_FILE} on ${SPARSE_GRM_FILE}"
+  [[ ${OUT_FILE} == "" ]] && OUT_FILE="${MODEL_FILE%.rda}.sigma.tsv"
+  [[ ${LABEL} == "" ]] && LABEL=$(basename "${MODEL_FILE%.rda}")
+fi
 
 check_relcutoff "${RELCUTOFF}"
 grm_density_check "${SPARSE_GRM_FILE}" "${RELCUTOFF}" || true   # its density, and a cutoff that differs from the GRM's
@@ -146,15 +158,14 @@ check_container_env $SINGULARITY
 container_path () { [[ $1 == /* ]] && echo "$1" || echo "${HOME}/$1"; }
 
 log="${OUT_FILE}.log"
-cmd="aou_sigma_pd_check.R \
-  --modelFile=$(container_path "${MODEL_FILE}") \
+cmd="aou_sigma_pd_check.R ${MODE_ARGS} \
   --sparseGRMFile=$(container_path "${SPARSE_GRM_FILE}") \
   --sparseGRMSampleIDFile=$(container_path "${SPARSE_GRM_ID_FILE}") \
   --relatednessCutoff=${RELCUTOFF} \
   --maxDenseComponent=${MAX_DENSE} \
   --label=${LABEL} \
   --reportFile=$(container_path "${OUT_FILE}") ${PLANT}"
-echo "Sigma check for ${MODEL_FILE} on ${SPARSE_GRM_FILE} at --relatednessCutoff ${RELCUTOFF}; log: ${log}"
+echo "Sigma check for ${WHAT} at --relatednessCutoff ${RELCUTOFF}; log: ${log}"
 if [[ ${DRYRUN:-false} = true ]]; then
   run_container; exit $?
 fi
@@ -169,7 +180,11 @@ cat "${OUT_FILE}"
 verdict=$(awk -F'\t' '$2 == "verdict" {v = $3} END {print v}' "${OUT_FILE}")
 case "${verdict}" in
   "positive definite")
-    echo "Sigma is positive definite: step 2 can run on this model."
+    if [[ ${MODEL_FILE} == "" ]]; then
+      echo "The GRM thinned at ${RELCUTOFF} is positive semidefinite: Sigma is positive definite for every model fitted on it."
+    else
+      echo "Sigma is positive definite: step 2 can run on this model."
+    fi
     ;;
   "positive definite with near-null directions")
     echo "WARNING: Sigma is positive definite but has near-null directions (a family block with an eigenvalue" >&2
@@ -182,12 +197,16 @@ case "${verdict}" in
   *)
     {
       echo "################################################################################"
-      echo "REFUSED: Sigma is NOT positive definite for ${MODEL_FILE} at --relatednessCutoff ${RELCUTOFF}"
+      echo "REFUSED: Sigma is NOT positive definite for ${WHAT} at --relatednessCutoff ${RELCUTOFF}"
       echo "  (verdict: '${verdict}'). The GRM thinned at this cutoff is not a covariance matrix, and"
       echo "  step 2's sparse-GRM variances on it are the thinning's artefact: negative (p 1, BETA NA)"
       echo "  or tiny (an inflated Z printed as a valid p). Rebuild the GRM -- in an admixed cohort from"
-      echo "  KING-robust kinship (README, step 0) -- refit step 1 on it, and run this check again."
-      echo "  Do NOT run step 2 on this model."
+      echo "  KING-robust kinship (README, step 0) -- and run this check on the new one before fitting"
+      if [[ ${MODEL_FILE} == "" ]]; then
+        echo "  anything on it. Fit NO model on this GRM, and run NO step 2 on a model fitted on it."
+      else
+        echo "  anything on it. Refit this model on the new GRM; do NOT run step 2 on this one."
+      fi
       echo "################################################################################"
     } >&2
     exit 2
