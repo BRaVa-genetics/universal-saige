@@ -598,6 +598,67 @@ def nglmm_direct(trait, binary):
     return total
 
 
+# ------------------------------------------------------------ step 5 (the Sigma check)
+def sigma_report(path):
+    rows = {}
+    if os.path.exists(path):
+        for line in open(path).read().split("\n")[1:]:
+            p = line.split("\t")
+            if len(p) == 3:
+                rows[p[1]] = p[2]
+    return rows
+
+
+for name, path in (("s5_sigma_grm", "grm.sigma.tsv"), ("s5_sigma_grm_0125", "grm_0125.sigma.tsv")):
+    section(name)
+    rep = sigma_report(out(path))
+    check("step5 %s: the pedigree GRM thinned at the cutoff is positive semidefinite (no model)" % name,
+          rep.get("verdict") == "positive definite", rep.get("verdict", "no report"), "positive definite")
+    check("step5 %s: the report says it ran on the GRM alone" % name, rep.get("mode", "").startswith("grmOnly"),
+          rep.get("mode", "no mode row"), "grmOnly")
+section("s5_sigma_grm_planted")
+rep = sigma_report(out("grm.sigma_planted.tsv"))
+check("step5 GRM-only, planted indefinite block: reported NOT positive definite",
+      rep.get("verdict") == "Sigma is NOT positive definite", rep.get("verdict", "no report"), "Sigma is NOT positive definite")
+check("step5 GRM-only, planted indefinite block: the driver refused it (exit 2)",
+      status.get("s5_sigma_grm_planted", ("", -1, 0))[1] == 2, status.get("s5_sigma_grm_planted", ("", -1, 0))[1], "2")
+section("s5_refuse_no_grm")
+check("step5: no --sparseGRM is refused before the container starts", "are required" in log("s5_refuse_no_grm"),
+      "", "message printed")
+for trait in ("Q_pos", "B_pos"):
+    section("s5_sigma_" + trait)
+    rep = sigma_report(out(trait + ".sigma.tsv"))
+    check("step5 %s: Sigma on the pedigree GRM is positive definite" % trait, rep.get("verdict") == "positive definite",
+          rep.get("verdict", "no report"), "positive definite")
+    check("step5 %s: no indefinite family component" % trait, rep.get("components_indefinite") == "0",
+          rep.get("components_indefinite", "no report"), "0")
+    ok_tau = rep.get("tau2") not in (None, "") and fnum(rep.get("tau2")) > 0
+    check("step5 %s: the model carries a random effect (tau2 > 0), so the check was not vacuous" % trait, ok_tau,
+          rep.get("tau2", "no report"), "> 0")
+section("s5_sigma_planted")
+rep = sigma_report(out("Q_pos.sigma_planted.tsv"))
+check("step5 planted indefinite block: reported NOT positive definite", rep.get("verdict") == "Sigma is NOT positive definite",
+      rep.get("verdict", "no report"), "Sigma is NOT positive definite")
+check("step5 planted indefinite block: the driver refused it (exit 2)", status.get("s5_sigma_planted", ("", -1, 0))[1] == 2,
+      status.get("s5_sigma_planted", ("", -1, 0))[1], "2")
+check("step5 planted indefinite block: the banner names the GRM as the fix",
+      "Rebuild the GRM" in log("s5_sigma_planted"), "", "banner printed")
+section("s5_refuse_no_model")
+check("step5: a missing model is refused before the container starts", "not found or empty" in log("s5_refuse_no_model"),
+      "", "message printed")
+# the step-2 guard (image 66b80710+) runs on every group test and must flag nothing on the positive-definite GRM
+for run_name in ("s2_Q_pos_group", "s2_B_pos_group", "s2_Q_pos_flexrv"):
+    section(run_name)
+    lg = log(run_name)
+    line = [l for l in lg.split("\n") if l.startswith("Sigma variance: ")]
+    flagged = None
+    if line:
+        import re as _re
+        m = _re.search(r"; (\d+) flagged", line[0])
+        flagged = int(m.group(1)) if m else None
+    check("step2 %s: the Sigma guard ran and flagged 0 tests" % run_name, flagged == 0,
+          line[0][:60] if line else "no 'Sigma variance:' line", "0 flagged")
+
 section("s3_nglmm")
 path = out("neff.csv")
 vals = {}

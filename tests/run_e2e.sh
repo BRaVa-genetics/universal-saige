@@ -183,6 +183,20 @@ run s1_sex_genetic_pgen    ok   "${S1[@]}" --traitType quantitative --phenoCol Q
 run s1_Q_null_female ok   "${S1[@]}" --traitType quantitative --phenoCol Q_null --sex F --covarColList "age,age2,PC1,PC2,PC3,PC4" --genotypePlink "${VR}" --outputPrefix "${OUT}/Q_null_female"
 run s1_Q_null_malesNA ok  "${S1[@]}" --traitType quantitative --phenoFile "${OUT}/pheno_qnull_malesNA.tsv" --phenoCol Q_null --covarColList "age,age2,PC1,PC2,PC3,PC4" --genotypePlink "${VR}" --outputPrefix "${OUT}/Q_null_malesNA"
 
+echo "== step 5 (the Sigma check, before step 2)"
+# the pedigree GRM at 0.05 is positive definite (first-degree pairs only, no background): both traits pass;
+# the planted indefinite block is the positive control and must be refused (exit 2); a missing model is refused
+S5=(bash 05_sigma_check.sh --isSingularity "${SING}" --sparseGRM "${GRM}" --sparseGRMID "${GRMID}")
+run s5_sigma_grm        ok   "${S5[@]}" --outputFile "${OUT}/grm.sigma.tsv"
+run s5_sigma_grm_0125   ok   "${S5[@]}" --relatednessCutoff 0.125 --outputFile "${OUT}/grm_0125.sigma.tsv"
+run s5_sigma_grm_planted fail "${S5[@]}" --outputFile "${OUT}/grm.sigma_planted.tsv" --plantIndefinite
+run s5_sigma_Q_pos      ok   "${S5[@]}" --modelFile "${OUT}/Q_pos.rda" --outputFile "${OUT}/Q_pos.sigma.tsv"
+run s5_sigma_B_pos      ok   "${S5[@]}" --modelFile "${OUT}/B_pos.rda" --outputFile "${OUT}/B_pos.sigma.tsv"
+run s5_sigma_planted    fail "${S5[@]}" --modelFile "${OUT}/Q_pos.rda" --outputFile "${OUT}/Q_pos.sigma_planted.tsv" --plantIndefinite
+run s5_refuse_no_model  fail "${S5[@]}" --modelFile "${OUT}/no_such_model.rda"
+run s5_refuse_no_grm    fail bash 05_sigma_check.sh --isSingularity "${SING}" --sparseGRMID "${GRMID}"
+run s5_dryrun           ok   "${S5[@]}" --dryRun
+
 echo "== step 4 (FlexRV group file)"
 run s4_selftest ok python3 flexrv_score_from_alphamissense.py --selftest
 run s4_flexrv   ok bash 04_flexrv_groupfile.sh --group "${IN}/group.chr7.txt" --chr 7 --name AM --am "${IN}/am_dummy.tsv.gz" \

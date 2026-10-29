@@ -100,3 +100,6 @@ bash 01_step1_fitNULLGLMM.sh \
 # (the fit can run for hours or never finish): rerun step 0 with a higher
 # relatedness_cutoff. Only if that is not an option, add --forceDenseGRM.
 
+# The GRM must have passed the Sigma check (step 5, the last call of the step 0
+# template) before any model is fitted on it; nothing per phenotype is needed.
+

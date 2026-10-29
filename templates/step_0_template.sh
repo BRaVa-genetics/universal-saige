@@ -31,6 +31,11 @@ sample_id_path=["path/to/sampleIDs"]
 # steps 1, 2 and 3. 0.05 is the default; All of Us used 0.125 for its admixed amr
 # cohort, whose GRM was too dense to fit at 0.05. Steps 0 and 1 print the
 # GRM's relatives per sample and warn loudly when it is dense: raise it then.
+# A DENSE GRM IN AN ADMIXED COHORT IS ANCESTRY, NOT FAMILY, and raising the
+# cutoff is not the fix: the thinned matrix is then not positive definite
+# (step 5 says so) and step 2's variances on it are wrong. Build the GRM from
+# KING-robust kinship instead (README, step 0: plink2 --make-king-table and
+# king_to_mtx.py convert), pass those files below as the GRM, and use 0.125.
 relatedness_cutoff=0.05
 
 # The inclusion of the following two flags ensures that the variance ratio file
@@ -48,3 +53,14 @@ bash 00_step0_VR_and_GRM.sh \
     --relatednessCutoff ${relatedness_cutoff} \
     --generate_plink_for_vr \
     --generate_GRM
+
+# THEN, BEFORE ANY STEP 1: is the GRM, thinned at this cutoff, positive
+# semidefinite? Once per GRM, minutes. 'positive definite' means every model
+# fitted on it is fine; exit 2 and a banner means rebuild the GRM (README,
+# step 0: KING-robust) and check again -- do not fit on it. Keep the
+# .sigma.tsv: it is submitted with the results.
+bash 05_sigma_check.sh \
+    --sparseGRM ${out_step0}_relatednessCutoff_${relatedness_cutoff}_5000_randomMarkersUsed.sparseGRM.mtx \
+    --sparseGRMID ${out_step0}_relatednessCutoff_${relatedness_cutoff}_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt \
+    --relatednessCutoff ${relatedness_cutoff} \
+    --isSingularity ${IS_SINGULARITY}

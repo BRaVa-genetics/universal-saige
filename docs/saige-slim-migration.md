@@ -160,6 +160,19 @@ checks; it also passes on a SLURM cluster under Apptainer.
   the log10 columns; added after FlexRV height hits in All of Us rested on fewer than five effective
   carriers. Step 2 also writes per-variant results only on SAIGE-GENE+ runs by default (`--singleInGroup`,
   FALSE for FlexRV), as the All of Us runs did from 2026-10-08.
+- **Image `1.5.2-dev-41d78ae3`** (2026-10-29, replacing `49178058`): LEDGER #183. On the sparse-GRM band a
+  thinned GRM's Sigma can be indefinite, and a converged solve then returns a negative or tiny variance (an
+  All of Us amr random-score cell printed p 1e-73 one step before the p 1 / BETA NA collapse). Every step-2 run
+  now compares each such variance against the no-GRM variance of the same vector and, when the solve is not
+  positive or below half of it, reports the no-GRM variance instead, naming the test in `.sigmaGuard.txt`
+  (image `66b80710`; measured on the rebuilt All of Us amr fleet: 0 flagged tests on 672 real-arm jobs). The
+  image also carries `aou_sigma_pd_check.R`, and the new `05_sigma_check.sh` runs it ONCE per GRM and cutoff,
+  after step 0 and before any step 1 (`--grmOnly`: if the thinned GRM is positive semidefinite, every model's Sigma
+  is positive definite; exit 2 and a banner otherwise: rebuild the GRM, fit nothing on it). `--modelFile` checks one
+  model's own Sigma, a diagnosis.
+  The All of Us amr GRM failed it and was rebuilt from KING-robust kinship (`king_to_mtx.py`); its step 1 and
+  step 2 were rerun. The step-2 template gains run 5: the `flexrv_RAND` twin on every phenotype, FlexRV's
+  file-level null, read per trait.
 - **Step 3**: Nglmm at the same cutoff as the fit (default 0.05; it was
   `extractNglmm.R`'s own 0.125, which every earlier BRaVa submission used).
 - **Docs**: templates use 20 PCs, as AoU did; walkthrough and templates checked
