@@ -242,6 +242,29 @@ and then the pair counts at each cutoff: the difference is the background. Pass 
 third-degree band, so 0.05 on it can join tens of thousands of people into one indefinite component; All of Us amr: positive
 definite at 0.125, not at 0.05), and run step 0a on it. `king_to_mtx.py` needs numpy; `python3 king_to_mtx.py selftest` checks it.
 
+**If step 0a still says NOT on the KING matrix at 0.125, the next rung is PC-Relate, not a dense GRM.** PC-Relate (Conomos
+et al. 2016) estimates kinship conditional on the PCs, which removes KING-robust's bias on pairs of differing ancestry.
+`pcrelate_to_mtx.py` computes it natively (numpy, blocked matrix products, no Spark, no GPU) and writes SAIGE's `.mtx`
+directly; it reads `--bed` or `--pgen` (the latter through the Pgenlib python package, `pip install Pgenlib`). GENESIS's
+`pcrelate()` computes the same estimator but returns every pair (about 3.2 billion at 80k samples), so at biobank scale
+it needs its multi-job sample-block pipeline; this tool does it in one pass and keeps only the pairs past the cutoff. Inputs: LD-pruned array markers (100k or more), PCs from PC-AiR (or `plink2 --pca` on a KING-unrelated set)
+and that unrelated set. As in the KING recipe, `--cutoff 0.05` only sets which pairs are written: the file keeps every pair
+down to 0.05 so that another cutoff needs no rerun (hours at 80k samples), and steps 0a, 1, 2 and 3 thin it to 0.125:
+
+```
+python3 pcrelate_to_mtx.py run --bed <out_step0>.plink_for_grm --pcs <pcair.tsv> --npcs <as in step 1> \
+    --unrelated <unrelated_ids.txt> --cutoff 0.05 --out <out_step0>_pcrelate --threads <cores>
+bash 00a_sigma_check.sh --sparseGRM <out_step0>_pcrelate.mtx --sparseGRMID <out_step0>_pcrelate.mtx.sampleIDs.txt --relatednessCutoff 0.125 ...
+```
+
+`python3 pcrelate_to_mtx.py selftest` (15 s) runs its controls on a simulated admixed cohort with planted relatives:
+every planted class recovered, unrelated pairs at zero within and across populations, the same estimator WITHOUT the PCs
+misreading the cross-population pairs (so the correction is shown to do the work), a permutation null, and the PGEN
+arm when plink2 and Pgenlib are present. It is reconciled pair for pair against GENESIS (max difference 7e-4;
+`pcrelate_genesis_recon.R`). At 80k samples and 100k markers expect a few hours on a 32-core machine
+(`--memory-gb` sizes the sample tile; 16 GB is four passes over the genotypes). Then steps 1 to 3 on the `_pcrelate` files
+exactly as on the `_king` ones. Only if PC-Relate's matrix also fails step 0a is a dense GRM worth its cost.
+
 ### Step 0a: the Sigma check (once per GRM, before step 1)
 
 ```
@@ -272,7 +295,8 @@ formed. Three outcomes:
   unknown`, also exit 3: the negative direction sits in a family block above `--maxDenseComponent`; raise it, or run
   `--modelFile` per model, which decides by a Cholesky of that model's own Sigma.)
 - **`NOT positive definite`** (exit 2, a banner naming any refused model): the recommended fix is to rebuild the GRM
-  (step 0, the KING-robust recipe), refit, and check again; All of Us did that for amr. A biobank that cannot rebuild may
+  (step 0: the KING-robust recipe, then PC-Relate if KING's matrix is also refused), refit, and check again; All of Us did
+  that for amr with KING. A biobank that cannot rebuild may
   proceed: every step-2 run repairs a test whose GRM variance is not positive or below half the no-GRM value and names it
   in `.sigmaGuard.txt`, which is how the amr p 1e-73 cell became 1.8e-4 before the rebuild, and the rebuilt amr run agreed
   with it gene for gene (Spearman 0.996, 31 of 684k cells moved). What the guard leaves is the band just above its 0.5

@@ -35,7 +35,9 @@ sample_id_path=["path/to/sampleIDs"]
 # cutoff is not the fix: the thinned matrix is then not positive definite
 # (step 0a says so) and step 2's variances on it are wrong. Build the GRM from
 # KING-robust kinship instead (README, step 0: plink2 --make-king-table and
-# king_to_mtx.py convert), pass those files below as the GRM, and use 0.125.
+# king_to_mtx.py convert), pass those files below as the GRM, and use 0.125. If step 0a refuses
+# that matrix too, pcrelate_to_mtx.py (PC-Relate, README under step 0) is the next rung before
+# any dense GRM.
 relatedness_cutoff=0.05
 
 # The inclusion of the following two flags ensures that the variance ratio file
