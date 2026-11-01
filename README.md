@@ -37,8 +37,9 @@
 > | both sexes (PhecodeX `Both`) | `age, age2, sex, age_sex, age2_sex`, PCs | as in the template |
 > | one sex (PhecodeX `Female` / `Male`, the six above) | `age, age2`, PCs: no sex terms | add `--sex F` / `--sex M` |
 >
-> Within one sex, `sex` is constant and `age_sex`/`age2_sex` are either zero or copies of `age`/`age2`. With `--sex`, step 1
-> refuses a `sex` covariate, but it does not check the interactions: leave those out yourself.
+> Within one sex, `sex` is constant and `age_sex`/`age2_sex` are zero or copies of `age`/`age2`, so with `--sex` step 1
+> refuses any covariate with `sex` as a word in its name. A covariate that is not a sex term but is named that way
+> (rare) must be renamed.
 >
 > **5. The steps, in the order they run.**
 >
@@ -300,7 +301,7 @@ optional:
 - `--sampleIDs`: single-column file of sample IDs to restrict the fit to; leave the flag out to use every sample (an empty value is refused).
 - `--sampleIDCol` (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
 - `--relatednessCutoff` (default 0.05): the GRM is thinned to entries above it. It must equal steps 0, 2 and 3's.
-- `--sex` (`M` or `F`): for a sex-specific trait. SAIGE fits only the samples of that sex (`--FemaleOnly`/`--MaleOnly`, as All of Us did) and drops the rest; step 1 prints how many it keeps and drops. Leave every sex term (`sex`, `age_sex`, `age2_sex`) out of the covariates; a `sex` covariate is refused.
+- `--sex` (`M` or `F`): for a sex-specific trait. SAIGE fits only the samples of that sex (`--FemaleOnly`/`--MaleOnly`, as All of Us did) and drops the rest; step 1 prints how many it keeps and drops. Leave every sex term (`sex`, `age_sex`, `age2_sex`) out of the covariates: with `--sex`, any covariate with `sex` as a word in its name, in any case (`sex`, `Sex`, `age_sex`, `age2_sex`), is refused. A covariate that is not a sex term but has such a name must be renamed to be used in a sex-specific fit (`essex` or `sexual_partners` are not read as sex terms).
 - `--femaleCode`, `--maleCode` (default `0`, `1`: BRaVa's phenotype coding): the values of a numeric `sex` column. A column of `M` and `F` is read as such. SAIGE's own default, and the All of Us file, use 1 for female. Step 1 refuses a code the column does not hold, a code no sample with a phenotype has, and (binary) a split that puts every case in the sex being dropped; it warns loudly when the column holds other values, when (quantitative) more samples with a phenotype are dropped than kept, or when (binary) some cases are in the sex being dropped. Each of these is what flipped or mismatched codes look like. Where the genotype file has genetic sex (`.fam` column 5, or the `.psam` `SEX` column; PLINK fixes 1 = male, 2 = female), step 1 checks the phenotype file's sex against it: more than half disagreeing means the codes are flipped and is refused, more than 1% is warned loudly, and a genotype file without usable sex (e.g. converted from VCF) is warned loudly as unverifiable. The phenotype file's `sex` always decides who is fitted.
 - `--forceDenseGRM`: fit even when the sparse GRM has more than 100 relatives per sample on average, which is otherwise refused (see the note on refusals above); not recommended.
 - `--dryRun`: print the SAIGE command instead of running it.

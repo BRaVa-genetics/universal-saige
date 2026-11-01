@@ -126,6 +126,8 @@ run s1_sex_binary_both     ok   "${S1[@]}" --traitType binary --phenoCol B_pos -
 # the codes flipped (SAIGE's 1 = female against this file's 0): no female has a phenotype under that code
 run s1_sex_flipped_code    fail "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --femaleCode 1 --maleCode 0 --genotypePlink "${VR}" --dryRun
 run s1_refuse_sex_covar    fail "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList age,sex --genotypePlink "${VR}" --dryRun
+run s1_refuse_sex_inter    fail "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList age,age2,age_sex,age2_sex --genotypePlink "${VR}" --dryRun
+run s1_refuse_sex_categ    fail "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList age --categCovarColList Sex --genotypePlink "${VR}" --dryRun
 run s0_refuse_vcf          fail bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat vcf \
   --geneticDataType genotype --outputPrefix "${OUT}/never" --generate_GRM
 run s0_refuse_no_out       fail bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
