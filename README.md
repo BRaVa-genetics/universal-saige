@@ -25,8 +25,8 @@
 >   latest release bundle and follow its README with the default settings. Every column of the `phenotype_matrix` it
 >   writes clears 200 cases and 200 controls: run them all.
 > - **Sex-specific phenotypes are run in that sex only**: step 1's `--sex F` (or `M`), with `sex`, `age_sex` and
->   `age2_sex` left out of the covariates. For PhecodeX, the bundle's `release/phecode_info.csv` says which: its `sex`
->   column is `Female`, `Male` or `Both`. Of the BRaVa pilot phenotypes, six are female-only: BenCervUterNeo, BreastCanc,
+>   `age2_sex` left out of the covariates. For PhecodeX, the bundle's `release/phecode_info.csv` says which (its `sex`
+>   column; phecode_mapping's README has [a snippet that lists them](https://github.com/astheeggeggs/phecode_mapping#which-phenotypes-are-sex-restricted)). Of the BRaVa pilot phenotypes, six are female-only: BenCervUterNeo, BreastCanc,
 >   CervCanc, EFRMB, FemInf and MatHem.
 >   Submit only the single-sex results for these.
 >
