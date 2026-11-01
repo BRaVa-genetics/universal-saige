@@ -33,7 +33,7 @@ sample_id_path=["path/to/sampleIDs"]
 # GRM's relatives per sample and warn loudly when it is dense: raise it then.
 # A DENSE GRM IN AN ADMIXED COHORT IS ANCESTRY, NOT FAMILY, and raising the
 # cutoff is not the fix: the thinned matrix is then not positive definite
-# (step 5 says so) and step 2's variances on it are wrong. Build the GRM from
+# (step 0a says so) and step 2's variances on it are wrong. Build the GRM from
 # KING-robust kinship instead (README, step 0: plink2 --make-king-table and
 # king_to_mtx.py convert), pass those files below as the GRM, and use 0.125.
 relatedness_cutoff=0.05
@@ -63,7 +63,7 @@ bash 00_step0_VR_and_GRM.sh \
 # cannot, proceed -- the image repairs and names the affected tests
 # (.sigmaGuard.txt) -- and say so when you submit. Keep the .sigma.tsv: it is
 # submitted with the results.
-bash 05_sigma_check.sh \
+bash 00a_sigma_check.sh \
     --sparseGRM ${out_step0}_relatednessCutoff_${relatedness_cutoff}_5000_randomMarkersUsed.sparseGRM.mtx \
     --sparseGRMID ${out_step0}_relatednessCutoff_${relatedness_cutoff}_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt \
     --relatednessCutoff ${relatedness_cutoff} \

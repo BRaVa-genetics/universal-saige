@@ -3,34 +3,87 @@
 </h1>
 
 > [!IMPORTANT]
-> If you are a BRaVa analyst looking to run these steps in your biobank/cohort, check out these helpful templates:
-> - [step 0](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_0_template.sh)
-> - [step 1](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_1_template.sh)
-> - [step 2](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh)
->   
-> You'll need to replace filepaths, column names etc in the commands with the corresponding column names in your data. Free text portions of the commands to be changed are placed in square brackets `[like this]`, portions of the commands where you'll need to make a choice between a collection of options are placed in braces `{like this}`.
-
-> [!IMPORTANT]
-> **What a biobank does differently from the last release (October 2026, image `1.5.2-dev-10fe4c84`).** Four things:
+> ## BRaVa November 2026: what we expect of each biobank
 >
-> 1. **Fetch the new image**: `bash download_resources.sh --saige-image` (add `--singularity` on a cluster). Record the tag with your results.
-> 2. **Once per GRM, after step 0, run the Sigma check**:
->    `bash 05_sigma_check.sh --sparseGRM <GRM>.mtx --sparseGRMID <GRM>.mtx.sampleIDs.txt --relatednessCutoff <the cutoff you use>`
->    (minutes, once per cohort; the last line of the step 0 template). `positive definite` means every model you fit on
->    this GRM is fine: nothing more to do. `GRM indefinite ... (pass --modelDir)` (exit 3) is common and usually harmless:
->    fit your models, then run it once more with `--modelDir <directory of your .rda files>`, which judges every model in
->    seconds. `NOT positive definite` (exit 2, a banner naming the models): the recommended fix is to rebuild the GRM
->    from KING-robust kinship (the recipe under [step 0](#step-0-once-per-cohortbiobank)) and refit, which is what All of
->    Us did for its admixed amr cohort. **If you cannot, you are not blocked**: the image repairs the affected tests and
->    names them in `.sigmaGuard.txt`, and on All of Us amr the results with and without the rebuild agree gene for gene
->    (Spearman 0.996, 31 of 684k cells moved). Say which route you took when you submit.
-> 3. **Add a fifth step-2 run per chromosome and phenotype**: FlexRV on the random-score twin (`rand/*.flexrv_RAND.txt.gz`,
->    already in your bucket), `--flexRVscore RAND --annotations synonymous --flexRVpartialMask`, on EVERY phenotype you
->    submit (run 5 in the [step 2 template](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh)).
-> 4. **Ship three more files with the results**: the GRM's `<GRM>.mtx.sigma.tsv` (the Sigma check's report), every step-2
->    run's `<prefix>.txt.sigmaGuard.txt` where one was written, and the run-5 (`flexrv_RAND`) results files.
+> Run this once per ancestry cohort in your biobank. Every command is written out in the templates
+> ([step 0](templates/step_0_template.sh), [step 1](templates/step_1_template.sh), [step 2](templates/step_2_template.sh));
+> the sections below explain each step. In the templates, replace `[text in square brackets]` with your own paths and
+> column names, and pick one of the options in `{braces}`.
 >
-> Nothing else changes: the group files, masks, runs 1-4 and the result columns are as in the October release below.
+> **1. Set up.** `bash download_resources.sh --saige-image --plink2` (add `--singularity` on a cluster). The image is
+> `1.5.2-dev-10fe4c84`: record the tag with your results.
+>
+> **2. Group files.** In your BRaVa bucket, `gs://brava-meta-upload-<biobank>/brava_groupfiles_2026-10_flexrvpct/`, with a
+> `README.md` and a `MANIFEST.md5` to check the download against. Use `biobank_ids/` if your genotype files use the variant IDs
+> shown there, otherwise `chr_pos_ref_alt/`. Each holds, per chromosome, the group files for runs 1-4 and a `rand/`
+> subfolder with the run-5 files. No files yet (Biome, Estonia)? We can build them for you, or follow
+> [variant-annotation](https://github.com/BRaVa-genetics/variant-annotation).
+>
+> **3. Phenotypes.**
+> - The 44 BRaVa pilot phenotypes, as before.
+> - PhecodeX phenotypes, defined with [phecode_mapping](https://github.com/astheeggeggs/phecode_mapping): download the
+>   latest release bundle and follow its README with the default settings. Every column of the `phenotype_matrix` it
+>   writes clears 200 cases and 200 controls: run them all.
+> - **Sex-specific phenotypes are run in that sex only** (see 4). For PhecodeX, the `sex` column of the bundle's
+>   `release/phecode_info.csv` says which: `Female`, `Male` or `Both` (phecode_mapping's README has
+>   [a snippet that lists the ones in your matrix](https://github.com/astheeggeggs/phecode_mapping#which-phenotypes-are-sex-restricted)).
+>   Of the BRaVa pilot phenotypes, six are female-only: BenCervUterNeo, BreastCanc, CervCanc, EFRMB, FemInf and MatHem.
+>   Submit only the single-sex results for these.
+>
+> **4. Covariates.** PCs: the templates use 20; fewer is fine in a small cohort, say how many.
+>
+> | phenotype | covariates | step 1 |
+> |---|---|---|
+> | both sexes (PhecodeX `Both`) | `age, age2, sex, age_sex, age2_sex`, PCs | as in the template |
+> | one sex (PhecodeX `Female` / `Male`, the six above) | `age, age2`, PCs: no sex terms | add `--sex F` / `--sex M` |
+>
+> Within one sex, `sex` is constant and `age_sex`/`age2_sex` are zero or copies of `age`/`age2`, so with `--sex` step 1
+> refuses any covariate with `sex` as a word in its name. A covariate that is not a sex term but is named that way
+> (rare) must be renamed.
+>
+> **5. The steps, in the order they run.**
+>
+> | step | how often | what |
+> |---|---|---|
+> | [0](#step-0-once-per-cohortbiobank) | once per cohort | the sparse GRM and the variance-ratio markers |
+> | [0a](#step-0a-the-sigma-check-once-per-grm-before-step-1) | once per GRM, minutes | the Sigma check: is the GRM safe to test on? |
+> | [1](#step-1-once-per-phenotype) | once per phenotype (several per call) | the null model |
+> | [2](#step-2-once-per-chromosome-per-phenotype) | **five runs** per chromosome and phenotype | the gene tests (below) |
+> | [3](#step-3) | once per cohort | Nglmm, each phenotype's effective sample size |
+>
+> Use the same `--relatednessCutoff` in every step. The five step-2 runs:
+>
+> | run | test | group file | mask (`--annotations`) |
+> |---|---|---|---|
+> | 1 | SAIGE-GENE+ (SKAT-O) | `*.new_rules.saige_group.txt.gz` | the seven masks in the step 2 template |
+> | 2 | SAIGE-GENE+ (SKAT-O), AlphaMissense >= 0.906 | `*.am_moderate.saige_group.txt.gz` | `am_moderate`, with `--singleInGroup FALSE` |
+> | 3 | FlexRV, AlphaMissense percentile | `*.flexrv_AMPCT.txt.gz`, `--flexRVscore AMPCT` | `pLoF:damaging_missense:other_missense:spliceai2_gt040` |
+> | 4 | FlexRV, scallion percentile (chr 1-22, X) | `*.flexrv_SCALLION.txt.gz`, `--flexRVscore SCALLION` | as run 3 |
+> | 5 | FlexRV, random scores: the null control | `rand/*.flexrv_RAND.txt.gz`, `--flexRVscore RAND --flexRVpartialMask` | `synonymous` |
+>
+> Run 5 on every phenotype: it is how FlexRV's calibration is checked in your data.
+>
+> **6. Refusals are deliberate.** Step 1 refuses, naming the reason, a binary phenotype with fewer than 100 cases, a
+> categorical covariate level with fewer than 10 cases or controls, a separated covariate model, a fit that did not
+> converge, and a GRM too dense to fit. Leave the gates on and do not pre-filter separately: they are the consortium's
+> common filter. A refusal for a level with 0 cases is usually a sex-specific phenotype not run single-sex.
+>
+> **7. Admixed cohorts.** If step 0's GRM is too dense to fit, or step 0a says `NOT positive definite`, rebuild it from
+> KING-robust kinship (under [step 0](#step-0-once-per-cohortbiobank)) at 0.125 and check again, as All of Us did for its
+> admixed cohort. If you cannot, carry on: the image repairs the affected tests and names them in `.sigmaGuard.txt`. A full
+> (dense) GRM is acceptable too, one method per cohort for every phenotype and run, but means calling SAIGE outside these
+> scripts: contact us first.
+>
+> **8. Send back**, to `gs://brava-meta-upload-<biobank>/BRaVa_Nov26_runs/` (the bucket your group files are in):
+> - **everything step 2 writes**, all five runs: the results `<prefix>.txt`, run 1's `.singleAssoc.txt`, and every
+>   sidecar beside them (`<prefix>.txt.<name>.txt`; which appear depends on the run, and several are written only when
+>   there is something to report -- `.sigmaGuard.txt` among them; [step 2](#step-2-once-per-chromosome-per-phenotype) lists them all);
+> - step 0a's `<GRM>.mtx.sigma.tsv`, if your governance allows it (it counts samples in family blocks);
+> - step 3's `neff.csv`;
+> - a short note: the image tag, the GRM each cohort used (step 0's, KING-robust, or dense) and its cutoff, the number of
+>   PCs, and which phenotypes step 1 refused and why.
+>
+> Apply your own small-count rules before anything leaves your environment.
 
 > [!NOTE]
 > **What's in the October 2026 release, in full**
@@ -38,7 +91,7 @@
 >    variance of the same test and, when the GRM's value is not positive or below half of it, reports the no-GRM variance
 >    instead and names the test in `<prefix>.txt.sigmaGuard.txt` (saige-slim LEDGER #183). On a GRM that passes the Sigma
 >    check this touches a few cells per cohort, nowhere near a hit; on one that fails it is where p 1e-73 cells went. The image
->    also carries the check itself (`aou_sigma_pd_check.R`, run by `05_sigma_check.sh`).
+>    also carries the check itself (`aou_sigma_pd_check.R`, run by `00a_sigma_check.sh`).
 > 2. **BRaVa group files** (October 2026 rebuild), in your biobank's bucket with a README: four files per chromosome,
 >    one per run (no scallion file on chrY), plus the `rand/` twins. Labels: `pLoF`, `damaging_missense`, `spliceai2_gt040`,
 >    `other_missense`, `synonymous`, `non_coding`.
@@ -63,7 +116,7 @@
 >    people). If your own scripts read result columns by position rather than by name, add `--log10P FALSE --nEff FALSE`.
 > 5. **Step 2 checks your masks before it runs**: a label that is not in the group file (a typo, or the old label names on the
 >    new files) is refused, and so is a FlexRV mask that leaves out variants carrying a score. The message lists what the file has.
-> 6. **The Sigma check** ([step 5](#step-5-the-sigma-check-once-per-grm-before-step-1)) asks whether the matrix step 2
+> 6. **The Sigma check** ([step 0a](#step-0a-the-sigma-check-once-per-grm-before-step-1)) asks whether the matrix step 2
 >    solves against, the GRM thinned at your relatedness cutoff, is positive definite. In All of Us the admixed amr cohort's
 >    was not: ~90 % of what its GRM kept at 0.125 was shared ancestry rather than family, and a burden test on it printed
 >    p 1e-73 where ~1e-3 was right. That GRM was rebuilt from KING-robust kinship (`king_to_mtx.py`, the recipe under step 0)
@@ -84,11 +137,11 @@
 * [Input data (optional)](#input-data-optional)
 * [Usage](#usage)
   * [Step 0 (once per cohort/biobank)](#step-0-once-per-cohortbiobank)
+  * [Step 0a: the Sigma check (once per GRM, before step 1)](#step-0a-the-sigma-check-once-per-grm-before-step-1)
   * [Step 1 (once per phenotype)](#step-1-once-per-phenotype)
   * [Step 2 (once per chromosome per phenotype)](#step-2-once-per-chromosome-per-phenotype)
-  * [Step 4: FlexRV weights](#step-4-flexrv-weights-once-per-chromosome-per-weight-set)
-  * [Step 5: the Sigma check (once per GRM, before step 1)](#step-5-the-sigma-check-once-per-grm-before-step-1)
   * [Step 3](#step-3)
+  * [Step 4: FlexRV weights](#step-4-flexrv-weights-once-per-chromosome-per-weight-set)
 
 ## Overview
 
@@ -173,7 +226,7 @@ optional:
 genotypes with cohort-wide allele frequencies, so in an admixed cohort shared ancestry reads as relatedness: All of Us amr
 kept 23 million pairs at 0.05 (~644 relatives per sample) and, at the 0.125 it had to use, ~90 % of what it kept was still
 background while real second-degree relatives fell below the line. A GRM thinned like that is not positive definite
-(step 5 below says so), and step 2's variances on it are the thinning's artefact. The fix is the GRM, not the cutoff:
+(step 0a below says so), and step 2's variances on it are the thinning's artefact. The fix is the GRM, not the cutoff:
 estimate kinship with KING-robust, which is ancestry-aware by construction, and convert it to SAIGE's format:
 
 ```
@@ -187,7 +240,45 @@ python3 king_to_mtx.py compare --new <out_step0>_king.mtx --old <out_step0>_rela
 and then the pair counts at each cutoff: the difference is the background. Pass the `_king` files to steps 1, 2 and 3 as
 `--sparseGRM`/`--sparseGRMID`, at a cutoff of 0.125 (KING-robust is itself biased on pairs of differing ancestry at the
 third-degree band, so 0.05 on it can join tens of thousands of people into one indefinite component; All of Us amr: positive
-definite at 0.125, not at 0.05), and run step 5 on the first model. `king_to_mtx.py` needs numpy; `python3 king_to_mtx.py selftest` checks it.
+definite at 0.125, not at 0.05), and run step 0a on it. `king_to_mtx.py` needs numpy; `python3 king_to_mtx.py selftest` checks it.
+
+### Step 0a: the Sigma check (once per GRM, before step 1)
+
+```
+usage: 00a_sigma_check.sh
+```
+required:
+- `--sparseGRM`, `--sparseGRMID`: the GRM (step 0's, or the KING-robust one) and its sample IDs.
+
+optional:
+- `--relatednessCutoff` (default 0.05): the cutoff steps 1 and 2 use. The check describes the matrix step 2 will build, so pass the same value.
+- `--modelFile`: one step-1 model (`<out_step1>.rda`), to check that model's own Sigma (`tau1 I + tau2 K`, or the binary diagonal) instead of the GRM alone. A diagnosis of one fit; not needed for the submission.
+- `-o`,`--outputFile` (default `<sparseGRM>.sigma.tsv`, or `<modelFile without .rda>.sigma.tsv`): the report, `label key value` rows: the pairs kept at the cutoff, the family components evaluated and how many are indefinite, the smallest eigenvalue over the diagonal, and the `verdict` (with a model also `tau1`, `tau2`). The log is `<outputFile>.log`.
+- `--label`, `--maxDenseComponent` (default 2000: larger family blocks are judged by the Cholesky of the whole matrix alone), `-s`,`--isSingularity`, `--dryRun`, `--plantIndefinite` (the positive control: a planted indefinite block, which must be refused).
+
+Step 2's sparse-GRM variances are `g' Sigma^-1 g` with `Sigma = tau1 I + tau2 K`, `K` the GRM thinned to the cutoff, from a
+conjugate-gradient solve that checks only its residual. Thinning does not keep a matrix positive definite, and on an
+indefinite Sigma a test's variance can be negative (printed as p 1, BETA NA) or tiny (an inflated Z printed as valid: p 1e-73
+on an All of Us random-score control where ~1e-3 was right; saige-slim LEDGER #183). The check cuts the thinned GRM into
+families, eigendecomposes each block and hands the whole sparse matrix to a Cholesky once, in minutes and with nothing N x N
+formed. Three outcomes:
+- **`positive definite`** (exit 0): the thinned GRM is positive semidefinite, so Sigma is positive definite for every model
+  fitted on it, whatever its variance components. Nothing per phenotype.
+- **`GRM indefinite ... (pass --modelDir)`** (exit 3): a thinned GRM often has a slightly negative eigenvalue, and that is
+  harmless for a model whose `tau2 |lambda_min|` is below `tau1` (binary: below the 1/W diagonal, at least 4). The report
+  prints the bound (`tau2_over_tau1_bound_quantitative`, `tau2_bound_binary`). After step 1, run once more with
+  `--modelDir <directory of .rda models>`: every model is judged against the family blocks' eigenvalues in seconds (exact
+  for a quantitative model, Weyl's bound for a binary one), one `model_<name>` row each, exit 0 if all pass. (`bound
+  unknown`, also exit 3: the negative direction sits in a family block above `--maxDenseComponent`; raise it, or run
+  `--modelFile` per model, which decides by a Cholesky of that model's own Sigma.)
+- **`NOT positive definite`** (exit 2, a banner naming any refused model): the recommended fix is to rebuild the GRM
+  (step 0, the KING-robust recipe), refit, and check again; All of Us did that for amr. A biobank that cannot rebuild may
+  proceed: every step-2 run repairs a test whose GRM variance is not positive or below half the no-GRM value and names it
+  in `.sigmaGuard.txt`, which is how the amr p 1e-73 cell became 1.8e-4 before the rebuild, and the rebuilt amr run agreed
+  with it gene for gene (Spearman 0.996, 31 of 684k cells moved). What the guard leaves is the band just above its 0.5
+  line, about 1 % of sparse-GRM-band tests with Z inflated by up to 1.4 on the amr matrix. State which route you took.
+
+Submit the GRM's `.sigma.tsv` (and the `--modelDir` one, if it was needed) with the results.
 
 ### Step 1 (once per phenotype)
 
@@ -210,7 +301,7 @@ optional:
 - `--sampleIDs`: single-column file of sample IDs to restrict the fit to; leave the flag out to use every sample (an empty value is refused).
 - `--sampleIDCol` (default: IID): column containing the sample IDs in the phenotype file, which must match the sample IDs in the plink files.
 - `--relatednessCutoff` (default 0.05): the GRM is thinned to entries above it. It must equal steps 0, 2 and 3's.
-- `--sex` (`M` or `F`): for a sex-specific trait. SAIGE fits only the samples of that sex (`--FemaleOnly`/`--MaleOnly`, as All of Us did) and drops the rest; step 1 prints how many it keeps and drops. Leave every sex term (`sex`, `age_sex`, `age2_sex`) out of the covariates; a `sex` covariate is refused.
+- `--sex` (`M` or `F`): for a sex-specific trait. SAIGE fits only the samples of that sex (`--FemaleOnly`/`--MaleOnly`, as All of Us did) and drops the rest; step 1 prints how many it keeps and drops. Leave every sex term (`sex`, `age_sex`, `age2_sex`) out of the covariates: with `--sex`, any covariate with `sex` as a word in its name, in any case (`sex`, `Sex`, `age_sex`, `age2_sex`), is refused. A covariate that is not a sex term but has such a name must be renamed to be used in a sex-specific fit (`essex` or `sexual_partners` are not read as sex terms).
 - `--femaleCode`, `--maleCode` (default `0`, `1`: BRaVa's phenotype coding): the values of a numeric `sex` column. A column of `M` and `F` is read as such. SAIGE's own default, and the All of Us file, use 1 for female. Step 1 refuses a code the column does not hold, a code no sample with a phenotype has, and (binary) a split that puts every case in the sex being dropped; it warns loudly when the column holds other values, when (quantitative) more samples with a phenotype are dropped than kept, or when (binary) some cases are in the sex being dropped. Each of these is what flipped or mismatched codes look like. Where the genotype file has genetic sex (`.fam` column 5, or the `.psam` `SEX` column; PLINK fixes 1 = male, 2 = female), step 1 checks the phenotype file's sex against it: more than half disagreeing means the codes are flipped and is refused, more than 1% is warned loudly, and a genotype file without usable sex (e.g. converted from VCF) is warned loudly as unverifiable. The phenotype file's `sex` always decides who is fitted.
 - `--forceDenseGRM`: fit even when the sparse GRM has more than 100 relatives per sample on average, which is otherwise refused (see the note on refusals above); not recommended.
 - `--dryRun`: print the SAIGE command instead of running it.
@@ -234,7 +325,7 @@ optional:
   - `.spaPinned.txt` (binary traits): tests whose saddlepoint left out samples the null model holds near-certain (flip probability at or below 1e-8), or would have but for the budget (LEDGER #174).
   - `.stretchGate.txt` (binary traits, weighted cells): cells the variance ratio stretches far relative to the rest of their score; the most stretched report the exact convolution at the unstretched score in place of the saddlepoint (LEDGER #176). From image `928f95ad` it always has the same columns, so per-chromosome files stack under one header.
   - `.spaRegionNA.txt` (image `b5456dee`): burden cells whose variance-rescale saddlepoint did not converge or returned a non-finite value. Each takes the normal-approximation p instead, and the log ends with `Region saddlepoint NA: N ...`. Before this image a non-finite value killed the whole chromosome (saige-slim LEDGER #181).
-  - `.sigmaGuard.txt` (image `66b80710`): tests on the sparse-GRM band (rare cells and pseudo-markers) whose variance from the GRM solve was not positive, or below half the no-GRM variance of the same vector. They report the no-GRM variance instead (`reported = diagonal`), and the log ends with `Sigma variance: N test(s) ...; K flagged`. On a GRM whose Sigma is positive definite (step 5) this names a few cells per fleet at most, in the 0.4-0.5 band, nowhere near a hit; on an indefinite one it is where the p 1e-73 cells went (saige-slim LEDGER #183). Many rows, or any with `negative = TRUE`, means step 5 was skipped or failed: rebuild the GRM.
+  - `.sigmaGuard.txt` (image `66b80710`): tests on the sparse-GRM band (rare cells and pseudo-markers) whose variance from the GRM solve was not positive, or below half the no-GRM variance of the same vector. They report the no-GRM variance instead (`reported = diagonal`), and the log ends with `Sigma variance: N test(s) ...; K flagged`. On a GRM whose Sigma is positive definite (step 0a) this names a few cells per fleet at most, in the 0.4-0.5 band, nowhere near a hit; on an indefinite one it is where the p 1e-73 cells went (saige-slim LEDGER #183). Many rows, or any with `negative = TRUE`, means step 5 was skipped or failed: rebuild the GRM.
 - `-s`,`--isSingularity` (default: false).
 - `-g`,`--groupFile`: required for a group test. The annotation file.
 - `--annotations`: required for a group test. `':'` joins labels into one mask, `','` separates masks. For SAIGE-GENE+ on the October 2026 BRaVa group files use `pLoF,damaging_missense,pLoF:damaging_missense,pLoF:damaging_missense:spliceai2_gt040,synonymous,other_missense,pLoF:damaging_missense:spliceai2_gt040:other_missense:synonymous` (on older BRaVa files, whose labels differ: `pLoF,damaging_missense_or_protein_altering,other_missense_or_protein_altering,synonymous,pLoF:damaging_missense_or_protein_altering,pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering:synonymous`).
@@ -251,6 +342,33 @@ FlexRV (one run per weight set):
 - `--flexRVscore NAME`: run FlexRV on the group file's `score:NAME` line (the October 2026 BRaVa release ships `*.flexrv_AMPCT.txt.gz` and `*.flexrv_SCALLION.txt.gz` with it already; otherwise built by step 4 below). On the release files pass `--annotations pLoF:damaging_missense:other_missense:spliceai2_gt040`: the default mask below uses the older label names. Every region needs that line; a group file with none, or one per some regions only, is refused. One annotation mask (default `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`), one max MAF (`--flexRVmaxMAF`, default 0.001), burden statistic. The results file carries one row per transform set and the pooled `p_FlexRV` row (`Group == Cauchy`).
 - `--flexRVlofAnno` (default `pLoF`): the label(s) the `lof` transform keys on, the same labels the score line was built with.
 - `--flexRVpartialMask`: allow a mask that leaves out variants carrying a score > 0. Without it, step 2 refuses such a mask before SAIGE starts and names the labels left out: SAIGE drops variants whose label is outside the mask before it reads their scores, so a mask missing one label (for example a SpliceAI category that also holds missense variants) silently tests fewer variants under the same name. Pass it only for a deliberate subset.
+
+### Step 3
+
+```
+usage: 03_estimate_nGlmm.sh
+```
+required (at least one of the first two):
+- `--binaryPhenos`: space separated list of binary phenotypes.
+- `--contPhenos`: space separated list of continuous phenotypes.
+- `--phenoFile`: filename of the phenotype file.
+- `--sparseGRM`: filename of the sparseGRM .mtx file.
+- `--sparseGRMID`: filename of the sparseGRM ID file.
+
+Each is relative to the current working directory, or an absolute path under it or under a directory listed,
+colon-separated, in the `SAIGE_EXTRA_MOUNTS` environment variable (bound read-only).
+
+optional:
+- `--covarList`: comma separated covariate column names in `--phenoFile`.
+- `--relatednessCutoff` (default 0.05): the GRM is thinned to entries above it, as in steps 1 and 2; pass the value steps 0-2 used.
+  Until 2026-10, step 3 left `extractNglmm.R` at its own default, 0.125, whatever steps 0-2 used, so Nglmm from earlier
+  BRaVa runs describes a sparser GRM than the fit. Nglmm now follows the cutoff, which changes it slightly against those.
+- `-o`,`--outputFile` (default `neff.csv`): one `pheno,nglmm` row per phenotype; each phenotype's log is `<outputFile without .csv>.<pheno>.log`.
+- `-s`,`--isSingularity` (default: false), `--dryRun`.
+
+Nglmm is `1' K^-1 1` on the sparse GRM `K` over the phenotype's analysed samples (times `4 Pn (1 - Pn)` for a binary
+trait, `Pn` the case fraction): a function of the relatedness and the case fraction, not of the phenotype's heritability.
+A phenotype whose fit fails gets no row, and the script exits non-zero.
 
 ### Step 4: FlexRV weights (once per chromosome per weight set)
 
@@ -302,68 +420,3 @@ A second weight set goes through the same door: `--annoTable <BRaVa long-form ta
 for a score carried as a column of the annotation table, or `--am <table>` for a score in AlphaMissense's per-variant
 layout. One score line per file, so one file and one step-2 run per weight set. The tool behind it is
 `flexrv_score_from_alphamissense.py` (`--help`, and `--selftest` for its controls). `04_flexrv_groupfile.sh -h` lists the rest of its options (`--lofAnno`, `--missenseAnno`, `--dropAnno`, `--missing`, `--isoforms`, `--mane`, `--gtf`, `--nonMissense`, `--amScale`, `--provenance`). With `--scoreColumn`, `--nonMissense gene-mean` keeps exactly the variants the AlphaMissense percentile file keeps (the BRaVa scallion file is built this way from a percentile column).
-
-### Step 5: the Sigma check (once per GRM, before step 1)
-
-```
-usage: 05_sigma_check.sh
-```
-required:
-- `--sparseGRM`, `--sparseGRMID`: the GRM (step 0's, or the KING-robust one) and its sample IDs.
-
-optional:
-- `--relatednessCutoff` (default 0.05): the cutoff steps 1 and 2 use. The check describes the matrix step 2 will build, so pass the same value.
-- `--modelFile`: one step-1 model (`<out_step1>.rda`), to check that model's own Sigma (`tau1 I + tau2 K`, or the binary diagonal) instead of the GRM alone. A diagnosis of one fit; not needed for the submission.
-- `-o`,`--outputFile` (default `<sparseGRM>.sigma.tsv`, or `<modelFile without .rda>.sigma.tsv`): the report, `label key value` rows: the pairs kept at the cutoff, the family components evaluated and how many are indefinite, the smallest eigenvalue over the diagonal, and the `verdict` (with a model also `tau1`, `tau2`). The log is `<outputFile>.log`.
-- `--label`, `--maxDenseComponent` (default 2000: larger family blocks are judged by the Cholesky of the whole matrix alone), `-s`,`--isSingularity`, `--dryRun`, `--plantIndefinite` (the positive control: a planted indefinite block, which must be refused).
-
-Step 2's sparse-GRM variances are `g' Sigma^-1 g` with `Sigma = tau1 I + tau2 K`, `K` the GRM thinned to the cutoff, from a
-conjugate-gradient solve that checks only its residual. Thinning does not keep a matrix positive definite, and on an
-indefinite Sigma a test's variance can be negative (printed as p 1, BETA NA) or tiny (an inflated Z printed as valid: p 1e-73
-on an All of Us random-score control where ~1e-3 was right; saige-slim LEDGER #183). The check cuts the thinned GRM into
-families, eigendecomposes each block and hands the whole sparse matrix to a Cholesky once, in minutes and with nothing N x N
-formed. Three outcomes:
-- **`positive definite`** (exit 0): the thinned GRM is positive semidefinite, so Sigma is positive definite for every model
-  fitted on it, whatever its variance components. Nothing per phenotype.
-- **`GRM indefinite ... (pass --modelDir)`** (exit 3): a thinned GRM often has a slightly negative eigenvalue, and that is
-  harmless for a model whose `tau2 |lambda_min|` is below `tau1` (binary: below the 1/W diagonal, at least 4). The report
-  prints the bound (`tau2_over_tau1_bound_quantitative`, `tau2_bound_binary`). After step 1, run once more with
-  `--modelDir <directory of .rda models>`: every model is judged against the family blocks' eigenvalues in seconds (exact
-  for a quantitative model, Weyl's bound for a binary one), one `model_<name>` row each, exit 0 if all pass. (`bound
-  unknown`, also exit 3: the negative direction sits in a family block above `--maxDenseComponent`; raise it, or run
-  `--modelFile` per model, which decides by a Cholesky of that model's own Sigma.)
-- **`NOT positive definite`** (exit 2, a banner naming any refused model): the recommended fix is to rebuild the GRM
-  (step 0, the KING-robust recipe), refit, and check again; All of Us did that for amr. A biobank that cannot rebuild may
-  proceed: every step-2 run repairs a test whose GRM variance is not positive or below half the no-GRM value and names it
-  in `.sigmaGuard.txt`, which is how the amr p 1e-73 cell became 1.8e-4 before the rebuild, and the rebuilt amr run agreed
-  with it gene for gene (Spearman 0.996, 31 of 684k cells moved). What the guard leaves is the band just above its 0.5
-  line, about 1 % of sparse-GRM-band tests with Z inflated by up to 1.4 on the amr matrix. State which route you took.
-
-Submit the GRM's `.sigma.tsv` (and the `--modelDir` one, if it was needed) with the results.
-
-### Step 3
-
-```
-usage: 03_estimate_nGlmm.sh
-```
-required (at least one of the first two):
-- `--binaryPhenos`: space separated list of binary phenotypes.
-- `--contPhenos`: space separated list of continuous phenotypes.
-- `--phenoFile`: filename of the phenotype file.
-- `--sparseGRM`: filename of the sparseGRM .mtx file.
-- `--sparseGRMID`: filename of the sparseGRM ID file.
-
-Each is relative to the current working directory, or an absolute path under it or under a directory listed,
-colon-separated, in the `SAIGE_EXTRA_MOUNTS` environment variable (bound read-only).
-
-optional:
-- `--covarList`: comma separated covariate column names in `--phenoFile`.
-- `--relatednessCutoff` (default 0.05): the GRM is thinned to entries above it, as in steps 1 and 2; pass the value steps 0-2 used.
-  Until 2026-10, step 3 left `extractNglmm.R` at its own default, 0.125, whatever steps 0-2 used, so Nglmm from earlier
-  BRaVa runs describes a sparser GRM than the fit. Nglmm now follows the cutoff, which changes it slightly against those.
-- `-o`,`--outputFile` (default `neff.csv`): one `pheno,nglmm` row per phenotype; each phenotype's log is `<outputFile without .csv>.<pheno>.log`.
-- `-s`,`--isSingularity` (default: false), `--dryRun`.
-
-Nglmm is `1' K^-1 1` on the sparse GRM `K` over the phenotype's analysed samples (times `4 Pn (1 - Pn)` for a binary
-trait, `Pn` the case fraction): a function of the relatedness and the case fraction, not of the phenotype's heritability.
-A phenotype whose fit fails gets no row, and the script exits non-zero.

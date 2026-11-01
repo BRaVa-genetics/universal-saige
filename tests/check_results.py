@@ -171,6 +171,8 @@ for name, text in [
     ("s1_sex_numeric_ok", "--FemaleOnly=TRUE --sexCol=sex --FemaleCode=0"),
     ("s1_sex_flipped_code", "no sample with sex == 1 has a non-missing Q_female"),
     ("s1_refuse_sex_covar", "'sex' is also a covariate"),
+    ("s1_refuse_sex_inter", "'sex' is also a covariate (age_sex, age2_sex)"),
+    ("s1_refuse_sex_categ", "'sex' is also a covariate (Sex)"),
     ("s0_refuse_vcf", "geneticDataFormat must be in {plink,pgen}"),
     ("s0_refuse_no_out", "--outputPrefix is required"),
     ("s0_refuse_bad_relcut", "--relatednessCutoff must be a number between 0 and 1"),
@@ -598,7 +600,7 @@ def nglmm_direct(trait, binary):
     return total
 
 
-# ------------------------------------------------------------ step 5 (the Sigma check)
+# ------------------------------------------------------------ step 0a (the Sigma check)
 def sigma_report(path):
     rows = {}
     if os.path.exists(path):

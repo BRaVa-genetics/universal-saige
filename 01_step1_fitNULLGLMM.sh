@@ -157,7 +157,9 @@ while [[ $# -gt 0 ]]; do
     --relatednessCutoff (default: 0.05): the GRM is thinned to entries above it. MUST equal steps 0, 2 and 3's
       (All of Us: 0.05, and 0.125 for amr); nothing in SAIGE checks it.
     --sex ('M' or 'F'): for a sex-specific trait. SAIGE fits only the samples whose 'sex' column holds that sex's code
-      (--FemaleOnly/--MaleOnly, as All of Us did) and drops the rest. Leave every sex term out of the covariates.
+      (--FemaleOnly/--MaleOnly, as All of Us did) and drops the rest. Leave every sex term out of the covariates:
+      with --sex, any covariate with 'sex' as a word in its name (sex, Sex, age_sex, age2_sex) is refused, so a
+      covariate that is not a sex term but has such a name must be renamed.
     --femaleCode, --maleCode (default 0, 1: BRaVa's phenotype coding): the values of the 'sex' column for each sex, when it
       is numeric; a column of M and F is read as such. SAIGE's own default, and the All of Us file, use 1 for female.
     --dryRun: print the SAIGE command instead of running it.
@@ -234,8 +236,21 @@ if [[ ${SEX:-} != "" ]]; then
     echo "--sex must be M or F"
     exit 1
   fi
-  if [[ ,${COVARCOLLIST},${CATEGCOVARCOLLIST}, == *,sex,* ]]; then
-    echo "--sex ${SEX}: 'sex' is also a covariate; leave every sex term (sex, age_sex, age2_sex) out of a sex-specific fit"
+  # Within one sex, every sex term is constant (sex) or zero or a copy of another covariate
+  # (age_sex = 0 for one sex, = age for the other). SAIGE drops such columns itself, with a
+  # "multi collinearity" warning, and the results are unchanged (measured, both traits), so
+  # this is not about correctness: a sex term in a sex-specific fit means the run was not set
+  # up as intended, and saying so here is clearer than a warning deep in the log. Any covariate
+  # with "sex" as a word in its name, in any case (sex, Sex, age_sex, age2_sex, sex_age), is
+  # taken to be one; "essex" or "sexual" are not.
+  sex_terms=""
+  for name in $(tr ',' ' ' <<< "${COVARCOLLIST},${CATEGCOVARCOLLIST}"); do
+    lc=$(tr '[:upper:]' '[:lower:]' <<< "${name}")
+    if [[ ${lc} =~ (^|[^a-z])sex([^a-z]|$) ]]; then sex_terms="${sex_terms:+${sex_terms}, }${name}"; fi
+  done
+  if [[ ${sex_terms} != "" ]]; then
+    echo "--sex ${SEX}: 'sex' is also a covariate (${sex_terms}); leave every sex term (sex, age_sex, age2_sex) out of a sex-specific fit."
+    echo "  A covariate is read as a sex term when 'sex' is a word in its name. If one of these is not a sex term, rename the column."
     exit 1
   fi
   fs=' '   # awk's whitespace splitting, unless the file is tab-delimited (empty fields keep their place)

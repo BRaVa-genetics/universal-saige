@@ -126,6 +126,8 @@ run s1_sex_binary_both     ok   "${S1[@]}" --traitType binary --phenoCol B_pos -
 # the codes flipped (SAIGE's 1 = female against this file's 0): no female has a phenotype under that code
 run s1_sex_flipped_code    fail "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --femaleCode 1 --maleCode 0 --genotypePlink "${VR}" --dryRun
 run s1_refuse_sex_covar    fail "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList age,sex --genotypePlink "${VR}" --dryRun
+run s1_refuse_sex_inter    fail "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList age,age2,age_sex,age2_sex --genotypePlink "${VR}" --dryRun
+run s1_refuse_sex_categ    fail "${S1[@]}" --traitType quantitative --phenoCol Q_female --sex F --covarColList age --categCovarColList Sex --genotypePlink "${VR}" --dryRun
 run s0_refuse_vcf          fail bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat vcf \
   --geneticDataType genotype --outputPrefix "${OUT}/never" --generate_GRM
 run s0_refuse_no_out       fail bash 00_step0_VR_and_GRM.sh --isSingularity "${SING}" --geneticDataDirectory "${IN}/array" --geneticDataFormat plink \
@@ -183,10 +185,10 @@ run s1_sex_genetic_pgen    ok   "${S1[@]}" --traitType quantitative --phenoCol Q
 run s1_Q_null_female ok   "${S1[@]}" --traitType quantitative --phenoCol Q_null --sex F --covarColList "age,age2,PC1,PC2,PC3,PC4" --genotypePlink "${VR}" --outputPrefix "${OUT}/Q_null_female"
 run s1_Q_null_malesNA ok  "${S1[@]}" --traitType quantitative --phenoFile "${OUT}/pheno_qnull_malesNA.tsv" --phenoCol Q_null --covarColList "age,age2,PC1,PC2,PC3,PC4" --genotypePlink "${VR}" --outputPrefix "${OUT}/Q_null_malesNA"
 
-echo "== step 5 (the Sigma check, before step 2)"
+echo "== step 0a (the Sigma check, before step 2)"
 # the pedigree GRM at 0.05 is positive definite (first-degree pairs only, no background): both traits pass;
 # the planted indefinite block is the positive control and must be refused (exit 2); a missing model is refused
-S5=(bash 05_sigma_check.sh --isSingularity "${SING}" --sparseGRM "${GRM}" --sparseGRMID "${GRMID}")
+S5=(bash 00a_sigma_check.sh --isSingularity "${SING}" --sparseGRM "${GRM}" --sparseGRMID "${GRMID}")
 run s5_sigma_grm        ok   "${S5[@]}" --outputFile "${OUT}/grm.sigma.tsv"
 run s5_sigma_grm_0125   ok   "${S5[@]}" --relatednessCutoff 0.125 --outputFile "${OUT}/grm_0125.sigma.tsv"
 run s5_sigma_grm_planted fail "${S5[@]}" --outputFile "${OUT}/grm.sigma_planted.tsv" --plantIndefinite
@@ -196,7 +198,7 @@ run s5_sigma_Q_pos      ok   "${S5[@]}" --modelFile "${OUT}/Q_pos.rda" --outputF
 run s5_sigma_B_pos      ok   "${S5[@]}" --modelFile "${OUT}/B_pos.rda" --outputFile "${OUT}/B_pos.sigma.tsv"
 run s5_sigma_planted    fail "${S5[@]}" --modelFile "${OUT}/Q_pos.rda" --outputFile "${OUT}/Q_pos.sigma_planted.tsv" --plantIndefinite
 run s5_refuse_no_model  fail "${S5[@]}" --modelFile "${OUT}/no_such_model.rda"
-run s5_refuse_no_grm    fail bash 05_sigma_check.sh --isSingularity "${SING}" --sparseGRMID "${GRMID}"
+run s5_refuse_no_grm    fail bash 00a_sigma_check.sh --isSingularity "${SING}" --sparseGRMID "${GRMID}"
 run s5_dryrun           ok   "${S5[@]}" --dryRun
 
 echo "== step 4 (FlexRV group file)"
