@@ -121,10 +121,10 @@ This took 5 hours with 64 cores and 512 GB memory (for ~400K samples). Inspectin
 
 The last line step 0 prints is the GRM's density, e.g. `sparse GRM: 400000 samples, ... relatives per sample (built at --relatednessCutoff 0.05)`; a loud warning there means the cutoff should be raised before step 1.
 
-Before any step 1, the Sigma check on the GRM (step 5; minutes, once per cohort):
+Before any step 1, the Sigma check on the GRM (step 0a; minutes, once per cohort):
 
 ```
-bash 05_sigma_check.sh \
+bash 00a_sigma_check.sh \
     --sparseGRM out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```

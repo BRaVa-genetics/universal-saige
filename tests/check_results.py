@@ -598,7 +598,7 @@ def nglmm_direct(trait, binary):
     return total
 
 
-# ------------------------------------------------------------ step 5 (the Sigma check)
+# ------------------------------------------------------------ step 0a (the Sigma check)
 def sigma_report(path):
     rows = {}
     if os.path.exists(path):

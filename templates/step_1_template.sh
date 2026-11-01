@@ -107,7 +107,7 @@ bash 01_step1_fitNULLGLMM.sh \
 # the GRM from KING-robust kinship and refit; if you cannot, proceed and say
 # so -- the image repairs and names the affected tests in .sigmaGuard.txt).
 # Not needed when the step 0 run said 'positive definite'.
-bash 05_sigma_check.sh \
+bash 00a_sigma_check.sh \
     --sparseGRM ${GRM} \
     --sparseGRMID ${GRM_samples} \
     --relatednessCutoff ${relatedness_cutoff} \
