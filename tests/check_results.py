@@ -11,8 +11,10 @@ first run and derived from the simulation (N ~ 1,800 analysed):
     the relatedness correction, unweighted ~ 1/sqrt(2) of that (half the
     copies are null), so score weighting should win by >= 100x in p and must
     not once the scores are shuffled; the common variant
-    z ~ 0.25 * sqrt(2 * 0.3 * 0.7 * N) ~ 7. Pass bar p < 1e-6 (quantitative),
-    with the sign of the effect checked;
+    z ~ 0.25 * sqrt(2 * 0.3 * 0.7 * N) ~ 7 (measured: SE 0.038 on the IRNT scale,
+    z ~ 0.24 / 0.038 ~ 6.3). Pass bar p < 1e-6 for the genes (quantitative);
+    p < 1e-4 for the one prespecified common variant, with BETA within 3 SE of
+    0.25 / SD(Q_pos) (quantitative), and the sign of every effect checked;
   * negative controls: no null gene or variant below 1e-6 (about 1% chance
     over ~15k tests), lambda_GC of MAC >= 20 variants within 0.85-1.15, and
     GENE_BURDEN p > 1e-3 when the phenotype is permuted or has no effect;
@@ -135,6 +137,56 @@ for name in ("s2_B_pos_variant", "s2_B_pos_group", "s3_nglmm", "s2_Q_null_group"
         check("exit: " + name, False, "never ran", "exit 0")
 
 # ------------------------------------------------------------ refusal messages
+# The counts in the expected messages are recomputed from the run's own inputs, not
+# written in: step 1's --sex lines from pheno.tsv and the variance-ratio .fam (BRaVa's
+# 0 = female against PLINK's 2 = female; run_e2e.sh writes vr_partial.fam with every
+# 20th row flipped), step 0's density line by counting the GRM's off-diagonal entries,
+# where the driver reads the Matrix Market size line.
+with open(os.path.join(IN, "pheno.tsv")) as fh:
+    _h = fh.readline().rstrip("\n").split("\t")
+    PHENO = [dict(zip(_h, l.rstrip("\n").split("\t"))) for l in fh if l.strip()]
+
+
+def nonmissing(v):
+    return v not in ("", "NA")
+
+
+def sex_compared(fam):
+    """(compared, discordant) as step 1 counts them: phenotype rows whose IID has a genetic sex."""
+    if not os.path.exists(fam):
+        return -1, -1
+    gsex = {}
+    for l in open(fam):
+        f = l.split()
+        g = f[4] if len(f) > 4 else "0"
+        if g in ("1", "2"):
+            gsex[f[1]] = g
+    rows = [r for r in PHENO if r["IID"] in gsex and r["sex"] in ("0", "1")]
+    return len(rows), sum(1 for r in rows if ("2" if r["sex"] == "0" else "1") != gsex[r["IID"]])
+
+
+def grm_line(mtx):
+    """step 0's density line, from the GRM's entries one by one."""
+    if not os.path.exists(mtx):
+        return "(no %s)" % os.path.basename(mtx)
+    n, pairs = 0, 0
+    for l in open(mtx):
+        if l.startswith("%"):
+            continue
+        f = l.split()
+        if n == 0:
+            n = int(f[0])
+            continue
+        pairs += f[0] != f[1]
+    cut = mtx.split("_relatednessCutoff_")[1].split("_")[0]
+    return "%d samples, %d related pairs, %.1f relatives per sample (built at --relatednessCutoff %s)" % (
+        n, pairs, 2 * pairs / n, cut)
+
+
+n_kept_f = sum(1 for r in PHENO if nonmissing(r["Q_null"]) and r["sex"] == "0")
+n_dropped_f = sum(1 for r in PHENO if nonmissing(r["Q_null"]) and r["sex"] != "0")
+vr_n, _ = sex_compared(out("step0.plink_for_var_ratio.fam"))
+part_n, part_d = sex_compared(out("vr_partial.fam"))
 for name, text in [
     ("s2_refuse_vcf", "--vcf is not accepted"),
     ("s2_refuse_both_geno", "pass ONE of --pgen and --plink"),
@@ -159,15 +211,16 @@ for name, text in [
     ("s1_refuse_both_geno", "Pass ONE of --genotypePlink and --genotypePgen"),
     ("s1_sex_mf_ok", "--FemaleOnly=TRUE --sexCol=sex --FemaleCode=F"),
     ("s1_sex_mf_wrong", "no sample with sex == M has a non-missing Q_f"),
-    ("s1_sex_mixed", "More samples with a Q_null are of the sex being dropped (1013) than kept (897)"),
+    ("s1_sex_mixed", "More samples with a Q_null are of the sex being dropped (%d) than kept (%d)" % (n_dropped_f, n_kept_f)),
     ("s1_sex_code_absent", "is coded 0, which is not a value of the 'sex' column"),
     ("s1_sex_binary_flipped", "cases of B_f have sex == 0, the sex being dropped: the codes look flipped"),
     ("s1_sex_binary_both", "cases of B_pos have sex == 1, the sex being dropped"),
     ("s1_sex_genetic_flipped", "100.0% of samples disagree with their genetic sex"),
     ("s1_sex_genetic_unknown", "has no usable genetic sex (0 male, 0 female"),
-    ("s1_sex_genetic_partial", "94 of 1873 samples (5.0%) have a 'sex' that disagrees with their genetic sex"),
-    ("s1_sex_genetic_pgen", "plink_for_var_ratio.psam) agrees with the phenotype file's for 1873 of 1873 samples"),
-    ("s1_Q_female", "plink_for_var_ratio.fam) agrees with the phenotype file's for 1873 of 1873 samples"),
+    ("s1_sex_genetic_partial", "%d of %d samples (%.1f%%) have a 'sex' that disagrees with their genetic sex"
+     % (part_d, part_n, 100 * part_d / max(part_n, 1))),
+    ("s1_sex_genetic_pgen", "plink_for_var_ratio.psam) agrees with the phenotype file's for %d of %d samples" % (vr_n, vr_n)),
+    ("s1_Q_female", "plink_for_var_ratio.fam) agrees with the phenotype file's for %d of %d samples" % (vr_n, vr_n)),
     ("s1_sex_numeric_ok", "--FemaleOnly=TRUE --sexCol=sex --FemaleCode=0"),
     ("s1_sex_flipped_code", "no sample with sex == 1 has a non-missing Q_female"),
     ("s1_refuse_sex_covar", "'sex' is also a covariate"),
@@ -187,8 +240,8 @@ for name, text in [
     ("grm_relcut_mismatch", "built at --relatednessCutoff 0.05 and this step uses 0.125"),
     ("s1_refuse_dense", "REFUSED: the sparse GRM is too dense to fit"),
     ("s1_dense_override", "--forceDenseGRM: fitting on the dense GRM anyway"),
-    ("s0_plink", "1900 samples, 2267 related pairs, 2.4 relatives per sample (built at --relatednessCutoff 0.05)"),
-    ("s0_relcut_0125", "1900 samples, 2258 related pairs, 2.4 relatives per sample (built at --relatednessCutoff 0.125)"),
+    ("s0_plink", grm_line(out("step0_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx"))),
+    ("s0_relcut_0125", grm_line(out("step0_rc0125_relatednessCutoff_0.125_5000_randomMarkersUsed.sparseGRM.mtx"))),
     ("s1_Q_pos", "relatives per sample"),
 ]:
     if os.path.exists(out(name + ".skipped")):
@@ -393,10 +446,22 @@ def variant_checks(trait, positive):
             r = common_rows[0]
             p, beta = fnum(r["p.value"]), fnum(r["BETA"])
             sign = 1 if r["Allele2"] == C["alt"] else -1
-            bar = 1e-6 if trait.startswith("Q") else 1e-4
-            check("step2 %s variant: planted common variant" % trait, p < bar and sign * beta > 0,
-                  "p %s, BETA %.3f on %s (ALT %s)" % (fmt_p(p), beta, r["Allele2"], C["alt"]),
-                  "p < %g, effect on ALT > 0" % bar)
+            # One prespecified variant, so p < 1e-4 is a 1-in-10,000 null event; expected z
+            # 0.25 / SD(Q_pos) / SE ~ 0.24 / 0.038 ~ 6.3, so a working pipeline misses the bar
+            # ~1% of cohorts (p < 1e-6, z 4.9, missed ~8%: python3 3.11's cohort gave p 1.7e-6,
+            # z 4.8). Quantitative: BETA on the IRNT scale within 3 SE of 0.25 / SD(Q_pos),
+            # which a scale or sign error would leave and p alone would not see.
+            bar = 1e-4
+            ok = p < bar and sign * beta > 0
+            exp_note = ""
+            if trait.startswith("Q"):
+                y = [fnum(q[trait]) for q in PHENO if nonmissing(q[trait])]
+                b0, se = 0.25 / statistics.pstdev(y), fnum(r["SE"])
+                ok = ok and abs(sign * beta - b0) < 3 * se
+                exp_note = ", BETA within 3 SE of %.3f" % b0
+            check("step2 %s variant: planted common variant" % trait, ok,
+                  "p %s, BETA %.3f (SE %.3f) on %s (ALT %s)" % (fmt_p(p), beta, fnum(r.get("SE")), r["Allele2"], C["alt"]),
+                  "p < %g, effect on ALT > 0%s" % (bar, exp_note))
         else:
             check("step2 %s variant: planted common variant" % trait, False, "not in output", "present")
     else:
@@ -629,10 +694,19 @@ check("step5 GRM-only, planted: the tau bound is printed and tiny (K eigenvalue 
       fnum(rep.get("tau2_over_tau1_bound_quantitative", "nan")) < 0.01, rep.get("tau2_over_tau1_bound_quantitative", "none"), "< 0.01")
 section("s5_sigma_grm_planted_models")
 rep = sigma_report(out("grm.sigma_planted_models.tsv"))
-check("step5 GRM-only, planted block + --modelDir: every e2e model refused",
+# A model with tau2 = 0 has Sigma = tau1 I, positive definite on any GRM, so it must pass:
+# a permuted trait can fit tau2 = 0 (Q_perm did on the cohort python3 3.11 simulated).
+models = {k[len("model_"):]: v for k, v in rep.items() if k.startswith("model_")}
+tau2 = {m: fnum(v.split(" tau2 ")[1].split()[0]) if " tau2 " in v else float("nan") for m, v in models.items()}
+wrong = [m for m, v in models.items() if v.endswith("NOT positive definite") != (tau2[m] > 0)]
+check("step5 GRM-only, planted block + --modelDir: every e2e model with tau2 > 0 refused, any with tau2 = 0 passed",
       rep.get("verdict") == "Sigma is NOT positive definite for some model in --modelDir"
-      and rep.get("models_checked") == rep.get("models_not_positive_definite") and rep.get("models_checked", "0") != "0",
-      "%s of %s refused" % (rep.get("models_not_positive_definite"), rep.get("models_checked")), "all")
+      and any(t > 0 for t in tau2.values()) and not wrong
+      and str(len(models)) == rep.get("models_checked") == str(sum(t > 0 for t in tau2.values()) + sum(t == 0 for t in tau2.values()))
+      and rep.get("models_not_positive_definite") == str(sum(t > 0 for t in tau2.values())),
+      "%s of %s refused (tau2 = 0: %s); wrong: %s" % (rep.get("models_not_positive_definite"), rep.get("models_checked"),
+                                                      ", ".join(m for m in tau2 if tau2[m] == 0) or "none", ", ".join(wrong) or "none"),
+      "every tau2 > 0 model refused, tau2 = 0 passed")
 check("step5 GRM-only, planted block + --modelDir: the driver refused (exit 2) and named a model",
       status.get("s5_sigma_grm_planted_models", ("", -1, 0))[1] == 2 and "model_Q_pos" in log("s5_sigma_grm_planted_models"),
       status.get("s5_sigma_grm_planted_models", ("", -1, 0))[1], "2, model_Q_pos in the banner")

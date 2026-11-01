@@ -56,10 +56,58 @@ BASES = "ACGT"
 
 
 def binomial(rng, n, p):
-    f = getattr(rng, "binomialvariate", None)     # Python >= 3.12
-    if f is not None:
-        return f(n, p)
-    return sum(1 for _ in range(n) if rng.random() < p)
+    """CPython 3.12-3.14's random.binomialvariate (Lib/random.py), copied so the cohort is the
+    same on every Python: before 2026-11 this used rng.binomialvariate where it existed and a
+    sum of n draws below 3.12, so python3 3.11 simulated a different cohort from the same seed
+    (the 2026-10-07 one is the 3.12+ draw; on 3.11's, 8 checks failed). Only the
+    rng.random() stream is used, as there."""
+    if p <= 0.0:
+        return 0
+    if p >= 1.0:
+        return n
+    if n == 1:
+        return int(rng.random() < p)
+    if p > 0.5:
+        return n - binomial(rng, n, 1.0 - p)
+    if n * p < 10.0:
+        # Devroye's geometric method
+        x = y = 0
+        c = math.log2(1.0 - p)
+        if not c:
+            return x
+        while True:
+            try:
+                y += math.floor(math.log2(rng.random()) / c) + 1
+            except ValueError:
+                continue
+            if y > n:
+                return x
+            x += 1
+    # BTRS: Hormann's transformed rejection with squeeze
+    setup_complete = False
+    spq = math.sqrt(n * p * (1.0 - p))
+    b = 1.15 + 2.53 * spq
+    a = -0.0873 + 0.0248 * b + 0.01 * p
+    c = n * p + 0.5
+    vr = 0.92 - 4.2 / b
+    while True:
+        u = rng.random() - 0.5
+        us = 0.5 - math.fabs(u)
+        k = math.floor((2.0 * a / us + b) * u + c)
+        if k < 0 or k > n:
+            continue
+        v = rng.random()
+        if us >= 0.07 and v <= vr:
+            return k
+        if not setup_complete:
+            alpha = (2.83 + 5.1 / b) * spq
+            lpq = math.log(p / (1.0 - p))
+            m = math.floor((n + 1) * p)
+            h = math.lgamma(m + 1) + math.lgamma(n - m + 1)
+            setup_complete = True
+        v *= alpha / (a / (us * us) + b)
+        if math.log(v) <= h - math.lgamma(k + 1) - math.lgamma(n - k + 1) + (k - m) * lpq:
+            return k
 
 
 def simulate_variant(rng, maf):
