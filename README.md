@@ -24,14 +24,21 @@
 > - PhecodeX phenotypes, defined with [phecode_mapping](https://github.com/astheeggeggs/phecode_mapping): download the
 >   latest release bundle and follow its README with the default settings. Every column of the `phenotype_matrix` it
 >   writes clears 200 cases and 200 controls: run them all.
-> - **Sex-specific phenotypes are run in that sex only**: step 1's `--sex F` (or `M`), with `sex`, `age_sex` and
->   `age2_sex` left out of the covariates. For PhecodeX, the bundle's `release/phecode_info.csv` says which (its `sex`
->   column; phecode_mapping's README has [a snippet that lists them](https://github.com/astheeggeggs/phecode_mapping#which-phenotypes-are-sex-restricted)). Of the BRaVa pilot phenotypes, six are female-only: BenCervUterNeo, BreastCanc,
->   CervCanc, EFRMB, FemInf and MatHem.
+> - **Sex-specific phenotypes are run in that sex only** (see 4). For PhecodeX, the `sex` column of the bundle's
+>   `release/phecode_info.csv` says which: `Female`, `Male` or `Both` (phecode_mapping's README has
+>   [a snippet that lists the ones in your matrix](https://github.com/astheeggeggs/phecode_mapping#which-phenotypes-are-sex-restricted)).
+>   Of the BRaVa pilot phenotypes, six are female-only: BenCervUterNeo, BreastCanc, CervCanc, EFRMB, FemInf and MatHem.
 >   Submit only the single-sex results for these.
 >
-> **4. Covariates.** `age, age2, sex, age_sex, age2_sex` and PCs (the templates use 20; fewer is fine in a small cohort,
-> say how many).
+> **4. Covariates.** PCs: the templates use 20; fewer is fine in a small cohort, say how many.
+>
+> | phenotype | covariates | step 1 |
+> |---|---|---|
+> | both sexes (PhecodeX `Both`) | `age, age2, sex, age_sex, age2_sex`, PCs | as in the template |
+> | one sex (PhecodeX `Female` / `Male`, the six above) | `age, age2`, PCs: no sex terms | add `--sex F` / `--sex M` |
+>
+> Within one sex, `sex` is constant and `age_sex`/`age2_sex` are either zero or copies of `age`/`age2`. With `--sex`, step 1
+> refuses a `sex` covariate, but it does not check the interactions: leave those out yourself.
 >
 > **5. The steps, in the order they run.**
 >
