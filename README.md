@@ -70,9 +70,10 @@
 >
 > **7. Admixed cohorts.** If step 0's GRM is too dense to fit, or step 0a says `NOT positive definite`, rebuild it from
 > KING-robust kinship (under [step 0](#step-0-once-per-cohortbiobank)) at 0.125 and check again, as All of Us did for its
-> admixed cohort. If you cannot, carry on: the image repairs the affected tests and names them in `.sigmaGuard.txt`. A full
-> (dense) GRM is acceptable too, one method per cohort for every phenotype and run, but means calling SAIGE outside these
-> scripts: contact us first.
+> admixed cohort. If step 0a still refuses the KING matrix, rebuild it with PC-Relate ([recipe under step 0](#pc-relate))
+> before considering a dense GRM. If you cannot rebuild, carry on: the image repairs the affected tests and names them
+> in `.sigmaGuard.txt`. A full (dense) GRM is acceptable too, one method per cohort for every phenotype and run, but
+> means calling SAIGE outside these scripts: contact us first.
 >
 > **8. Send back**, to `gs://brava-meta-upload-<biobank>/BRaVa_Nov26_runs/` (the bucket your group files are in):
 > - **everything step 2 writes**, all five runs: the results `<prefix>.txt`, run 1's `.singleAssoc.txt`, and every
@@ -242,7 +243,7 @@ and then the pair counts at each cutoff: the difference is the background. Pass 
 third-degree band, so 0.05 on it can join tens of thousands of people into one indefinite component; All of Us amr: positive
 definite at 0.125, not at 0.05), and run step 0a on it. `king_to_mtx.py` needs numpy; `python3 king_to_mtx.py selftest` checks it.
 
-**If step 0a still says NOT on the KING matrix at 0.125, the next rung is PC-Relate, not a dense GRM.** PC-Relate (Conomos
+<a id="pc-relate"></a>**If step 0a still says NOT on the KING matrix at 0.125, the next rung is PC-Relate, not a dense GRM.** PC-Relate (Conomos
 et al. 2016) estimates kinship conditional on the PCs, which removes KING-robust's bias on pairs of differing ancestry.
 `pcrelate_to_mtx.py` computes it natively (numpy, blocked matrix products, no Spark, no GPU) and writes SAIGE's `.mtx`
 directly; it reads `--bed` or `--pgen` (the latter through the Pgenlib python package, `pip install Pgenlib`). GENESIS's
