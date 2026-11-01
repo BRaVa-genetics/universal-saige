@@ -20,15 +20,14 @@
 > [variant-annotation](https://github.com/BRaVa-genetics/variant-annotation).
 >
 > **3. Phenotypes.**
-> - The BRaVa phenotypes, as before.
+> - The 44 BRaVa pilot phenotypes, as before.
 > - PhecodeX phenotypes, defined with [phecode_mapping](https://github.com/astheeggeggs/phecode_mapping): download the
 >   latest release bundle and follow its README with the default settings. Every column of the `phenotype_matrix` it
 >   writes clears 200 cases and 200 controls: run them all.
 > - **Sex-specific phenotypes are run in that sex only**: step 1's `--sex F` (or `M`), with `sex`, `age_sex` and
 >   `age2_sex` left out of the covariates. For PhecodeX, the bundle's `release/phecode_info.csv` says which: its `sex`
->   column is `Female`, `Male` or `Both`. For the BRaVa phenotypes, female: Adenomy, BenCervUterNeo, BreastCanc,
->   CervCanc, EFRMB, Endometr, FemInf, FemInfAC, MatHem, MatHypDis, OvCanc, PCOS, PlacInsuf, Preeclamps, PregLoss,
->   UterCanc; male: MalInf.
+>   column is `Female`, `Male` or `Both`. Of the BRaVa pilot phenotypes, six are female-only: BenCervUterNeo, BreastCanc,
+>   CervCanc, EFRMB, FemInf and MatHem.
 >   Submit only the single-sex results for these.
 >
 > **4. Covariates.** `age, age2, sex, age_sex, age2_sex` and PCs (the templates use 20; fewer is fine in a small cohort,
