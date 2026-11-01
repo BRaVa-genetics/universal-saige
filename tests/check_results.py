@@ -679,18 +679,18 @@ def sigma_report(path):
 for name, path in (("s5_sigma_grm", "grm.sigma.tsv"), ("s5_sigma_grm_0125", "grm_0125.sigma.tsv")):
     section(name)
     rep = sigma_report(out(path))
-    check("step5 %s: the pedigree GRM thinned at the cutoff is positive semidefinite (no model)" % name,
+    check("step0a %s: the pedigree GRM thinned at the cutoff is positive semidefinite (no model)" % name,
           rep.get("verdict") == "positive definite", rep.get("verdict", "no report"), "positive definite")
-    check("step5 %s: the report says it ran on the GRM alone" % name, rep.get("mode", "").startswith("grmOnly"),
+    check("step0a %s: the report says it ran on the GRM alone" % name, rep.get("mode", "").startswith("grmOnly"),
           rep.get("mode", "no mode row"), "grmOnly")
 section("s5_sigma_grm_planted")
 rep = sigma_report(out("grm.sigma_planted.tsv"))
-check("step5 GRM-only, planted indefinite block, no models: reported indefinite within a tau bound",
+check("step0a GRM-only, planted indefinite block, no models: reported indefinite within a tau bound",
       rep.get("verdict", "").startswith("GRM indefinite: positive definite for every model within the tau bound"),
       rep.get("verdict", "no report"), "GRM indefinite ... (pass --modelDir)")
-check("step5 GRM-only, planted indefinite block, no models: the driver asks for --modelDir (exit 3)",
+check("step0a GRM-only, planted indefinite block, no models: the driver asks for --modelDir (exit 3)",
       status.get("s5_sigma_grm_planted", ("", -1, 0))[1] == 3, status.get("s5_sigma_grm_planted", ("", -1, 0))[1], "3")
-check("step5 GRM-only, planted: the tau bound is printed and tiny (K eigenvalue -172)",
+check("step0a GRM-only, planted: the tau bound is printed and tiny (K eigenvalue -172)",
       fnum(rep.get("tau2_over_tau1_bound_quantitative", "nan")) < 0.01, rep.get("tau2_over_tau1_bound_quantitative", "none"), "< 0.01")
 section("s5_sigma_grm_planted_models")
 rep = sigma_report(out("grm.sigma_planted_models.tsv"))
@@ -699,7 +699,7 @@ rep = sigma_report(out("grm.sigma_planted_models.tsv"))
 models = {k[len("model_"):]: v for k, v in rep.items() if k.startswith("model_")}
 tau2 = {m: fnum(v.split(" tau2 ")[1].split()[0]) if " tau2 " in v else float("nan") for m, v in models.items()}
 wrong = [m for m, v in models.items() if v.endswith("NOT positive definite") != (tau2[m] > 0)]
-check("step5 GRM-only, planted block + --modelDir: every e2e model with tau2 > 0 refused, any with tau2 = 0 passed",
+check("step0a GRM-only, planted block + --modelDir: every e2e model with tau2 > 0 refused, any with tau2 = 0 passed",
       rep.get("verdict") == "Sigma is NOT positive definite for some model in --modelDir"
       and any(t > 0 for t in tau2.values()) and not wrong
       and str(len(models)) == rep.get("models_checked") == str(sum(t > 0 for t in tau2.values()) + sum(t == 0 for t in tau2.values()))
@@ -707,36 +707,36 @@ check("step5 GRM-only, planted block + --modelDir: every e2e model with tau2 > 0
       "%s of %s refused (tau2 = 0: %s); wrong: %s" % (rep.get("models_not_positive_definite"), rep.get("models_checked"),
                                                       ", ".join(m for m in tau2 if tau2[m] == 0) or "none", ", ".join(wrong) or "none"),
       "every tau2 > 0 model refused, tau2 = 0 passed")
-check("step5 GRM-only, planted block + --modelDir: the driver refused (exit 2) and named a model",
+check("step0a GRM-only, planted block + --modelDir: the driver refused (exit 2) and named a model",
       status.get("s5_sigma_grm_planted_models", ("", -1, 0))[1] == 2 and "model_Q_pos" in log("s5_sigma_grm_planted_models"),
       status.get("s5_sigma_grm_planted_models", ("", -1, 0))[1], "2, model_Q_pos in the banner")
 section("s5_sigma_grm_models")
 rep = sigma_report(out("grm.sigma_models.tsv"))
-check("step5 GRM-only + --modelDir on the pedigree GRM: positive definite, models not needed",
+check("step0a GRM-only + --modelDir on the pedigree GRM: positive definite, models not needed",
       rep.get("verdict") == "positive definite" and "models_checked" not in rep, rep.get("verdict", "no report"), "positive definite")
 section("s5_refuse_no_grm")
-check("step5: no --sparseGRM is refused before the container starts", "are required" in log("s5_refuse_no_grm"),
+check("step0a: no --sparseGRM is refused before the container starts", "are required" in log("s5_refuse_no_grm"),
       "", "message printed")
 for trait in ("Q_pos", "B_pos"):
     section("s5_sigma_" + trait)
     rep = sigma_report(out(trait + ".sigma.tsv"))
-    check("step5 %s: Sigma on the pedigree GRM is positive definite" % trait, rep.get("verdict") == "positive definite",
+    check("step0a %s: Sigma on the pedigree GRM is positive definite" % trait, rep.get("verdict") == "positive definite",
           rep.get("verdict", "no report"), "positive definite")
-    check("step5 %s: no indefinite family component" % trait, rep.get("components_indefinite") == "0",
+    check("step0a %s: no indefinite family component" % trait, rep.get("components_indefinite") == "0",
           rep.get("components_indefinite", "no report"), "0")
     ok_tau = rep.get("tau2") not in (None, "") and fnum(rep.get("tau2")) > 0
-    check("step5 %s: the model carries a random effect (tau2 > 0), so the check was not vacuous" % trait, ok_tau,
+    check("step0a %s: the model carries a random effect (tau2 > 0), so the check was not vacuous" % trait, ok_tau,
           rep.get("tau2", "no report"), "> 0")
 section("s5_sigma_planted")
 rep = sigma_report(out("Q_pos.sigma_planted.tsv"))
-check("step5 planted indefinite block: reported NOT positive definite", rep.get("verdict") == "Sigma is NOT positive definite",
+check("step0a planted indefinite block: reported NOT positive definite", rep.get("verdict") == "Sigma is NOT positive definite",
       rep.get("verdict", "no report"), "Sigma is NOT positive definite")
-check("step5 planted indefinite block: the driver refused it (exit 2)", status.get("s5_sigma_planted", ("", -1, 0))[1] == 2,
+check("step0a planted indefinite block: the driver refused it (exit 2)", status.get("s5_sigma_planted", ("", -1, 0))[1] == 2,
       status.get("s5_sigma_planted", ("", -1, 0))[1], "2")
-check("step5 planted indefinite block: the banner names the GRM as the fix",
+check("step0a planted indefinite block: the banner names the GRM as the fix",
       "rebuild the grm" in log("s5_sigma_planted").lower(), "", "banner printed")
 section("s5_refuse_no_model")
-check("step5: a missing model is refused before the container starts", "not found or empty" in log("s5_refuse_no_model"),
+check("step0a: a missing model is refused before the container starts", "not found or empty" in log("s5_refuse_no_model"),
       "", "message printed")
 # the step-2 guard (image 66b80710+) runs on every group test and must flag nothing on the positive-definite GRM
 for run_name in ("s2_Q_pos_group", "s2_B_pos_group", "s2_Q_pos_flexrv"):
