@@ -194,6 +194,13 @@ run s5_sigma_grm_0125   ok   "${S5[@]}" --relatednessCutoff 0.125 --outputFile "
 run s5_sigma_grm_planted fail "${S5[@]}" --outputFile "${OUT}/grm.sigma_planted.tsv" --plantIndefinite
 run s5_sigma_grm_planted_models fail "${S5[@]}" --outputFile "${OUT}/grm.sigma_planted_models.tsv" --plantIndefinite --modelDir "${OUT}"
 run s5_sigma_grm_models  ok   "${S5[@]}" --outputFile "${OUT}/grm.sigma_models.tsv" --modelDir "${OUT}"
+# LEDGER #184: a family component above --maxDenseComponent is NOT evaluated. With the planted star of 4
+# above a cap of 3 the Cholesky fails and no evaluated block explains it: the verdict must be 'bound unknown'
+# naming the skipped components (exit 3), never a bound from the other blocks; and with --modelDir no model
+# is judged. Unplanted at the same cap the Cholesky succeeds, which is complete on its own: still exit 0.
+run s5_sigma_grm_planted_cap fail "${S5[@]}" --outputFile "${OUT}/grm.sigma_planted_cap.tsv" --plantIndefinite --maxDenseComponent 3
+run s5_sigma_grm_planted_cap_models fail "${S5[@]}" --outputFile "${OUT}/grm.sigma_planted_cap_models.tsv" --plantIndefinite --maxDenseComponent 3 --modelDir "${OUT}"
+run s5_sigma_grm_cap     ok   "${S5[@]}" --outputFile "${OUT}/grm.sigma_cap.tsv" --maxDenseComponent 3
 run s5_sigma_Q_pos      ok   "${S5[@]}" --modelFile "${OUT}/Q_pos.rda" --outputFile "${OUT}/Q_pos.sigma.tsv"
 run s5_sigma_B_pos      ok   "${S5[@]}" --modelFile "${OUT}/B_pos.rda" --outputFile "${OUT}/B_pos.sigma.tsv"
 run s5_sigma_planted    fail "${S5[@]}" --modelFile "${OUT}/Q_pos.rda" --outputFile "${OUT}/Q_pos.sigma_planted.tsv" --plantIndefinite
