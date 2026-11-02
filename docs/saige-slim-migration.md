@@ -160,7 +160,9 @@ checks; it also passes on a SLURM cluster under Apptainer.
   the log10 columns; added after FlexRV height hits in All of Us rested on fewer than five effective
   carriers. Step 2 also writes per-variant results only on SAIGE-GENE+ runs by default (`--singleInGroup`,
   FALSE for FlexRV), as the All of Us runs did from 2026-10-08.
-- **Image `1.5.2-dev-df5dd875`** (2026-11-02, replacing `10fe4c84`): LEDGER #184, the Sigma check alone. With
+- **Image `1.5.2-dev-913d9ee9`** (2026-11-02, replacing `10fe4c84`): LEDGER #184, the Sigma check, and LEDGER #185,
+  step 0 only: the kinship refine is pair-major and the genotype read is parallel over markers, 5-9x faster with
+  byte-identical output (an earlier `df5dd875` build carrying #184 alone was never published). #184: with
   `--grmOnly` the check skipped family components above `--maxDenseComponent` (then 2000) and, when the Cholesky
   failed and a small evaluated block was slightly indefinite, printed a tau bound from the evaluated blocks and
   `within the tau bound`; on All of Us amr the skipped 10,003-sample component held the negative eigenvalue

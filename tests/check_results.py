@@ -692,6 +692,8 @@ check("step0a GRM-only, planted indefinite block, no models: the driver asks for
       status.get("s5_sigma_grm_planted", ("", -1, 0))[1] == 3, status.get("s5_sigma_grm_planted", ("", -1, 0))[1], "3")
 check("step0a GRM-only, planted: the tau bound is printed and tiny (K eigenvalue -172)",
       fnum(rep.get("tau2_over_tau1_bound_quantitative", "nan")) < 0.01, rep.get("tau2_over_tau1_bound_quantitative", "none"), "< 0.01")
+check("step0a GRM-only, planted: the bound (< 1) is triaged as 'rebuild the GRM now, before step 1'",
+      "rebuild the grm now" in log("s5_sigma_grm_planted").lower(), "", "triage line printed")
 section("s5_sigma_grm_planted_models")
 rep = sigma_report(out("grm.sigma_planted_models.tsv"))
 # A model with tau2 = 0 has Sigma = tau1 I, positive definite on any GRM, so it must pass:

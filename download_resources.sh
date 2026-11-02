@@ -14,8 +14,11 @@
 set -euo pipefail
 
 SAIGE_IMAGE="${SAIGE_IMAGE:-astheeggeggs/saige-slim}"        # Docker Hub namespace/repository
-SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-df5dd875}"          # the tag; pin it, and record it with your results
-# df5dd875 (built 2026-11-02): aou_sigma_pd_check.R (00a_sigma_check.sh) no longer states a tau bound or a
+SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-913d9ee9}"          # the tag; pin it, and record it with your results
+# 913d9ee9 (built 2026-11-02; Docker Hub digest sha256:ca3e3eb661fa): df5dd875 plus saige-slim LEDGER #185, step 0 only --
+# the kinship refine is pair-major and the genotype read parallel, 5-9x faster with byte-identical output
+# (All of Us eur dense pool: 4,199 s expected to become ~450). df5dd875 itself was never published.
+# df5dd875 (commit 2026-11-02): aou_sigma_pd_check.R (00a_sigma_check.sh) no longer states a tau bound or a
 # positive-definite verdict while a family component above --maxDenseComponent was skipped (saige-slim
 # LEDGER #184: on All of Us amr the 10,003-sample component held the negative eigenvalue while the small
 # blocks printed a bound of 1e15); such a run now reads "bound unknown" naming the skipped components, the

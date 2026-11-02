@@ -11,7 +11,7 @@
 > column names, and pick one of the options in `{braces}`.
 >
 > **1. Set up.** `bash download_resources.sh --saige-image --plink2` (add `--singularity` on a cluster). The image is
-> `1.5.2-dev-df5dd875`: record the tag with your results.
+> `1.5.2-dev-913d9ee9`: record the tag with your results.
 >
 > **2. Group files.** In your BRaVa bucket, `gs://brava-meta-upload-<biobank>/brava_groupfiles_2026-10_flexrvpct/`, with a
 > `README.md` and a `MANIFEST.md5` to check the download against. Use `biobank_ids/` if your genotype files use the variant IDs
@@ -88,9 +88,10 @@
 
 > [!NOTE]
 > **What's in the October 2026 release, in full**
-> 1. **SAIGE image `1.5.2-dev-df5dd875`** (`10fe4c84` plus one fix to the Sigma check, 2026-11-02: a family component
+> 1. **SAIGE image `1.5.2-dev-913d9ee9`** (`10fe4c84` plus one fix to the Sigma check, 2026-11-02: a family component
 >    above `--maxDenseComponent` left unevaluated no longer lets the run state a tau bound from the other blocks; it reads
->    `bound unknown` and names what it skipped, saige-slim LEDGER #184). Every step-2 run now compares each sparse-GRM variance against the no-GRM
+>    `bound unknown` and names what it skipped, saige-slim LEDGER #184; and a 5-9x faster step 0 with byte-identical
+>    output, LEDGER #185). Every step-2 run now compares each sparse-GRM variance against the no-GRM
 >    variance of the same test and, when the GRM's value is not positive or below half of it, reports the no-GRM variance
 >    instead and names the test in `<prefix>.txt.sigmaGuard.txt` (saige-slim LEDGER #183). On a GRM that passes the Sigma
 >    check this touches a few cells per cohort, nowhere near a hit; on one that fails it is where p 1e-73 cells went. The image
