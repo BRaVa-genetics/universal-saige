@@ -160,6 +160,14 @@ checks; it also passes on a SLURM cluster under Apptainer.
   the log10 columns; added after FlexRV height hits in All of Us rested on fewer than five effective
   carriers. Step 2 also writes per-variant results only on SAIGE-GENE+ runs by default (`--singleInGroup`,
   FALSE for FlexRV), as the All of Us runs did from 2026-10-08.
+- **Image `1.5.2-dev-df5dd875`** (2026-11-02, replacing `10fe4c84`): LEDGER #184, the Sigma check alone. With
+  `--grmOnly` the check skipped family components above `--maxDenseComponent` (then 2000) and, when the Cholesky
+  failed and a small evaluated block was slightly indefinite, printed a tau bound from the evaluated blocks and
+  `within the tau bound`; on All of Us amr the skipped 10,003-sample component held the negative eigenvalue
+  (-19.9, bound 0.05) behind a printed bound of 1e15. Now such a run reads `bound unknown`, names the skipped
+  components and samples, writes no bound and judges no `--modelDir` model; a successful Cholesky stays complete
+  on its own; the default cap is 12000 and each dense block above 1,000 samples logs its memory first. Nothing in
+  steps 1 to 3 changed.
 - **Image `1.5.2-dev-10fe4c84`** (2026-10-29, replacing `49178058`): LEDGER #183. On the sparse-GRM band a
   thinned GRM's Sigma can be indefinite, and a converged solve then returns a negative or tiny variance (an
   All of Us amr random-score cell printed p 1e-73 one step before the p 1 / BETA NA collapse). Every step-2 run

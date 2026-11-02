@@ -14,7 +14,12 @@
 set -euo pipefail
 
 SAIGE_IMAGE="${SAIGE_IMAGE:-astheeggeggs/saige-slim}"        # Docker Hub namespace/repository
-SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-10fe4c84}"          # the tag; pin it, and record it with your results
+SAIGE_VERSION="${SAIGE_VERSION:-1.5.2-dev-df5dd875}"          # the tag; pin it, and record it with your results
+# df5dd875 (built 2026-11-02): aou_sigma_pd_check.R (00a_sigma_check.sh) no longer states a tau bound or a
+# positive-definite verdict while a family component above --maxDenseComponent was skipped (saige-slim
+# LEDGER #184: on All of Us amr the 10,003-sample component held the negative eigenvalue while the small
+# blocks printed a bound of 1e15); such a run now reads "bound unknown" naming the skipped components, the
+# default cap is 12000, and the report carries components_not_evaluated / samples_not_evaluated.
 # 49178058 (built 2026-10-16; Docker Hub digest sha256:f9a25a16f0c7560c99036a41647c4892e4ae5378d8c940b23a6c6b6e412a4336):
 # b5456dee plus SAIGE's --is_output_nEff -- nEff_Burden, the effective number of carriers behind each cell's burden
 # test (Kish), which step 2 writes by default (--nEff), for the meta-analysis to flag FlexRV hits resting on a few people.

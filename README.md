@@ -11,7 +11,7 @@
 > column names, and pick one of the options in `{braces}`.
 >
 > **1. Set up.** `bash download_resources.sh --saige-image --plink2` (add `--singularity` on a cluster). The image is
-> `1.5.2-dev-10fe4c84`: record the tag with your results.
+> `1.5.2-dev-df5dd875`: record the tag with your results.
 >
 > **2. Group files.** In your BRaVa bucket, `gs://brava-meta-upload-<biobank>/brava_groupfiles_2026-10_flexrvpct/`, with a
 > `README.md` and a `MANIFEST.md5` to check the download against. Use `biobank_ids/` if your genotype files use the variant IDs
@@ -88,7 +88,9 @@
 
 > [!NOTE]
 > **What's in the October 2026 release, in full**
-> 1. **SAIGE image `1.5.2-dev-10fe4c84`.** Every step-2 run now compares each sparse-GRM variance against the no-GRM
+> 1. **SAIGE image `1.5.2-dev-df5dd875`** (`10fe4c84` plus one fix to the Sigma check, 2026-11-02: a family component
+>    above `--maxDenseComponent` left unevaluated no longer lets the run state a tau bound from the other blocks; it reads
+>    `bound unknown` and names what it skipped, saige-slim LEDGER #184). Every step-2 run now compares each sparse-GRM variance against the no-GRM
 >    variance of the same test and, when the GRM's value is not positive or below half of it, reports the no-GRM variance
 >    instead and names the test in `<prefix>.txt.sigmaGuard.txt` (saige-slim LEDGER #183). On a GRM that passes the Sigma
 >    check this touches a few cells per cohort, nowhere near a hit; on one that fails it is where p 1e-73 cells went. The image
@@ -278,7 +280,7 @@ optional:
 - `--relatednessCutoff` (default 0.05): the cutoff steps 1 and 2 use. The check describes the matrix step 2 will build, so pass the same value.
 - `--modelFile`: one step-1 model (`<out_step1>.rda`), to check that model's own Sigma (`tau1 I + tau2 K`, or the binary diagonal) instead of the GRM alone. A diagnosis of one fit; not needed for the submission.
 - `-o`,`--outputFile` (default `<sparseGRM>.sigma.tsv`, or `<modelFile without .rda>.sigma.tsv`): the report, `label key value` rows: the pairs kept at the cutoff, the family components evaluated and how many are indefinite, the smallest eigenvalue over the diagonal, and the `verdict` (with a model also `tau1`, `tau2`). The log is `<outputFile>.log`.
-- `--label`, `--maxDenseComponent` (default 2000: larger family blocks are judged by the Cholesky of the whole matrix alone), `-s`,`--isSingularity`, `--dryRun`, `--plantIndefinite` (the positive control: a planted indefinite block, which must be refused).
+- `--label`, `--maxDenseComponent` (default 12000: a larger family block is NOT evaluated -- see `bound unknown` below), `-s`,`--isSingularity`, `--dryRun`, `--plantIndefinite` (the positive control: a planted indefinite block, which must be refused).
 
 Step 2's sparse-GRM variances are `g' Sigma^-1 g` with `Sigma = tau1 I + tau2 K`, `K` the GRM thinned to the cutoff, from a
 conjugate-gradient solve that checks only its residual. Thinning does not keep a matrix positive definite, and on an
@@ -293,8 +295,27 @@ formed. Three outcomes:
   prints the bound (`tau2_over_tau1_bound_quantitative`, `tau2_bound_binary`). After step 1, run once more with
   `--modelDir <directory of .rda models>`: every model is judged against the family blocks' eigenvalues in seconds (exact
   for a quantitative model, Weyl's bound for a binary one), one `model_<name>` row each, exit 0 if all pass. (`bound
-  unknown`, also exit 3: the negative direction sits in a family block above `--maxDenseComponent`; raise it, or run
-  `--modelFile` per model, which decides by a Cholesky of that model's own Sigma.)
+  unknown`, also exit 3: a family component above `--maxDenseComponent` was not evaluated, so no bound is stated and no
+  model is judged -- a bound from the evaluated blocks alone describes part of the matrix, and on All of Us amr the
+  skipped 10,003-sample component was the one holding the negative eigenvalue (saige-slim LEDGER #184); the report
+  names the skipped components and samples. Raise the cap to cover them (a dense eigendecomposition, n^2 x 8 bytes,
+  ~3 min at 10,000 samples), or run `--modelFile` per model, which decides by a Cholesky of that model's own Sigma. A
+  successful Cholesky of the whole matrix is complete on its own, so `positive definite` can be reached with a
+  component skipped.)
+
+  **How large a bound is enough.** A quantitative fit has roughly `tau2/tau1 ~ h2 / (1 - h2)` for the variance relatives
+  share, so the most heritable trait sets the worst case, and on a sparse GRM with few relatives tau2 is noisy as well.
+  Two All of Us Height fits (CDR v8) mark the scale: eur, `tau2/tau1` 5.1 against a bound of 6.9, positive definite; amr
+  on its 0.125-thinned GRM, 0.42 against about 0.45, NOT. The driver reads the bound and says which case you are in:
+
+  | `tau2_over_tau1_bound_quantitative` | what to do |
+  |---|---|
+  | below 1 | rebuild the GRM now (KING-robust), before step 1: a moderately heritable trait will not fit under it |
+  | 1 to 10 | fit Height and a few binary traits first, run `--modelDir` on those, and go on if they pass |
+  | 10 or more | fit as usual; `--modelDir` after step 1 confirms |
+
+  The cut points are those two cases with about a 2x margin each way, a heuristic; `--modelDir` is the verdict. Binary
+  models have more room (`tau2_bound_binary` is four times the quantitative bound, and larger still for rare traits).
 - **`NOT positive definite`** (exit 2, a banner naming any refused model): the recommended fix is to rebuild the GRM
   (step 0: the KING-robust recipe, then PC-Relate if KING's matrix is also refused), refit, and check again; All of Us did
   that for amr with KING. A biobank that cannot rebuild may
