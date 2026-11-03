@@ -454,7 +454,9 @@ else
   # beyond the floor in the pooled row)
   GROUP_ARGS="--groupFile=${GROUPFILE} --annotation_in_groupTest=${ANNOTATIONS} --is_output_markerList_in_groupTest=TRUE --is_single_in_groupTest=${SINGLE_IN_GROUP} --is_output_log10P=${LOG10P} --is_output_nEff=${NEFF}"
   if [[ ${FLEXRV_SCORE} != "" ]]; then
-    GROUP_ARGS="${GROUP_ARGS} --maxMAF_in_groupTest=${FLEXRV_MAXMAF} --flexRV_score=${FLEXRV_SCORE} --flexRV_maxMAF=${FLEXRV_MAXMAF} --flexRV_lofAnno=${FLEXRV_LOFANNO} --r.corr=1"
+    # --flexRV_maxMAF is the run's one max MAF: SAIGE sets maxMAF_in_groupTest from it when that flag
+    # is absent, and refuses a different one (step2_SPAtests.R, SAIGE_Test_main.R), so it is not passed
+    GROUP_ARGS="${GROUP_ARGS} --flexRV_score=${FLEXRV_SCORE} --flexRV_maxMAF=${FLEXRV_MAXMAF} --flexRV_lofAnno=${FLEXRV_LOFANNO} --r.corr=1"
   else
     GROUP_ARGS="${GROUP_ARGS} --maxMAF_in_groupTest=0.0001,0.001,0.01"
   fi
