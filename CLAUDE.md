@@ -42,10 +42,10 @@ Pipeline and hand-offs (outputs of one step are flags of the next):
 | `01_step1_fitNULLGLMM.sh` | `step1_fitNULLGLMM.R` | `<out>.rda`, `<out>.varianceRatio.txt` |
 | `02_step2_SPAtests_variant_and_gene.sh` | `step2_SPAtests.R`, one chromosome | `<out>.txt` (+ `.singleAssoc.txt`, `.markerList.txt`, sidecars for group tests) |
 | `03_estimate_nGlmm.sh` | `extractNglmm.R`, once per phenotype | `neff.csv` (`--outputFile`), where Nglmm = 1ᵀK⁻¹1 on the GRM (× 4Pn(1−Pn) for binary traits) |
-| `04_flexrv_groupfile.sh` | host `python3` wrapper around `flexrv_score_from_alphamissense.py` (stdlib only) | group file with a `score:NAME` line per gene |
+| `flexrv_groupfile.sh` | host `python3` wrapper around `flexrv_score_from_alphamissense.py` (stdlib only) | group file with a `score:NAME` line per gene |
 | `00a_sigma_check.sh` | `aou_sigma_pd_check.R --grmOnly`, once per GRM and cutoff, after step 0 and BEFORE any step 1 (`--modelFile` for one model's own Sigma) | `<GRM>.mtx.sigma.tsv` (`--outputFile`): is the GRM thinned at the cutoff positive semidefinite, so that every model's Sigma is positive definite? Exit 2 and a banner when it is not |
 
-Step numbering is not execution order: step 4 builds the FlexRV group file that step 2 `--flexRVscore NAME` then reads; step 0a (the Sigma check) runs between step 0 and step 1.
+Step numbering is not execution order: step 0a (the Sigma check) runs between step 0 and step 1. `flexrv_groupfile.sh` has no number and is not in the README: it builds the FlexRV group file step 2 `--flexRVscore NAME` reads, which the BRaVa release ships ready-made, so analysts never run it (it builds the release, and the e2e's FlexRV file).
 
 ## Invariants that are easy to break
 

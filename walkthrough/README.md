@@ -231,7 +231,7 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
     --sparseGRMID out/walkthrough_relatednessCutoff_0.05_5000_randomMarkersUsed.sparseGRM.mtx.sampleIDs.txt
 ```
 FlexRV on the same chromosome, once the AlphaMissense weights have been added to the group file
-(`bash download_resources.sh --alphamissense`, then `bash 04_flexrv_groupfile.sh --group in/ukb_brava_annotations.txt --chr 11 --name AM --out in/ukb_brava_annotations.flexrv_AM.txt`):
+(`bash download_resources.sh --alphamissense`, then `bash flexrv_groupfile.sh --group in/ukb_brava_annotations.txt --chr 11 --name AM --out in/ukb_brava_annotations.flexrv_AM.txt`):
 ```
 bash 02_step2_SPAtests_variant_and_gene.sh \
     --chr chr11 \
@@ -248,8 +248,8 @@ The pooled FlexRV p per gene is the `Group == Cauchy` row's `Pvalue_Burden`; the
 This example writes raw AlphaMissense scores, because this older group file comes without its annotation table. The
 October 2026 BRaVa release ships FlexRV files on the FlexRV paper's scale instead -- `*.flexrv_AMPCT.txt.gz` (AlphaMissense,
 `--flexRVscore AMPCT`) and `*.flexrv_SCALLION.txt.gz` (`--flexRVscore SCALLION`), each missense score the variant's
-percentile among all possible missense variants of its gene -- built with `04_flexrv_groupfile.sh ... --annoTable <long
-table> --amScale percentile --nonMissense gene-mean` ([README, step 4](../README.md#step-4-flexrv-weights-once-per-chromosome-per-weight-set)).
+percentile among all possible missense variants of its gene -- built with `flexrv_groupfile.sh ... --annoTable <long
+table> --amScale percentile --nonMissense gene-mean` (`flexrv_groupfile.sh -h`).
 Group-test results also carry log10 p-value columns (`log10_Pvalue`, `log10_Pvalue_Burden`, ...) right after `SE_Burden`; they stay exact far below the smallest p a double can print, where `Pvalue` reads 0. After them comes `nEff_Burden`, the effective number of carriers behind each burden test: a FlexRV hit with a small value (below about 10) rests on a few people. `--log10P FALSE --nEff FALSE` leaves them out. A FlexRV run writes no per-variant file by default (`--singleInGroup TRUE` to have one); the SAIGE-GENE+ run above writes them.
 This uses the default mask, `pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering`. If your group file has other labels whose variants carry scores (`--annotations` to change the mask), step 2 refuses a mask that leaves one out and names it; `--flexRVpartialMask` lets a deliberate subset through.
 

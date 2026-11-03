@@ -116,7 +116,7 @@ fi
 
 if [[ ${GET_AM} = true ]]; then
   # canonical transcripts (~600 MB); --isoforms adds the non-canonical complement (~1.2 GB),
-  # which the release marks as less evaluated -- only 04_flexrv_groupfile.sh --isoforms uses it
+  # which the release marks as less evaluated -- only flexrv_groupfile.sh --isoforms uses it
   wget -nc "${AM_RECORD}/AlphaMissense_hg38.tsv.gz" -P resources/
   [[ ${GET_ISO} = true ]] && wget -nc "${AM_RECORD}/AlphaMissense_isoforms_hg38.tsv.gz" -P resources/
   # protein-level scores and GENCODE v39 proteins: AlphaMissense rows for paralog copies it does not score

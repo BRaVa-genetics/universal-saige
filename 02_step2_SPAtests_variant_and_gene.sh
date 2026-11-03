@@ -209,7 +209,7 @@ while [[ $# -gt 0 ]]; do
     --dryRun: print the SAIGE command instead of running it.
   FlexRV (Schwartzentruber et al. 2025; a group test, burden statistic, 16 score x up to 12 MAF transforms per gene):
     --flexRVscore NAME: run FlexRV on the group file's 'score:NAME' line, which every region must have, or the run is
-      refused (see 04_flexrv_groupfile.sh). Implies --testType group,
+      refused (see flexrv_groupfile.sh). Implies --testType group,
       ONE annotation mask (default 'pLoF:damaging_missense_or_protein_altering:other_missense_or_protein_altering', the older
       BRaVa labels; on the October 2026 files pass --annotations pLoF:damaging_missense:other_missense:spliceai2_gt040),
       ONE max MAF (--flexRVmaxMAF, default 0.001) and r.corr = 1.
@@ -358,19 +358,19 @@ if [[ ${TESTTYPE} == "group" ]]; then
     exit 1
   fi
   # FlexRV reads its weights from a score:<NAME> line, which every region needs
-  # (one value per variant on its var line; 04_flexrv_groupfile.sh writes them).
+  # (one value per variant on its var line; flexrv_groupfile.sh writes them).
   # The AoU step-2 wrapper refuses a file that lacks them before any compute.
   if [[ ${FLEXRV_SCORE} != "" ]]; then
     read -r nvar nscore <<< "$(echo "${labels}" | sed -n 3p)"
     if (( nscore != nvar )); then
       echo "ERROR: --flexRVscore ${FLEXRV_SCORE} needs one 'score:${FLEXRV_SCORE}' line per region; ${GROUPFILE}"
-      echo "  has ${nscore} for ${nvar} region(s). Build the file with 04_flexrv_groupfile.sh --name ${FLEXRV_SCORE}, or pass the"
+      echo "  has ${nscore} for ${nvar} region(s). Build the file with flexrv_groupfile.sh --name ${FLEXRV_SCORE}, or pass the"
       echo "  name of the score line the file does carry."
       exit 1
     fi
     # The mask must hold every variant the score line weights: SAIGE drops markers matching no requested
     # label before reading any score, so a mask that omits a scored label tests fewer variants under the
-    # same name, silently. Scores > 0 mark the variants meant to be tested (04_flexrv_groupfile.sh writes
+    # same name, silently. Scores > 0 mark the variants meant to be tested (flexrv_groupfile.sh writes
     # --other, default 0, for the rest). Found in the BRaVa 2026-10 rebuild: missense variants labelled with
     # the SpliceAI category carried AlphaMissense scores the mask pLoF:damaging_missense:other_missense
     # never reached. The score line follows its region's anno line.

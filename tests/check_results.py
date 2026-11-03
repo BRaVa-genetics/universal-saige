@@ -381,7 +381,7 @@ check("step2 gate: B_rare model (fitted with gates off) refused on load", want i
       next((l.strip() for l in s2_gate.splitlines() if "below --minCaseCount" in l), "no gate message")[:90],
       repr(want))
 
-# ------------------------------------------------------------ step 4
+# ------------------------------------------------------------ FlexRV group file (flexrv_groupfile.sh)
 section("s4_flexrv")
 fg = out("group.chr7.flexrv_AM.txt")
 if os.path.exists(fg):
@@ -393,11 +393,11 @@ if os.path.exists(fg):
             order_ok &= lines[k - 1][1] == "anno" and lines[k - 1][0] == parts[0]
         genes.setdefault(parts[0], {})[parts[1]] = parts[2:]
     n_score = sum(1 for g in genes.values() if "score:AM" in g)
-    check("step4: every gene has a score:AM line after anno", n_score == T["n_genes"] and order_ok,
+    check("flexrv_groupfile: every gene has a score:AM line after anno", n_score == T["n_genes"] and order_ok,
           "%d genes, order %s" % (n_score, "ok" if order_ok else "WRONG"), T["n_genes"])
     lens_ok = all(len(g["score:AM"]) == len(g["var"]) for g in genes.values() if "score:AM" in g)
     vals = [fnum(v) for g in genes.values() for v in g.get("score:AM", [])]
-    check("step4: one score per variant, all in [0, 1]", lens_ok and all(0 <= v <= 1 for v in vals),
+    check("flexrv_groupfile: one score per variant, all in [0, 1]", lens_ok and all(0 <= v <= 1 for v in vals),
           "lengths %s, range %.3g-%.3g" % ("ok" if lens_ok else "WRONG", min(vals), max(vals)), "")
 
     def scores(gene, ids):
@@ -408,11 +408,11 @@ if os.path.exists(fg):
     b = scores("GENE_BURDEN", T["variants"]["GENE_BURDEN_pLoF"])
     fc = scores("GENE_FLEX", T["variants"]["GENE_FLEX_causal"])
     fn = scores("GENE_FLEX", T["variants"]["GENE_FLEX_null"])
-    check("step4: pLoF = 1; planted missense > 0.85; null missense < 0.3",
+    check("flexrv_groupfile: pLoF = 1; planted missense > 0.85; null missense < 0.3",
           b and all(v == 1 for v in b) and fc and min(fc) > 0.85 and fn and max(fn) < 0.3,
           "pLoF %s; causal min %.3f; null max %.3f" % (sorted(set(b)), min(fc), max(fn)), "")
 else:
-    check("step4: FlexRV group file", False, "missing", "present")
+    check("flexrv_groupfile: FlexRV group file", False, "missing", "present")
 
 # ------------------------------------------------------------ step 2
 N = T["expected_n"]
