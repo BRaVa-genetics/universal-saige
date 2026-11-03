@@ -266,7 +266,9 @@ every planted class recovered, unrelated pairs at zero within and across populat
 misreading the cross-population pairs (so the correction is shown to do the work), a permutation null, and the PGEN
 arm when plink2 and Pgenlib are present. It is reconciled pair for pair against GENESIS (max difference 7e-4;
 `pcrelate_genesis_recon.R`). At 80k samples and 100k markers expect a few hours on a 32-core machine
-(`--memory-gb` sizes the sample tile; 16 GB is four passes over the genotypes). Then steps 1 to 3 on the `_pcrelate` files
+(`--memory-gb` is the peak memory bar the genotype block, ~2 GB at 80k samples, and sets the sample tile: 16 GB is four
+passes over the genotypes, 32 GB two; an earlier build peaked at 2.5-3x the budget and was OOM-killed on All of Us amr at
+96k samples, fixed 2026-11-02). Then steps 1 to 3 on the `_pcrelate` files
 exactly as on the `_king` ones. Only if PC-Relate's matrix also fails step 0a is a dense GRM worth its cost.
 
 ### Step 0a: the Sigma check (once per GRM, before step 1)
