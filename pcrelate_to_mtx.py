@@ -41,7 +41,14 @@ king_to_mtx.py convert (off-diagonal = 2 x kinship, symmetric coordinate, lower 
 
 Memory at N samples: two float32 accumulators of block_samples x N, sized by default to
 --memory-gb (16 GB at N = 80k gives a tile of 25k, 4 passes), plus the marker block
-(N x block_markers x 4 B x 3). The genotypes are decoded and prepared once per sample tile, so
+(N x block_markers x 4 B x 3) and a ~64 MB row-chunk buffer; the products, the pair
+extraction and the inbreeding sums all walk in small row chunks (64 / 32 / 32 MB) and add
+nothing tile-sized, so the accumulators are the peak (measured on 12k x 2k at a 1.15 GB
+budget: 1.39 GB, against 2.56 before any of this), and only the lower triangle of each
+tile's square part is computed (the diagonal blocks through BLAS syrk) (2026-11-02: the extraction used to add four tile-sized arrays and a
+whole-tile GEMM a fifth, and the AoU amr run was OOM-killed at --memory-gb 64 on 128 GB). The
+row-chunked GEMM is not bit-identical to a whole-tile one on OpenBLAS (probed), a float32 ULP
+drift of the kind the sample tile already causes; the selftest's blocking check bounds it. The genotypes are decoded and prepared once per sample tile, so
 a larger budget means fewer passes. Flops 4 N^2 M: at N = 80k, M = 100k that is ~2.6e15, tens of
 minutes on a 32-core BLAS. --threads sets OPENBLAS/OMP/MKL_NUM_THREADS before numpy loads; do
 NOT source harness/env.sh first (it pins one thread for the goldens).
@@ -211,7 +218,7 @@ def open_genotypes(a):
 # ----------------------------------------------------------------------------- estimator
 
 def pcrelate_blocks(get_block, n_markers, X, train, cutoff, maf=0.01, block_markers=2048,
-                    block_samples=4096, log=print, keep_all=False):
+                    block_samples=4096, log=print, keep_all=False, extract_bytes=32e6, gemm_bytes=64e6):
     """PC-Relate over markers delivered by get_block(start, count) -> int8 (count x N).
 
     X: N x (k+1) design (intercept + PCs), train: bool mask of the regression samples.
@@ -259,7 +266,8 @@ def pcrelate_blocks(get_block, n_markers, X, train, cutoff, maf=0.01, block_mark
         R -= 2 * mu
         R[~valid] = 0
         A = mu * (1 - mu)
-        np.sqrt(A, out=A)
+        with np.errstate(invalid="ignore"):     # mu outside (0, 1) gives NaN here; the mask zeroes it next
+            np.sqrt(A, out=A)
         A[~valid] = 0
         return R, A, g, mu, valid, int(use.sum())
 
@@ -267,39 +275,102 @@ def pcrelate_blocks(get_block, n_markers, X, train, cutoff, maf=0.01, block_mark
     n_used_total = None
     tiles = list(range(0, N, block_samples))
     t0 = time.time()
+    # progress: a tile's cost is (its rows) x (columns from ts on) x markers, so the ETA weights
+    # the marker blocks by the tile's area rather than counting them; one line per ~5 % of the
+    # work and at least every 10 minutes, so a dsub log shows where a multi-hour job is
+    work_total = sum((min(ts + block_samples, N) - ts) * (N - ts) for ts in tiles) * n_markers
+    work_done, next_report, last_report_t = 0, 0.05, t0
     for ti, ts in enumerate(tiles):
         te = min(ts + block_samples, N)
         num = np.zeros((te - ts, N - ts), dtype=np.float32)   # tile rows x columns from ts on
         den = np.zeros((te - ts, N - ts), dtype=np.float32)
+        # The products land in a reused ~64 MB row-chunk buffer and are added from there, so the
+        # two accumulators ARE the peak (a whole-tile product was a third tile-sized array), and
+        # only the LOWER triangle of the tile's square part (columns ts..te) is computed: a row
+        # chunk's diagonal block is `X @ X.T` on one buffer, which numpy hands to BLAS syrk at
+        # half the flops, the blocks left of it and the rectangle (columns te..N) are gemm. A
+        # whole-tile product was syrk only when the tile was the whole remainder (one pass), and
+        # gemm over the full square otherwise, so this is the same flops on one pass and ~half
+        # on several; a row-chunked product is not bit-identical to the whole-tile one on
+        # OpenBLAS (probed on the host and the x86 image, 2026-11-02) -- the float32 ULP drift
+        # the sample tile itself already causes, bounded by the selftest's blocking check. The
+        # upper triangle of the square stays zero (num and den both, so it extracts as 0 and
+        # sits below any positive cutoff); keep_all mirrors it before extracting. At least 256
+        # rows a chunk so BLAS still runs at full efficiency.
+        sq = te - ts
+        gemm_rows = max(256, min(sq, int(gemm_bytes // (4 * (N - ts)))))
+        buf = np.empty((gemm_rows, N - ts), dtype=np.float32)
         n_used = 0
         for ms in range(0, n_markers, block_markers):
             mc = min(block_markers, n_markers - ms)
             R, A, g, mu, valid, used = prepared(ms, mc)
             n_used += used
-            num += R[ts:te] @ R[ts:].T
-            den += A[ts:te] @ A[ts:].T
+            for acc, Z in ((num, R), (den, A)):
+                for r0 in range(0, sq, gemm_rows):
+                    r1 = min(r0 + gemm_rows, sq)
+                    rows = Z[ts + r0:ts + r1]
+                    if r0 > 0:                                   # blocks left of the diagonal block
+                        np.matmul(rows, Z[ts:ts + r0].T, out=buf[:r1 - r0, :r0])
+                        acc[r0:r1, :r0] += buf[:r1 - r0, :r0]
+                    np.matmul(rows, rows.T, out=buf[:r1 - r0, r0:r1])   # the diagonal block: syrk
+                    acc[r0:r1, r0:r1] += buf[:r1 - r0, r0:r1]
+                    if te < N:                                   # the rectangle, columns te..N
+                        np.matmul(rows, Z[te:].T, out=buf[:r1 - r0, sq:])
+                        acc[r0:r1, sq:] += buf[:r1 - r0, sq:]
+            work_done += (te - ts) * (N - ts) * mc
+            frac, now = work_done / work_total, time.time()
+            if frac >= next_report or now - last_report_t >= 600:
+                el = now - t0
+                log(f"progress {100 * frac:5.1f} %: tile {ti + 1}/{len(tiles)}, markers {ms + mc}/{n_markers}, "
+                    f"elapsed {el:.0f}s, ETA {el / frac * (1 - frac):.0f}s")
+                next_report, last_report_t = (int(frac / 0.05) + 1) * 0.05, now
             if ti == 0:
-                # inbreeding: f_i = sum (g^2 - (1 + 2 mu) g + 2 mu^2) / sum 2 mu (1 - mu)
-                gm = np.where(valid, g, 0).astype(np.float64)
-                mm = np.where(valid, mu, 0).astype(np.float64)
-                f_num += (gm * gm - (1 + 2 * mm) * gm + 2 * mm * mm).sum(axis=1)
-                f_den += (2 * mm * (1 - mm)).sum(axis=1)
+                # inbreeding: f_i = sum (g^2 - (1 + 2 mu) g + 2 mu^2) / sum 2 mu (1 - mu), in row
+                # chunks (each row's sum is its own, so the chunking changes no bit -- probed on
+                # both OpenBLAS builds): over the whole block the float64 temporaries were ~5 x N x
+                # block_markers x 8 B, 8 GB at N 96k and the default block
+                f_rows = max(1, int(extract_bytes // (40 * mc)))
+                for a in range(0, N, f_rows):
+                    b = min(a + f_rows, N)
+                    gm = np.where(valid[a:b], g[a:b], 0).astype(np.float64)
+                    mm = np.where(valid[a:b], mu[a:b], 0).astype(np.float64)
+                    f_num[a:b] += (gm * gm - (1 + 2 * mm) * gm + 2 * mm * mm).sum(axis=1)
+                    f_den[a:b] += (2 * mm * (1 - mm)).sum(axis=1)
+                del gm, mm
         if n_used_total is None:
             n_used_total = n_used
-        with np.errstate(divide="ignore", invalid="ignore"):
-            kin = np.where(den > 0, num / (4 * den), 0)
-        grm = 2 * kin
-        # lower triangle only: row i (global ts + r) against column j (global ts + c), i > j
-        rows, cols = np.nonzero(grm >= cutoff) if not keep_all else np.nonzero(np.ones_like(grm, dtype=bool))
-        for r, c in zip(rows.tolist(), cols.tolist()):
-            i, j = ts + r, ts + c
-            if i == j:
-                continue
-            if i < j:
-                i, j = j, i
-            if (i, j) in pairs:
-                continue
-            pairs[(i, j)] = float(grm[r, c])
+        if keep_all or cutoff <= 0:
+            # mirror the lower triangle of the square part into the upper, in row chunks
+            for r0 in range(0, sq, gemm_rows):
+                r1 = min(r0 + gemm_rows, sq)
+                for acc in (num, den):
+                    acc[:r0, r0:r1] = acc[r0:r1, :r0].T
+        # Extraction in row chunks of ~32 MB: done over the whole tile it allocated four more
+        # tile-sized float32 temporaries (4 * den, the quotient, the where() result, 2 * kin) on
+        # top of the two accumulators, a peak of ~2x --memory-gb, which OOM-killed the AoU amr
+        # run (N 96,117, --memory-gb 64 on 128 GB) at the end of its first tile; a chunk costs
+        # ~2.25x its size at peak (mask, quotient, where() result), measured, hence 32 MB. The arithmetic
+        # per element is unchanged (the power-of-two scalings are exact in float32), so the pairs
+        # and their values are bit-identical to the whole-tile extraction, in the same order.
+        chunk_rows = max(1, int(extract_bytes // (4 * (N - ts))))
+        for r0 in range(0, te - ts, chunk_rows):
+            r1 = min(r0 + chunk_rows, te - ts)
+            d = den[r0:r1]
+            with np.errstate(divide="ignore", invalid="ignore"):
+                grm = np.where(d > 0, num[r0:r1] / (4 * d), 0)
+            grm *= 2
+            # lower triangle only: row i (global ts + r) against column j (global ts + c), i > j
+            rows, cols = np.nonzero(grm >= cutoff) if not keep_all else np.nonzero(np.ones_like(grm, dtype=bool))
+            for r, c in zip(rows.tolist(), cols.tolist()):
+                i, j = ts + r0 + r, ts + c
+                if i == j:
+                    continue
+                if i < j:
+                    i, j = j, i
+                if (i, j) in pairs:
+                    continue
+                pairs[(i, j)] = float(grm[r, c])
+            del grm
         log(f"tile {ti + 1}/{len(tiles)}: samples {ts}..{te - 1}, pairs kept so far {len(pairs)}, "
             f"{time.time() - t0:.0f}s")
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -363,9 +434,12 @@ def run(a):
         return bed.block(start, count)[:, keep_arr]
 
     if a.block_samples is None:
+        # the two accumulators are the only tile-sized arrays (the GEMMs land in a row-chunk
+        # buffer, the extraction and the inbreeding sums walk in row chunks), so the budget IS
+        # their size; before 2026-11-02 the extraction added four more and OOM-killed the AoU amr run
         a.block_samples = int(max(256, min(N, a.memory_gb * 1e9 / (8.0 * N))))
     print(f"sample tile {a.block_samples} ({-(-N // a.block_samples)} pass(es) over the genotypes, "
-          f"accumulators {8.0 * a.block_samples * N / 1e9:.1f} GB)")
+          f"accumulators {8.0 * a.block_samples * N / 1e9:.1f} GB, the peak bar the marker block)")
     print(f"samples: {N} of {len(fam)} in the {'.psam' if a.pgen else '.fam'} have PCs; regression set {int(train.sum())}"
           + (f" ({missing} --unrelated IDs not in the data)" if missing else "")
           + f"; PCs {X.shape[1] - 1}; markers {M}", flush=True)
@@ -694,7 +768,8 @@ def main():
     r.add_argument("--block-samples", type=int, default=None,
                    help="sample tile; default: the largest that keeps the two accumulators within --memory-gb")
     r.add_argument("--memory-gb", type=float, default=16.0,
-                   help="budget for the two float32 accumulators (2 x tile x N x 4 B) [%(default)s]")
+                   help="budget for the two float32 accumulators (2 x tile x N x 4 B), which are the peak "
+                        "bar the marker block and the kept pairs [%(default)s]")
     r.add_argument("--threads", type=int, default=os.cpu_count() or 1)
     r.add_argument("--mask", type=int, default=20)
     s = sub.add_parser("selftest")

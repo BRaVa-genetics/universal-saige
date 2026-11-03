@@ -32,6 +32,9 @@ change: no code path moves.
 Usage:
   king_to_mtx.py convert --king king.kin0 --samples ids.txt --out amr_king [--cutoff 0.05]
   king_to_mtx.py compare --new amr_king.mtx --old old.sparseGRM.mtx --report cmp.tsv [--mask 20]
+  king_to_mtx.py plot --new X.mtx --old Y.mtx --out fig [--old-label 'step-0 GRM' --new-label KING-robust]
+            (the labels say what the two matrices ARE: `--old-label KING-robust --new-label PC-Relate`
+            when the new matrix is pcrelate_to_mtx.py's and the old one KING's)
   king_to_mtx.py plot --new amr_king.mtx --old old.sparseGRM.mtx --out king_vs_grm [--mask 20]
   king_to_mtx.py selftest
 The old matrix at 0.05 has ~46M entries on amr: compare and plot read it with pandas into flat
@@ -213,6 +216,7 @@ def plot(a):
     import matplotlib.pyplot as plt
     offO, offN, diagO, cnt = pair_tables(a.new, a.old)
     m = offO.merge(offN, on=["i", "j"], how="outer", suffixes=("_old", "_new")).fillna(0.0)
+    OLD, NEW = a.old_label, a.new_label      # what the two matrices ARE; the defaults are the first use
     fig, ax = plt.subplots(1, 3, figsize=(17, 5.5))
     top = max(float(m["x_old"].max()), float(m["x_new"].max()), 0.6)
     # (a) every pair either keeps: cells below the mask are not drawn
@@ -233,15 +237,15 @@ def plot(a):
     old_only = m[(m["x_old"] > 0) & (m["x_new"] < 0.05)]["x_old"]
     kept = m[(m["x_old"] > 0) & (m["x_new"] >= 0.05)]["x_old"]
     edges = np.linspace(0, top, 61)
-    for vals, lab, col in ((old_only, "KING below 0.05 (background)", "#7f7f7f"), (kept, "KING at or above 0.05", "#d62728")):
+    for vals, lab, col in ((old_only, f"{NEW} below 0.05 (background)", "#7f7f7f"), (kept, f"{NEW} at or above 0.05", "#d62728")):
         cnts, _ = np.histogram(vals, bins=edges)
         cnts = np.where(cnts < a.mask, 0, cnts)   # bins below the mask are not drawn
         ax[2].step(edges[:-1], cnts, where="post", color=col, label=f"{lab}: {mask(len(vals), a.mask)} pairs")
-    ax[2].set_yscale("log"); ax[2].legend(fontsize=8); ax[2].set_title("old GRM values by KING's verdict", fontsize=10)
+    ax[2].set_yscale("log"); ax[2].legend(fontsize=8); ax[2].set_title(f"{OLD} values by {NEW}'s verdict", fontsize=10)
     for x in ax:
-        x.set_xlabel("step-0 GRM (2 x kinship)"); x.grid(alpha=0.3)
-    ax[0].set_ylabel("KING-robust (2 x kinship)"); ax[1].set_ylabel("KING-robust (2 x kinship)"); ax[2].set_ylabel("pairs")
-    fig.suptitle(f"KING-robust against the step-0 GRM: {cnt['samples_common']:,} shared samples", y=0.995)
+        x.set_xlabel(f"{OLD} (2 x kinship)"); x.grid(alpha=0.3)
+    ax[0].set_ylabel(f"{NEW} (2 x kinship)"); ax[1].set_ylabel(f"{NEW} (2 x kinship)"); ax[2].set_ylabel("pairs")
+    fig.suptitle(f"{NEW} against {OLD}: {cnt['samples_common']:,} shared samples", y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.96)); fig.savefig(a.out + ".png", dpi=110); plt.close(fig)
     print("wrote", a.out + ".png")
 
@@ -302,7 +306,8 @@ def selftest(_):
         sys.stdout = so
     rep2 = dict(l.rstrip("\n").split("\t") for l in open(f"{T}/cmp2.tsv") if not l.startswith("key"))
     assert rep2["old_pairs_at_or_above_0.4"] == "<20" and rep2["pairs_at_or_above_0.05_old"] == "404", rep2
-    plot(argparse.Namespace(new=f"{T}/new.mtx", old=f"{T}/old.mtx", out=f"{T}/king_vs_grm", mask=20))
+    plot(argparse.Namespace(new=f"{T}/new.mtx", old=f"{T}/old.mtx", out=f"{T}/king_vs_grm", mask=20,
+                            old_label="step-0 GRM", new_label="KING-robust"))
     assert os.path.getsize(f"{T}/king_vs_grm.png") > 10000
     print("selftest OK: convert (4 planted pairs on the GRM scale, diagonal 1), compare (positive control "
           "ratio ~1, 400 background pairs only in the old matrix, the band split, masking), plot (PNG written)")
@@ -316,7 +321,10 @@ def main():
     k = sub.add_parser("compare"); k.add_argument("--new", required=True); k.add_argument("--old", required=True)
     k.add_argument("--report", required=True); k.add_argument("--mask", type=int, default=20); k.set_defaults(fn=compare)
     g = sub.add_parser("plot"); g.add_argument("--new", required=True); g.add_argument("--old", required=True)
-    g.add_argument("--out", required=True); g.add_argument("--mask", type=int, default=20); g.set_defaults(fn=plot)
+    g.add_argument("--out", required=True); g.add_argument("--mask", type=int, default=20)
+    g.add_argument("--old-label", default="step-0 GRM", help="what --old is, for the axes [step-0 GRM]")
+    g.add_argument("--new-label", default="KING-robust", help="what --new is, for the axes [KING-robust]")
+    g.set_defaults(fn=plot)
     s = sub.add_parser("selftest"); s.set_defaults(fn=selftest)
     a = ap.parse_args(); a.fn(a)
 
