@@ -183,10 +183,5 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
 
 # With --plink instead of --pgen for PLINK 1 genotypes.
 #
-# (Building a FlexRV file yourself from another group file:
-#   bash download_resources.sh --alphamissense      (once)
-#   bash flexrv_groupfile.sh --group <group file> --chr <chromosome number> --name AMPCT --out <file>.flexrv_AMPCT.txt \
-#       --annoTable <long table> --isoforms <AlphaMissense isoforms> --mane <MANE summary> --gtf <GENCODE v39 GTF> \
-#       --amScale percentile --nonMissense gene-mean
-# and use a mask of that file's labels. Single-variant tests on their own, if you
-# need them: --testType variant without --groupFile/--annotations.)
+# Single-variant tests on their own, if you need them: --testType variant without
+# --groupFile/--annotations.
