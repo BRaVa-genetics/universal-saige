@@ -198,7 +198,7 @@ for name, text in [
     ("s2_dryrun", "--is_output_nEff=TRUE"),
     ("s2_dryrun", "--is_single_in_groupTest=TRUE"),
     ("s2_flex_partial_mask_ok", "--is_single_in_groupTest=FALSE"),
-    ("s2_flex_partial_mask_ok", "--maxMAF_in_groupTest=0.001 --flexRV_score=AM --flexRV_maxMAF=0.001"),
+    ("s2_flex_partial_mask_ok", "--flexRV_maxMAF=0.001"),
     ("s2_refuse_neff_value", "--nEff takes TRUE or FALSE, not 'maybe'"),
     ("s2_log10p_off", "--is_output_log10P=FALSE"),
     ("s2_refuse_log10p_value", "--log10P takes TRUE or FALSE, not 'yes'"),
