@@ -692,6 +692,8 @@ check("step0a GRM-only, planted indefinite block, no models: the driver asks for
       status.get("s5_sigma_grm_planted", ("", -1, 0))[1] == 3, status.get("s5_sigma_grm_planted", ("", -1, 0))[1], "3")
 check("step0a GRM-only, planted: the tau bound is printed and tiny (K eigenvalue -172)",
       fnum(rep.get("tau2_over_tau1_bound_quantitative", "nan")) < 0.01, rep.get("tau2_over_tau1_bound_quantitative", "none"), "< 0.01")
+check("step0a GRM-only, planted: the bound (< 1) is triaged as 'rebuild the GRM now, before step 1'",
+      "rebuild the grm now" in log("s5_sigma_grm_planted").lower(), "", "triage line printed")
 section("s5_sigma_grm_planted_models")
 rep = sigma_report(out("grm.sigma_planted_models.tsv"))
 # A model with tau2 = 0 has Sigma = tau1 I, positive definite on any GRM, so it must pass:
@@ -714,6 +716,39 @@ section("s5_sigma_grm_models")
 rep = sigma_report(out("grm.sigma_models.tsv"))
 check("step0a GRM-only + --modelDir on the pedigree GRM: positive definite, models not needed",
       rep.get("verdict") == "positive definite" and "models_checked" not in rep, rep.get("verdict", "no report"), "positive definite")
+section("s5_sigma_grm_planted_cap")
+# saige-slim LEDGER #184: the planted star of 4 sits above --maxDenseComponent 3, so it is not evaluated
+# and the Cholesky fails; the old script printed the other blocks' bound here (on All of Us amr, 1e15 beside
+# a skipped 10,003-sample component holding -19.9)
+rep = sigma_report(out("grm.sigma_planted_cap.tsv"))
+check("step0a GRM-only, planted block ABOVE the dense cap: verdict 'bound unknown' naming the skipped components",
+      rep.get("verdict", "").startswith("GRM indefinite: bound unknown, ") and "not evaluated" in rep.get("verdict", "")
+      and int(rep.get("components_not_evaluated", "0")) >= 1,
+      "%s; components_not_evaluated %s" % (rep.get("verdict", "no report"), rep.get("components_not_evaluated", "none")),
+      "GRM indefinite: bound unknown, ... not evaluated; >= 1")
+check("step0a GRM-only, planted block ABOVE the dense cap: no tau bound row at all",
+      "tau2_over_tau1_bound_quantitative" not in rep and "tau2_bound_binary" not in rep,
+      sorted(k for k in rep if k.startswith("tau2_")), "no tau2_* rows")
+check("step0a GRM-only, planted block ABOVE the dense cap: the driver says NOT DECIDED (exit 3) and names the cap",
+      status.get("s5_sigma_grm_planted_cap", ("", -1, 0))[1] == 3
+      and "not decided" in log("s5_sigma_grm_planted_cap").lower() and "maxDenseComponent (3)" in log("s5_sigma_grm_planted_cap"),
+      status.get("s5_sigma_grm_planted_cap", ("", -1, 0))[1], "3, 'NOT DECIDED', '--maxDenseComponent (3)'")
+section("s5_sigma_grm_planted_cap_models")
+rep = sigma_report(out("grm.sigma_planted_cap_models.tsv"))
+check("step0a GRM-only, planted block ABOVE the dense cap + --modelDir: no model judged, still 'bound unknown' (exit 3)",
+      rep.get("verdict", "").startswith("GRM indefinite: bound unknown, ") and rep.get("models_checked", "").startswith("0 ")
+      and not any(k.startswith("model_") for k in rep) and status.get("s5_sigma_grm_planted_cap_models", ("", -1, 0))[1] == 3,
+      "%s; models_checked %s; exit %s" % (rep.get("verdict", "no report"), rep.get("models_checked", "none"),
+                                          status.get("s5_sigma_grm_planted_cap_models", ("", -1, 0))[1]),
+      "bound unknown; models_checked '0 (...)'; no model_* rows; exit 3")
+section("s5_sigma_grm_cap")
+rep = sigma_report(out("grm.sigma_cap.tsv"))
+check("step0a GRM-only, unplanted, a family above the dense cap skipped: the Cholesky is complete on its own, positive definite",
+      rep.get("verdict") == "positive definite" and int(rep.get("components_not_evaluated", "0")) >= 1
+      and rep.get("sparse_cholesky_succeeds") == "TRUE",
+      "%s; components_not_evaluated %s; chol %s" % (rep.get("verdict", "no report"), rep.get("components_not_evaluated", "none"),
+                                                   rep.get("sparse_cholesky_succeeds", "none")),
+      "positive definite; >= 1 skipped; chol TRUE")
 section("s5_refuse_no_grm")
 check("step0a: no --sparseGRM is refused before the container starts", "are required" in log("s5_refuse_no_grm"),
       "", "message printed")

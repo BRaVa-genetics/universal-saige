@@ -106,7 +106,9 @@ bash 01_step1_fitNULLGLMM.sh \
 # names the models whose Sigma is not positive definite (recommended: rebuild
 # the GRM from KING-robust kinship and refit; if you cannot, proceed and say
 # so -- the image repairs and names the affected tests in .sigmaGuard.txt).
-# Not needed when the step 0 run said 'positive definite'.
+# Not needed when the step 0 run said 'positive definite'. If its bound
+# (tau2_over_tau1_bound_quantitative) was between 1 and 10, do this first on
+# Height and a few binary traits only, before fitting everything (README, step 0a).
 bash 00a_sigma_check.sh \
     --sparseGRM ${GRM} \
     --sparseGRMID ${GRM_samples} \

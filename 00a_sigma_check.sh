@@ -32,7 +32,7 @@ SPARSE_GRM_ID_FILE=""
 OUT_FILE=""
 LABEL=""
 RELCUTOFF="0.05"
-MAX_DENSE="2000"
+MAX_DENSE="12000"
 PLANT=""
 SINGULARITY=false
 
@@ -113,14 +113,16 @@ while [[ $# -gt 0 ]]; do
       'label key value' row per line (pairs kept, components evaluated / indefinite, the smallest eigenvalue over the
       diagonal, and the verdict; with a model also tau1, tau2). The log is <outputFile>.log.
     --label (default: the GRM or model file's name): the report's label column.
-    --maxDenseComponent (default: 2000): the largest family block eigendecomposed; larger blocks are judged by the
-      Cholesky of the whole Sigma alone.
+    --maxDenseComponent (default: 12000): the largest family block eigendecomposed (n^2 x 8 bytes: 1.2 GB at the
+      default). A LARGER block is NOT evaluated: if the Cholesky of the whole matrix succeeds the verdict is still
+      'positive definite' (complete on its own); if it fails, the run says 'bound unknown' and names the skipped
+      components -- raise the cap, or run --modelFile per model.
     -s,--isSingularity (default: false): is singularity (or apptainer) available? If not, it is assumed that docker is available.
     --dryRun: print the command instead of running it.
     --plantIndefinite: the positive control -- a planted indefinite block, which must be reported as NOT positive definite.
   Exit 0 when Sigma is positive definite (a warning when it has near-null directions), 2 when it is NOT, 3 when the
-  GRM-only run cannot decide alone (indefinite: pass --modelDir after step 1; or the negative direction sits in a family
-  block above --maxDenseComponent: pass --modelFile per model), with the rows of the report on stdout. Run it ONCE per
+  GRM-only run cannot decide alone (indefinite: pass --modelDir after step 1; or a family block above
+  --maxDenseComponent was not evaluated: raise it, or pass --modelFile per model), with the rows of the report on stdout. Run it ONCE per
   GRM and cutoff after step 0; 'positive definite' then covers every model. An indefinite thinned GRM is common and
   usually harmless (Sigma = tau1 I + tau2 K is positive definite whenever tau2 |lambda_min| < tau1): the run prints the
   tau bound, and --modelDir settles it for your models in one more run after step 1. A NOT verdict means the GRM, thinned at this cutoff, is not a covariance matrix: rebuild
@@ -223,15 +225,38 @@ case "${verdict}" in
       echo "  tau2_bound_binary). After step 1, run this once more with --modelDir <directory of your .rda models>:"
       echo "  it judges every model against the bound in seconds. If any model is refused, rebuild the GRM"
       echo "  (README, step 0: KING-robust) and refit."
+      # How large a bound is enough. A quantitative fit has tau2/tau1 ~ h2 / (1 - h2) for the variance relatives
+      # share, so the most heritable trait sets the worst case; on a sparse GRM with few relatives tau2 is noisy
+      # too. All of Us (CDR v8, saige-slim LEDGER #183): eur Height 5.1 against a bound of 6.9, positive
+      # definite; amr Height 0.42 against ~0.45 on its 0.125-thinned GRM, NOT. The cut points below are those
+      # two cases with about a 2x margin each way: a heuristic, which --modelDir then settles.
+      bound=$(awk -F'\t' '$2 == "tau2_over_tau1_bound_quantitative" {print $3}' "${OUT_FILE}")
+      if [[ -n ${bound} ]]; then
+        echo ""
+        if awk -v b="${bound}" 'BEGIN {exit !(b < 1)}'; then
+          echo "  The bound (tau2/tau1 < ${bound}) is below 1: a moderately heritable quantitative trait will not fit"
+          echo "  under it (All of Us amr Height: 0.42 against ~0.45, refused). RECOMMENDED: rebuild the GRM now,"
+          echo "  before step 1 (README, step 0: KING-robust), and run this check on the new one."
+        elif awk -v b="${bound}" 'BEGIN {exit !(b < 10)}'; then
+          echo "  The bound (tau2/tau1 < ${bound}) is in the range where the fitted taus decide (All of Us eur Height:"
+          echo "  5.1 against 6.9, passed). Before fitting every phenotype, fit the most heritable quantitative trait"
+          echo "  (Height) and a few binary traits, run this with --modelDir on those, and go on if they pass."
+        else
+          echo "  The bound (tau2/tau1 < ${bound}) is comfortable (All of Us eur Height, a most heritable trait, sat"
+          echo "  at 5.1). Fit as usual; --modelDir after step 1 confirms."
+        fi
+      fi
     } >&2
     exit 3
     ;;
-  "GRM indefinite in a block above --maxDenseComponent: bound unknown, run per model")
+  "GRM indefinite: bound unknown"*)
     {
-      echo "NOT DECIDED: the GRM's negative direction sits in a family block larger than --maxDenseComponent, so no"
-      echo "  bound can be stated. Either raise --maxDenseComponent (the block is eigendecomposed densely: memory"
-      echo "  grows with its square) or, after step 1, run this with --modelFile for each model (a Cholesky of the"
-      echo "  model's own Sigma decides directly)."
+      echo "NOT DECIDED: ${verdict}."
+      echo "  A family component larger than --maxDenseComponent (${MAX_DENSE}) was not evaluated, and a bound stated from"
+      echo "  the evaluated blocks alone would describe part of the matrix (saige-slim LEDGER #184: on All of Us amr the"
+      echo "  skipped 10,003-sample component held the negative eigenvalue). Either raise --maxDenseComponent to cover it"
+      echo "  (the block is eigendecomposed densely: n^2 x 8 bytes, ~3 min at 10,000) and run this again, or, after"
+      echo "  step 1, run this with --modelFile for each model (a Cholesky of the model's own Sigma decides directly)."
     } >&2
     exit 3
     ;;
