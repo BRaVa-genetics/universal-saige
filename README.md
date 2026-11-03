@@ -16,7 +16,9 @@
 > **2. Group files.** In your BRaVa bucket, `gs://brava-meta-upload-<biobank>/brava_groupfiles_2026-10_flexrvpct/`, with a
 > `README.md` and a `MANIFEST.md5` to check the download against. Use `biobank_ids/` if your genotype files use the variant IDs
 > shown there, otherwise `chr_pos_ref_alt/`. Each holds, per chromosome, the group files for runs 1-4 and a `rand/`
-> subfolder with the run-5 files. No files yet (Biome, Estonia)? We can build them for you, or follow
+> subfolder with the run-5 files. Labels: `pLoF`, `damaging_missense`, `spliceai2_gt040`, `other_missense`, `synonymous`,
+> `non_coding`. An older `*.flexrv_AM.txt.gz` (raw AlphaMissense), if you have one, is superseded by `*.flexrv_AMPCT.txt.gz`.
+> No files yet (Biome, Estonia)? We can build them for you, or follow
 > [variant-annotation](https://github.com/BRaVa-genetics/variant-annotation).
 >
 > **3. Phenotypes.**
@@ -61,12 +63,22 @@
 > | 4 | FlexRV, scallion percentile (chr 1-22, X) | `*.flexrv_SCALLION.txt.gz`, `--flexRVscore SCALLION` | as run 3 |
 > | 5 | FlexRV, random scores: the null control | `rand/*.flexrv_RAND.txt.gz`, `--flexRVscore RAND --flexRVpartialMask` | `synonymous` |
 >
-> Run 5 on every phenotype: it is how FlexRV's calibration is checked in your data.
+> FlexRV's scores are the FlexRV paper's: pLoF variants score 1, a missense variant its AlphaMissense (run 3) or scallion
+> (run 4) percentile among all possible missense variants of its gene. Run 5 on every phenotype: its scores are random and
+> the same in every biobank, so its p-values on synonymous variants must be uniform, and it is how FlexRV's calibration is
+> checked in your data. It is read per phenotype, because a strongly polygenic trait (Height in All of Us) carries real
+> signal through it. Group-test results carry `log10_*` and `nEff_Burden` columns after `SE_Burden`; if your own scripts
+> read result columns by position, add `--log10P FALSE --nEff FALSE`.
 >
-> **6. Refusals are deliberate.** Step 1 refuses, naming the reason, a binary phenotype with fewer than 100 cases, a
-> categorical covariate level with fewer than 10 cases or controls, a separated covariate model, a fit that did not
-> converge, and a GRM too dense to fit. Leave the gates on and do not pre-filter separately: they are the consortium's
-> common filter. A refusal for a level with 0 cases is usually a sex-specific phenotype not run single-sex.
+> <a id="refusals"></a>**6. Refusals are deliberate.** Step 1 refuses, naming the reason, a binary phenotype with fewer
+> than 100 cases, a categorical covariate level with fewer than 10 cases or controls, a separated covariate model and a
+> fit that did not converge (the image's fit gates, checked again when step 2 loads the model: the tail of the tests is
+> not calibrated there), and a sparse GRM too dense to fit, above 100 relatives per sample, where a fit can run for hours
+> or never finish (see 7, or rerun step 0 at a higher `--relatednessCutoff`). Leave the gates on and do not pre-filter
+> separately: they are the consortium's common filter (`SAIGE_FIT_GATES=0` and step 1's `--forceDenseGRM` override
+> them; not recommended). A refusal for a level with 0 cases is usually a sex-specific phenotype not run single-sex. Step 2
+> refuses a mask label that is not in the group file (a typo, or the old label names on the new files), listing the labels
+> the file has.
 >
 > **7. Admixed cohorts.** If step 0's GRM is too dense to fit, or step 0a says `NOT positive definite`, rebuild it from
 > KING-robust kinship (under [step 0](#step-0-once-per-cohortbiobank)) at 0.125 and check again, as All of Us did for its
@@ -85,46 +97,6 @@
 >   PCs, and which phenotypes step 1 refused and why.
 >
 > Apply your own small-count rules before anything leaves your environment.
-
-> [!NOTE]
-> **What's in the October 2026 release, in full**
-> 1. **SAIGE image `1.5.2-dev-913d9ee9`** (`10fe4c84` plus one fix to the Sigma check, 2026-11-02: a family component
->    above `--maxDenseComponent` left unevaluated no longer lets the run state a tau bound from the other blocks; it reads
->    `bound unknown` and names what it skipped, saige-slim LEDGER #184; and a 5-9x faster step 0 with byte-identical
->    output, LEDGER #185). Every step-2 run now compares each sparse-GRM variance against the no-GRM
->    variance of the same test and, when the GRM's value is not positive or below half of it, reports the no-GRM variance
->    instead and names the test in `<prefix>.txt.sigmaGuard.txt` (saige-slim LEDGER #183). On a GRM that passes the Sigma
->    check this touches a few cells per cohort, nowhere near a hit; on one that fails it is where p 1e-73 cells went. The image
->    also carries the check itself (`aou_sigma_pd_check.R`, run by `00a_sigma_check.sh`).
-> 2. **BRaVa group files** (October 2026 rebuild), in your biobank's bucket with a README: four files per chromosome,
->    one per run (no scallion file on chrY), plus the `rand/` twins. Labels: `pLoF`, `damaging_missense`, `spliceai2_gt040`,
->    `other_missense`, `synonymous`, `non_coding`.
-> 3. **Five runs per chromosome and phenotype** (all written out in the
->    [step 2 template](https://github.com/BRaVa-genetics/universal-saige/blob/main/templates/step_2_template.sh)):
->
->    | run | group file | mask (`--annotations`) |
->    |---|---|---|
->    | 1. SAIGE-GENE+ (SKAT-O) | `*.new_rules.saige_group.txt.gz` | `pLoF,damaging_missense,pLoF:damaging_missense,pLoF:damaging_missense:spliceai2_gt040,synonymous,other_missense,pLoF:damaging_missense:spliceai2_gt040:other_missense:synonymous` |
->    | 2. SAIGE-GENE+ (SKAT-O), AlphaMissense >= 0.906 | `*.am_moderate.saige_group.txt.gz` | `am_moderate`, with `--singleInGroup FALSE` |
->    | 3. FlexRV, AlphaMissense percentile | `*.flexrv_AMPCT.txt.gz` (ready to use), with `--flexRVscore AMPCT` | `pLoF:damaging_missense:other_missense:spliceai2_gt040` |
->    | 4. FlexRV, scallion percentile (chr1-22, X) | `*.flexrv_SCALLION.txt.gz` (ready to use), with `--flexRVscore SCALLION` | `pLoF:damaging_missense:other_missense:spliceai2_gt040` |
->    | 5. FlexRV, random-score twin (the control) | `rand/*.flexrv_RAND.txt.gz` (ready to use), with `--flexRVscore RAND --flexRVpartialMask` | `synonymous` |
->
->    FlexRV's scores are the FlexRV paper's: pLoF variants score 1, a missense variant its AlphaMissense percentile among all possible missense variants of its gene.
->    An earlier `*.flexrv_AM.txt.gz` (raw AlphaMissense) is superseded by `*.flexrv_AMPCT.txt.gz`. Run 5 is FlexRV's
->    file-level null (it has no synonymous null of its own): the twin's scores are random, identical across biobanks, and
->    its p-values on synonymous variants must be uniform. It is read PER PHENOTYPE, because a strongly polygenic trait
->    (Height in All of Us) carries real signal through it, and a pooled null would hide which trait.
-> 4. **Result columns** right after `SE_Burden`: log10 p-values (`log10_Pvalue`, ...; exact where `Pvalue` reads 0) and
->    `nEff_Burden` (the effective number of carriers behind each burden test; a FlexRV hit with a small value rests on a few
->    people). If your own scripts read result columns by position rather than by name, add `--log10P FALSE --nEff FALSE`.
-> 5. **Step 2 checks your masks before it runs**: a label that is not in the group file (a typo, or the old label names on the
->    new files) is refused, and so is a FlexRV mask that leaves out variants carrying a score. The message lists what the file has.
-> 6. **The Sigma check** ([step 0a](#step-0a-the-sigma-check-once-per-grm-before-step-1)) asks whether the matrix step 2
->    solves against, the GRM thinned at your relatedness cutoff, is positive definite. In All of Us the admixed amr cohort's
->    was not: ~90 % of what its GRM kept at 0.125 was shared ancestry rather than family, and a burden test on it printed
->    p 1e-73 where ~1e-3 was right. That GRM was rebuilt from KING-robust kinship (`king_to_mtx.py`, the recipe under step 0)
->    and its step 1 and 2 rerun. A `NOT positive definite` verdict means rebuild the GRM and refit, not filter the results.
 
 <p align="center">
   <img src="universal-saige.png" alt="VroomAI"/>
@@ -160,17 +132,6 @@ _Run SAIGE preprocessing and steps 1 and 2 without any hassle._
 > **Use PLINK 2 format.** Convert your exome data once with `plink2 --vcf exome.chr20.vcf.gz --make-pgen --out exome.chr20`
 > (`download_resources.sh --plink2` fetches plink2). The SAIGE image reads PLINK 2 and PLINK 1 genotypes and **nothing else**:
 > there is no VCF reader, and step 2 refuses a VCF rather than convert it on every chromosome of every phenotype.
-
-> [!NOTE]
-> The image's **fit gates are on**. A binary trait fitted on fewer than 100 cases, a categorical covariate level with fewer than
-> 10 cases or controls, a separated covariate model, or a fit that did not converge is refused, in step 1 and again when
-> step 2 loads the model, with the gate named in the log. That refusal is the right answer for such a trait (the tail of the
-> tests is not calibrated there). `SAIGE_FIT_GATES=0` in your environment turns the refusals into warnings; not recommended.
->
-> Step 1 also **refuses a dense sparse GRM**: more than 100 relatives per sample on average, where a fit can run for hours
-> or never finish (All of Us amr at `--relatednessCutoff 0.05`: ~644, and the fits never finished; at 0.125: ~3.9, a minute; the other four AoU cohorts: ~0.6 at 0.05).
-> Step 0 warns about it as it finishes. Rerun step 0 with a higher `--relatednessCutoff` and pass the same value to steps 1,
-> 2 and 3; step 1's `--forceDenseGRM` fits anyway (not recommended).
 
 The choices baked into the drivers (a sparse-GRM fit with `sparse` variance ratios, `--tol 0.02` for both trait types,
 inverse-rank normalisation of quantitative traits, Firth off, fastTest off, `--minMAC 4` for single-variant tests, the
@@ -217,7 +178,7 @@ optional:
 - `--generate_plink_for_vr` (default: false): generate plink file for vr. At least one of the two is required.
 - `--relatednessCutoff` (default 0.05): GRM entries below it are dropped; the GRM is written to
   `<outputPrefix>_relatednessCutoff_<value>_5000_randomMarkersUsed.sparseGRM.mtx`. The same value must be passed to steps 0, 1, 2 and 3; nothing in SAIGE checks that they agree. All of Us used 0.05, and 0.125 for its admixed amr cohort, whose GRM was too dense to fit at 0.05.
-  Steps 0 and 1 print the GRM's mean number of relatives per sample (from the file header, so instantly), warn loudly above 100 (step 1 then refuses the GRM, see the note on refusals above), and warn when the GRM was built at a different cutoff from the step's; above 100 a fit can run for hours or never finish (All of Us amr: ~644 at 0.05, ~3.9 at 0.125; its other cohorts ~0.6).
+  Steps 0 and 1 print the GRM's mean number of relatives per sample (from the file header, so instantly), warn loudly above 100 (step 1 then refuses the GRM, see [refusals](#refusals)), and warn when the GRM was built at a different cutoff from the step's; above 100 a fit can run for hours or never finish (All of Us amr: ~644 at 0.05, ~3.9 at 0.125; its other cohorts ~0.6).
 - `--sampleIDs`: single column of sample IDs (matched on IID) to define the GRM and the variance-ratio markers' samples; all samples when the flag is left out (an empty value is refused). Steps 1 and 2 then use only samples in the GRM: SAIGE fits step 1 on them, and step 2 tests the model's samples, ignoring any other samples in the `{WES, WGS}` files.
 
 > [!IMPORTANT]
@@ -349,7 +310,7 @@ optional:
 - `--relatednessCutoff` (default 0.05): the GRM is thinned to entries above it. It must equal steps 0, 2 and 3's.
 - `--sex` (`M` or `F`): for a sex-specific trait. SAIGE fits only the samples of that sex (`--FemaleOnly`/`--MaleOnly`, as All of Us did) and drops the rest; step 1 prints how many it keeps and drops. Leave every sex term (`sex`, `age_sex`, `age2_sex`) out of the covariates: with `--sex`, any covariate with `sex` as a word in its name, in any case (`sex`, `Sex`, `age_sex`, `age2_sex`), is refused. A covariate that is not a sex term but has such a name must be renamed to be used in a sex-specific fit (`essex` or `sexual_partners` are not read as sex terms).
 - `--femaleCode`, `--maleCode` (default `0`, `1`: BRaVa's phenotype coding): the values of a numeric `sex` column. A column of `M` and `F` is read as such. SAIGE's own default, and the All of Us file, use 1 for female. Step 1 refuses a code the column does not hold, a code no sample with a phenotype has, and (binary) a split that puts every case in the sex being dropped; it warns loudly when the column holds other values, when (quantitative) more samples with a phenotype are dropped than kept, or when (binary) some cases are in the sex being dropped. Each of these is what flipped or mismatched codes look like. Where the genotype file has genetic sex (`.fam` column 5, or the `.psam` `SEX` column; PLINK fixes 1 = male, 2 = female), step 1 checks the phenotype file's sex against it: more than half disagreeing means the codes are flipped and is refused, more than 1% is warned loudly, and a genotype file without usable sex (e.g. converted from VCF) is warned loudly as unverifiable. The phenotype file's `sex` always decides who is fitted.
-- `--forceDenseGRM`: fit even when the sparse GRM has more than 100 relatives per sample on average, which is otherwise refused (see the note on refusals above); not recommended.
+- `--forceDenseGRM`: fit even when the sparse GRM has more than 100 relatives per sample on average, which is otherwise refused (see [refusals](#refusals)); not recommended.
 - `--dryRun`: print the SAIGE command instead of running it.
 
 ### Step 2 (once per chromosome per phenotype)
