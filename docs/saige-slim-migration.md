@@ -33,7 +33,7 @@ up next. The parameter record it implements is
 4. **FlexRV** as a first-class step-2 mode (`--flexRVscore NAME`): one mask,
    one max MAF (0.001), burden statistic, the group file's `score:NAME` line.
    SAIGE reads ONE score line per file, so one file and one run per weight set.
-   The weights come from `04_flexrv_groupfile.sh` around
+   The weights come from `flexrv_groupfile.sh` around
    `flexrv_score_from_alphamissense.py` (copied from `saige-slim`
    `harness/tools/`; standard-library Python; `--selftest`): AlphaMissense first
    (LoF 1.0 by annotation, missense the AlphaMissense pathogenicity, missing
@@ -41,8 +41,7 @@ up next. The parameter record it implements is
    as a column of the BRaVa long-form table (`--scoreColumn`) or an
    AlphaMissense-shaped per-variant table (`--am`).
    Since 2026-10-21 `--amScale percentile` gives the FlexRV paper's score (a missense
-   variant's percentile among all possible missense variants of its gene; README,
-   step 4), which the BRaVa release ships as `flexrv_AMPCT` and `flexrv_SCALLION`.
+   variant's percentile among all possible missense variants of its gene), which the BRaVa release ships as `flexrv_AMPCT` and `flexrv_SCALLION`.
 
 ## Other fixes made on the way
 
@@ -115,7 +114,7 @@ around it changed:
   steps 0-2 (default 0.05). The e2e check had mirrored the 0.125 and so could
   not see this; it now recomputes 1'K^-1 1 at 0.05. Nglmm changes slightly
   against earlier BRaVa submissions, which all used 0.125.
-- `04_flexrv_groupfile.sh` failed under macOS bash 3.2 (an empty array under `set -u`).
+- `04_flexrv_groupfile.sh` (now `flexrv_groupfile.sh`) failed under macOS bash 3.2 (an empty array under `set -u`).
 - Templates: `--t` -> `--traitType`; the GRM file is `<out>_relatednessCutoff_...`.
 
 ## Third pass (2026-10-06/07): AoU parity checked against its job logs, and guards
@@ -176,7 +175,7 @@ checks; it also passes on a SLURM cluster under Apptainer.
   now compares each such variance against the no-GRM variance of the same vector and, when the solve is not
   positive or below half of it, reports the no-GRM variance instead, naming the test in `.sigmaGuard.txt`
   (image `66b80710`; measured on the rebuilt All of Us amr fleet: 0 flagged tests on 672 real-arm jobs). The
-  image also carries `aou_sigma_pd_check.R`, and the new `05_sigma_check.sh` runs it ONCE per GRM and cutoff,
+  image also carries `aou_sigma_pd_check.R`, and the new `05_sigma_check.sh` (now `00a_sigma_check.sh`) runs it ONCE per GRM and cutoff,
   after step 0 (`--grmOnly`: if the thinned GRM is positive semidefinite, every model's Sigma is positive
   definite). An indefinite thinned GRM is common and usually harmless (Sigma is positive definite whenever
   `tau2 |lambda_min| < tau1`): the run prints the bound and exits 3, and `--modelDir` after step 1 judges every model

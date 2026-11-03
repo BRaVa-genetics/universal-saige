@@ -115,7 +115,7 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
 # ---- run 3. FlexRV with AlphaMissense percentile weights (one mask, burden statistic)
 # The release's FlexRV file is ready to use (its score:AMPCT line is built in): LoF 1.0,
 # a missense variant its percentile among all possible missense variants of its gene
-# (FlexRV paper; README, step 4). ONE mask, which must include the SpliceAI label: that
+# (FlexRV paper). ONE mask, which must include the SpliceAI label: that
 # category holds missense variants with a splice call, which carry scores (step 2
 # refuses a mask that leaves scored variants out). The pooled FlexRV p per gene is the
 # row with Group == Cauchy; a hit whose nEff_Burden is small (below ~10) rests on a few
@@ -185,7 +185,7 @@ bash 02_step2_SPAtests_variant_and_gene.sh \
 #
 # (Building a FlexRV file yourself from another group file:
 #   bash download_resources.sh --alphamissense      (once)
-#   bash 04_flexrv_groupfile.sh --group <group file> --chr <chromosome number> --name AMPCT --out <file>.flexrv_AMPCT.txt \
+#   bash flexrv_groupfile.sh --group <group file> --chr <chromosome number> --name AMPCT --out <file>.flexrv_AMPCT.txt \
 #       --annoTable <long table> --isoforms <AlphaMissense isoforms> --mane <MANE summary> --gtf <GENCODE v39 GTF> \
 #       --amScale percentile --nonMissense gene-mean
 # and use a mask of that file's labels. Single-variant tests on their own, if you

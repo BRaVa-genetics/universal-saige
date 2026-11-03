@@ -4,16 +4,16 @@
 # FlexRV reads ONE score line per file, so one file per (chromosome, weight set):
 #
 #   AlphaMissense (the first weight set; Cheng et al. 2023):
-#     bash 04_flexrv_groupfile.sh --group in/brava.chr20.txt --chr 20 --name AM --out in/brava.chr20.flexrv_AM.txt
+#     bash flexrv_groupfile.sh --group in/brava.chr20.txt --chr 20 --name AM --out in/brava.chr20.flexrv_AM.txt
 #   on the FlexRV paper's scale, as the BRaVa release does: each missense score the variant's percentile among all
-#   possible missense variants of its gene (README, step 4); needs the annotation table, isoforms, MANE and GTF:
-#     bash 04_flexrv_groupfile.sh --group in/brava.chr20.txt.gz --chr 20 --name AMPCT --out in/brava.chr20.flexrv_AMPCT.txt \
+#   possible missense variants of its gene (flexrv_score_from_alphamissense.py --help); needs the annotation table, isoforms, MANE and GTF:
+#     bash flexrv_groupfile.sh --group in/brava.chr20.txt.gz --chr 20 --name AMPCT --out in/brava.chr20.flexrv_AMPCT.txt \
 #          --annoTable in/brava.chr20.long.tsv.gz --isoforms <AlphaMissense isoforms> --mane <MANE summary> \
 #          --gtf <GENCODE v39 GTF> --amScale percentile --nonMissense gene-mean
 #   a score carried as a column of the BRaVa long-form annotation table
 #   (the consortium's second weight set arrives this way, or as an
 #   AlphaMissense-shaped per-variant table passed to --am):
-#     bash 04_flexrv_groupfile.sh --group in/brava.chr20.txt --annoTable in/brava.chr20.long.tsv.gz \
+#     bash flexrv_groupfile.sh --group in/brava.chr20.txt --annoTable in/brava.chr20.long.tsv.gz \
 #          --scoreColumn MYSCORE --name MYSCORE --out in/brava.chr20.flexrv_MYSCORE.txt
 #
 # Then: 02_step2_SPAtests_variant_and_gene.sh --flexRVscore NAME --groupFile <out> ...

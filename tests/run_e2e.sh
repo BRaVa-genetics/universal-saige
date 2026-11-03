@@ -208,9 +208,9 @@ run s5_refuse_no_model  fail "${S5[@]}" --modelFile "${OUT}/no_such_model.rda"
 run s5_refuse_no_grm    fail bash 00a_sigma_check.sh --isSingularity "${SING}" --sparseGRMID "${GRMID}"
 run s5_dryrun           ok   "${S5[@]}" --dryRun
 
-echo "== step 4 (FlexRV group file)"
+echo "== FlexRV group file (flexrv_groupfile.sh)"
 run s4_selftest ok python3 flexrv_score_from_alphamissense.py --selftest
-run s4_flexrv   ok bash 04_flexrv_groupfile.sh --group "${IN}/group.chr7.txt" --chr 7 --name AM --am "${IN}/am_dummy.tsv.gz" \
+run s4_flexrv   ok bash flexrv_groupfile.sh --group "${IN}/group.chr7.txt" --chr 7 --name AM --am "${IN}/am_dummy.tsv.gz" \
   --out "${OUT}/group.chr7.flexrv_AM.txt"
 # negative control for the score wiring: GENE_FLEX's scores shuffled among its variants
 python3 - "${OUT}/group.chr7.flexrv_AM.txt" "${OUT}/group.chr7.flexrv_AM_shuffled.txt" << 'EOF'

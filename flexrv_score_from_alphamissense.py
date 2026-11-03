@@ -56,7 +56,7 @@ release offers directly. Two honest routes:
     inherits DeepMind's caution on every row it takes from the isoforms file.
     The run reports how many rows came from each source.
   * --isoforms --anno-table <BRaVa table> --prefer-anno-transcript (what
-    04_flexrv_groupfile.sh does with --annoTable): the row scored on the
+    flexrv_groupfile.sh does with --annoTable): the row scored on the
     transcript the annotation used. Where AlphaMissense has none, the
     canonical row, else a same-gene isoform row, else --missing; never a row
     on a transcript another gene uses (pick() in build() has the rule and the
