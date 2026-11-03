@@ -198,6 +198,7 @@ for name, text in [
     ("s2_dryrun", "--is_output_nEff=TRUE"),
     ("s2_dryrun", "--is_single_in_groupTest=TRUE"),
     ("s2_flex_partial_mask_ok", "--is_single_in_groupTest=FALSE"),
+    ("s2_flex_partial_mask_ok", "--maxMAF_in_groupTest=0.001 --flexRV_score=AM --flexRV_maxMAF=0.001"),
     ("s2_refuse_neff_value", "--nEff takes TRUE or FALSE, not 'maybe'"),
     ("s2_log10p_off", "--is_output_log10P=FALSE"),
     ("s2_refuse_log10p_value", "--log10P takes TRUE or FALSE, not 'yes'"),
@@ -559,6 +560,9 @@ check("step2 Q_pos FlexRV: nEff_Burden in (0, MAC] on every cell, NA on the pool
       "%d cells, %d pooled rows" % (len(cells), len(pooled)), "column present, bounds hold, pooled NA")
 check("step2 Q_pos FlexRV: no per-variant file (--singleInGroup defaults to FALSE for FlexRV)",
       not os.path.exists(out("Q_pos.flexrv_AM.txt.singleAssoc.txt")), "absent" if not os.path.exists(out("Q_pos.flexrv_AM.txt.singleAssoc.txt")) else "present", "absent")
+mafs = sorted({r.get("max_MAF") for r in (flex or []) if r.get("Group") != "Cauchy"})
+check("step2 Q_pos FlexRV: every cell at max MAF 0.001 (--flexRVmaxMAF default; the pooled Cauchy row has none)",
+      mafs == ["0.001"], ", ".join(map(str, mafs)) or "no rows", "0.001")
 check("step2 Q_pos group: per-variant file written (--singleInGroup defaults to TRUE for SAIGE-GENE+)",
       os.path.exists(out("Q_pos.group.txt.singleAssoc.txt")), "present" if os.path.exists(out("Q_pos.group.txt.singleAssoc.txt")) else "absent", "present")
 pairs, worst = log10_agree(flex, "Pvalue_Burden", "log10_Pvalue_Burden")
